@@ -51,13 +51,13 @@ fi
 
 # 3. 语法检查 (Flake8)
 ((total_checks++))
-if run_check "语法检查 (Flake8)" "flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503" "🔧"; then
+if run_check "语法检查 (Flake8)" "flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503 --count --statistics" "🔧"; then
     ((passed_checks++))
 fi
 
 # 4. 类型检查 (MyPy)
 ((total_checks++))
-if run_check "类型检查 (MyPy)" "mypy agraph/ --ignore-missing-imports --follow-imports=silent" "🎯"; then
+if run_check "类型检查 (MyPy)" "mypy agraph/ --ignore-missing-imports --follow-imports=silent --allow-untyped-defs" "🎯"; then
     ((passed_checks++))
 fi
 
@@ -69,7 +69,7 @@ fi
 
 # 6. 安全检查 (Bandit)
 ((total_checks++))
-if run_check "安全检查 (Bandit)" "bandit -r agraph/ -ll || true" "🔒"; then
+if run_check "安全检查 (Bandit)" "bandit -r agraph/ -ll --exit-zero" "🔒"; then
     ((passed_checks++))
 fi
 

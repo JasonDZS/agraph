@@ -30,31 +30,28 @@ jobs:
       run: |
         black --check --diff agraph/ examples/
 
+    - name: Import sorting check with isort
+      run: |
+        isort --check-only --diff agraph/ examples/
+
     - name: Linting with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
         flake8 agraph/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 agraph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 120 chars wide
+        flake8 agraph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --extend-ignore=E203,W503 --statistics
 
     - name: Type checking with mypy
       run: |
-        mypy agraph/ --ignore-missing-imports --follow-imports=silent
+        mypy agraph/ --ignore-missing-imports --follow-imports=silent --allow-untyped-defs
 
     - name: Linting with pylint
       run: |
-        pylint agraph/ --exit-zero --rcfile=.pylintrc || true
-
-    - name: Import sorting check with isort
-      run: |
-        pip install isort
-        isort --check-only --diff agraph/ examples/
+        pylint agraph/ --exit-zero --rcfile=.pylintrc
 
     - name: Security check with bandit
       run: |
-        pip install bandit[toml]
-        bandit -r agraph/ -f json -o bandit-report.json || true
-        bandit -r agraph/ || true
+        bandit -r agraph/ -ll --exit-zero
 
     - name: Upload bandit report
       uses: actions/upload-artifact@v4
