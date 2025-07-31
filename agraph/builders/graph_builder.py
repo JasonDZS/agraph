@@ -5,19 +5,11 @@
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from ..entities import Entity
-from ..extractors.entity_extractor import (
-    BaseEntityExtractor,
-    DatabaseEntityExtractor,
-    TextEntityExtractor,
-)
-from ..extractors.relation_extractor import (
-    BaseRelationExtractor,
-    DatabaseRelationExtractor,
-    TextRelationExtractor,
-)
+from ..extractors.entity_extractor import DatabaseEntityExtractor, TextEntityExtractor
+from ..extractors.relation_extractor import DatabaseRelationExtractor, TextRelationExtractor
 from ..graph import KnowledgeGraph
 from ..relations import Relation
 
@@ -27,7 +19,7 @@ logger = logging.getLogger(__name__)
 class BaseKnowledgeGraphBuilder(ABC):
     """知识图谱构建器基类"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.entity_extractor = None
         self.relation_extractor = None
         self.graph_storage = None
@@ -36,8 +28,8 @@ class BaseKnowledgeGraphBuilder(ABC):
     @abstractmethod
     def build_graph(
         self,
-        texts: List[str] = None,
-        database_schema: Dict[str, Any] = None,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "agraph",
     ) -> KnowledgeGraph:
         """
@@ -51,14 +43,14 @@ class BaseKnowledgeGraphBuilder(ABC):
         Returns:
             KnowledgeGraph: 构建的知识图谱
         """
-        pass
+        raise NotImplementedError("Subclasses must implement build_graph method")
 
     @abstractmethod
     def update_graph(
         self,
         graph: KnowledgeGraph,
-        new_entities: List[Entity] = None,
-        new_relations: List[Relation] = None,
+        new_entities: Optional[List[Entity]] = None,
+        new_relations: Optional[List[Relation]] = None,
     ) -> KnowledgeGraph:
         """
         更新知识图谱
@@ -71,7 +63,7 @@ class BaseKnowledgeGraphBuilder(ABC):
         Returns:
             KnowledgeGraph: 更新后的知识图谱
         """
-        pass
+        raise NotImplementedError("Subclasses must implement update_graph method")
 
     def merge_graphs(self, graphs: List[KnowledgeGraph]) -> KnowledgeGraph:
         """
@@ -91,8 +83,8 @@ class BaseKnowledgeGraphBuilder(ABC):
 
         # 创建新的合并图谱
         merged_graph = KnowledgeGraph(name="merged_graph")
-        all_entities = []
-        all_relations = []
+        all_entities: List[Entity] = []
+        all_relations: List[Relation] = []
 
         # 收集所有实体和关系
         for graph in graphs:
@@ -111,17 +103,15 @@ class BaseKnowledgeGraphBuilder(ABC):
         # 更新关系中的实体引用并添加到合并图谱
         for relation in all_relations:
             if (
-                relation.head_entity.id in entity_id_mapping
+                relation.head_entity is not None
+                and relation.tail_entity is not None
+                and relation.head_entity.id in entity_id_mapping
                 and relation.tail_entity.id in entity_id_mapping
             ):
 
                 # 更新实体引用
-                relation.head_entity = merged_graph.get_entity(
-                    entity_id_mapping[relation.head_entity.id]
-                )
-                relation.tail_entity = merged_graph.get_entity(
-                    entity_id_mapping[relation.tail_entity.id]
-                )
+                relation.head_entity = merged_graph.get_entity(entity_id_mapping[relation.head_entity.id])
+                relation.tail_entity = merged_graph.get_entity(entity_id_mapping[relation.tail_entity.id])
 
                 merged_graph.add_relation(relation)
 
@@ -137,7 +127,7 @@ class BaseKnowledgeGraphBuilder(ABC):
         Returns:
             Dict[str, Any]: 验证结果
         """
-        validation_result = {
+        validation_result: Dict[str, Any] = {
             "valid": True,
             "issues": [],
             "statistics": graph.get_statistics(),
@@ -176,21 +166,14 @@ class BaseKnowledgeGraphBuilder(ABC):
 
         # 设置整体有效性
         validation_result["valid"] = (
-            len(
-                [
-                    issue
-                    for issue in validation_result["issues"]
-                    if issue.get("severity", "medium") == "high"
-                ]
-            )
-            == 0
+            len([issue for issue in validation_result["issues"] if issue.get("severity", "medium") == "high"]) == 0
         )
 
         return validation_result
 
     def _align_entities(self, entities: List[Entity]) -> List[Entity]:
         """实体对齐和去重"""
-        aligned_entities = []
+        aligned_entities: List[Entity] = []
         processed_names = set()
 
         for entity in entities:
@@ -199,9 +182,7 @@ class BaseKnowledgeGraphBuilder(ABC):
 
             if normalized_name in processed_names:
                 # 查找已存在的实体进行合并
-                existing_entity = next(
-                    (e for e in aligned_entities if e.name.lower().strip() == normalized_name), None
-                )
+                existing_entity = next((e for e in aligned_entities if e.name.lower().strip() == normalized_name), None)
                 if existing_entity:
                     self._merge_entity_attributes(existing_entity, entity)
             else:
@@ -210,7 +191,7 @@ class BaseKnowledgeGraphBuilder(ABC):
 
         return aligned_entities
 
-    def _merge_entity_attributes(self, target_entity: Entity, source_entity: Entity):
+    def _merge_entity_attributes(self, target_entity: Entity, source_entity: Entity) -> None:
         """合并实体属性"""
         # 合并别名
         target_entity.aliases.extend(source_entity.aliases)
@@ -231,26 +212,22 @@ class BaseKnowledgeGraphBuilder(ABC):
         # 检查关系中的实体引用
         for relation in graph.relations.values():
             if not relation.head_entity or relation.head_entity.id not in graph.entities:
-                issues.append(
-                    {"type": "missing_head_entity", "relation_id": relation.id, "severity": "high"}
-                )
+                issues.append({"type": "missing_head_entity", "relation_id": relation.id, "severity": "high"})
 
             if not relation.tail_entity or relation.tail_entity.id not in graph.entities:
-                issues.append(
-                    {"type": "missing_tail_entity", "relation_id": relation.id, "severity": "high"}
-                )
+                issues.append({"type": "missing_tail_entity", "relation_id": relation.id, "severity": "high"})
 
         return issues
 
     def _check_connectivity(self, graph: KnowledgeGraph) -> List[Dict[str, Any]]:
         """检查图连通性"""
-        issues = []
+        issues: List[Dict[str, Any]] = []
 
         if not graph.entities:
             return issues
 
         # 使用DFS检查连通性
-        visited = set()
+        visited: set[str] = set()
         components = []
 
         for entity_id in graph.entities:
@@ -270,9 +247,7 @@ class BaseKnowledgeGraphBuilder(ABC):
 
         return issues
 
-    def _dfs_component(
-        self, graph: KnowledgeGraph, start_entity_id: str, visited: set
-    ) -> List[str]:
+    def _dfs_component(self, graph: KnowledgeGraph, start_entity_id: str, visited: set) -> List[str]:
         """DFS遍历连通分量"""
         component = []
         stack = [start_entity_id]
@@ -297,7 +272,7 @@ class BaseKnowledgeGraphBuilder(ABC):
         """查找孤立节点"""
         isolated_nodes = []
 
-        for entity_id, entity in graph.entities.items():
+        for entity_id in graph.entities:
             relations = graph.get_entity_relations(entity_id)
             if not relations:
                 isolated_nodes.append(entity_id)
@@ -328,7 +303,7 @@ class BaseKnowledgeGraphBuilder(ABC):
             # 检查出边
             relations = graph.get_entity_relations(entity_id, direction="out")
             for relation in relations:
-                if dfs_cycle(relation.tail_entity.id, path):
+                if relation.tail_entity is not None and dfs_cycle(relation.tail_entity.id, path):
                     break
 
             path.pop()
@@ -341,9 +316,7 @@ class BaseKnowledgeGraphBuilder(ABC):
 
         return cycles
 
-    def _generate_recommendations(
-        self, graph: KnowledgeGraph, issues: List[Dict[str, Any]]
-    ) -> List[str]:
+    def _generate_recommendations(self, graph: KnowledgeGraph, issues: List[Dict[str, Any]]) -> List[str]:
         """生成改进建议"""
         recommendations = []
 
@@ -380,7 +353,7 @@ class BaseKnowledgeGraphBuilder(ABC):
 class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
     """标准知识图谱构建器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.text_entity_extractor = TextEntityExtractor()
         self.db_entity_extractor = DatabaseEntityExtractor()
@@ -389,8 +362,8 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
 
     def build_graph(
         self,
-        texts: List[str] = None,
-        database_schema: Dict[str, Any] = None,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "agraph",
     ) -> KnowledgeGraph:
         """构建知识图谱"""
@@ -402,16 +375,14 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
 
             # 从文本抽取实体和关系
             if texts:
-                logger.info(f"Processing {len(texts)} text documents")
+                logger.info("Processing %d text documents", len(texts))
                 for text in texts:
                     # 抽取实体
                     text_entities = self.text_entity_extractor.extract_from_text(text)
                     all_entities.extend(text_entities)
 
                     # 抽取关系
-                    text_relations = self.text_relation_extractor.extract_from_text(
-                        text, text_entities
-                    )
+                    text_relations = self.text_relation_extractor.extract_from_text(text, text_entities)
                     all_relations.extend(text_relations)
 
             # 从数据库模式抽取实体和关系
@@ -422,13 +393,11 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
                 all_entities.extend(db_entities)
 
                 # 抽取数据库关系
-                db_relations = self.db_relation_extractor.extract_from_database(
-                    database_schema, db_entities
-                )
+                db_relations = self.db_relation_extractor.extract_from_database(database_schema, db_entities)
                 all_relations.extend(db_relations)
 
             # 实体去重和标准化
-            logger.info(f"Deduplicating {len(all_entities)} entities")
+            logger.info("Deduplicating %d entities", len(all_entities))
             unique_entities = self.text_entity_extractor.deduplicate_entities(all_entities)
 
             # 添加实体到图谱
@@ -436,18 +405,23 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
                 graph.add_entity(entity)
 
             # 过滤和添加关系
-            logger.info(f"Processing {len(all_relations)} relations")
+            logger.info("Processing %d relations", len(all_relations))
             valid_relations = []
             for relation in all_relations:
                 # 确保关系的实体存在于图谱中
                 if (
-                    relation.head_entity.id in graph.entities
+                    relation.head_entity
+                    and relation.head_entity.id in graph.entities
+                    and relation.tail_entity
                     and relation.tail_entity.id in graph.entities
                 ):
                     # 更新关系中的实体引用
-                    relation.head_entity = graph.get_entity(relation.head_entity.id)
-                    relation.tail_entity = graph.get_entity(relation.tail_entity.id)
-                    valid_relations.append(relation)
+                    head_entity = graph.get_entity(relation.head_entity.id)
+                    tail_entity = graph.get_entity(relation.tail_entity.id)
+                    if head_entity and tail_entity:
+                        relation.head_entity = head_entity
+                        relation.tail_entity = tail_entity
+                        valid_relations.append(relation)
 
             # 添加关系到图谱
             for relation in valid_relations:
@@ -460,47 +434,54 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
 
             for relation in implicit_relations:
                 if (
-                    relation.head_entity.id in graph.entities
+                    relation.head_entity
+                    and relation.head_entity.id in graph.entities
+                    and relation.tail_entity
                     and relation.tail_entity.id in graph.entities
                 ):
                     graph.add_relation(relation)
 
             logger.info(
-                f"Graph built successfully: {len(graph.entities)} entities, {len(graph.relations)} relations"
+                "Graph built successfully: %d entities, %d relations",
+                len(graph.entities),
+                len(graph.relations),
             )
             return graph
 
         except Exception as e:
-            logger.error(f"Error building graph: {e}")
+            logger.error("Error building graph: %s", e)
             raise
 
     def update_graph(
         self,
         graph: KnowledgeGraph,
-        new_entities: List[Entity] = None,
-        new_relations: List[Relation] = None,
+        new_entities: Optional[List[Entity]] = None,
+        new_relations: Optional[List[Relation]] = None,
     ) -> KnowledgeGraph:
         """更新知识图谱"""
         try:
             # 添加新实体
             if new_entities:
-                logger.info(f"Adding {len(new_entities)} new entities")
+                logger.info("Adding %d new entities", len(new_entities))
                 for entity in new_entities:
                     if entity.id not in graph.entities:
                         graph.add_entity(entity)
                     else:
                         # 合并已存在实体的属性
                         existing_entity = graph.get_entity(entity.id)
-                        self._merge_entity_attributes(existing_entity, entity)
+                        if existing_entity is not None:
+                            self._merge_entity_attributes(existing_entity, entity)
 
             # 添加新关系
             if new_relations:
-                logger.info(f"Adding {len(new_relations)} new relations")
+                logger.info("Adding %d new relations", len(new_relations))
                 for relation in new_relations:
                     if relation.id not in graph.relations:
                         # 确保关系的实体存在
                         if (
-                            relation.head_entity.id in graph.entities
+                            relation.head_entity is not None
+                            and relation.tail_entity is not None
+                            and relation.head_entity.id in graph.entities
                             and relation.tail_entity.id in graph.entities
                         ):
                             graph.add_relation(relation)
@@ -509,19 +490,21 @@ class StandardGraphBuilder(BaseKnowledgeGraphBuilder):
             graph.updated_at = datetime.now()
 
             logger.info(
-                f"Graph updated successfully: {len(graph.entities)} entities, {len(graph.relations)} relations"
+                "Graph updated successfully: %d entities, %d relations",
+                len(graph.entities),
+                len(graph.relations),
             )
             return graph
 
         except Exception as e:
-            logger.error(f"Error updating graph: {e}")
+            logger.error("Error updating graph: %s", e)
             raise
 
 
 class MultiSourceGraphBuilder(StandardGraphBuilder):
     """多源知识图谱构建器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.source_weights = {
             "database_schema": 1.0,
@@ -552,27 +535,23 @@ class MultiSourceGraphBuilder(StandardGraphBuilder):
                 source_data = source.get("data")
                 source_name = source.get("name", f"source_{i}")
 
-                logger.info(f"Processing source: {source_name} ({source_type})")
+                logger.info("Processing source: %s (%s)", source_name, source_type)
 
                 if source_type == "text":
                     texts = source_data if isinstance(source_data, list) else [source_data]
-                    sub_graph = self.build_graph(
-                        texts=texts, graph_name=f"{graph_name}_{source_name}"
-                    )
+                    sub_graph = self.build_graph(texts=texts, graph_name=f"{graph_name}_{source_name}")
                 elif source_type == "database":
-                    sub_graph = self.build_graph(
-                        database_schema=source_data, graph_name=f"{graph_name}_{source_name}"
-                    )
+                    sub_graph = self.build_graph(database_schema=source_data, graph_name=f"{graph_name}_{source_name}")
                 elif source_type == "mixed":
-                    texts = source_data.get("texts", [])
-                    db_schema = source_data.get("database_schema")
+                    texts = source_data.get("texts", []) if source_data else []
+                    db_schema = source_data.get("database_schema") if source_data else None
                     sub_graph = self.build_graph(
                         texts=texts,
                         database_schema=db_schema,
                         graph_name=f"{graph_name}_{source_name}",
                     )
                 else:
-                    logger.warning(f"Unknown source type: {source_type}")
+                    logger.warning("Unknown source type: %s", source_type)
                     continue
 
                 # 应用源权重
@@ -583,17 +562,17 @@ class MultiSourceGraphBuilder(StandardGraphBuilder):
             if not sub_graphs:
                 return KnowledgeGraph(name=graph_name)
 
-            logger.info(f"Merging {len(sub_graphs)} sub-graphs")
+            logger.info("Merging %d sub-graphs", len(sub_graphs))
             merged_graph = self.merge_graphs(sub_graphs)
             merged_graph.name = graph_name
 
             return merged_graph
 
         except Exception as e:
-            logger.error(f"Error building multi-source graph: {e}")
+            logger.error("Error building multi-source graph: %s", e)
             raise
 
-    def _apply_source_weights(self, graph: KnowledgeGraph, weight: float):
+    def _apply_source_weights(self, graph: KnowledgeGraph, weight: float) -> None:
         """应用数据源权重"""
         # 调整实体置信度
         for entity in graph.entities.values():

@@ -16,10 +16,10 @@ maintainers = [
     {name = "JasonDZS", email = "dizhensheng@sz.tsinghua.edu.cn"},
 ]
 keywords = [
-    "knowledge-graph", 
-    "graph-database", 
-    "nlp", 
-    "entity-extraction", 
+    "knowledge-graph",
+    "graph-database",
+    "nlp",
+    "entity-extraction",
     "relation-extraction",
     "lightrag",
     "neo4j",

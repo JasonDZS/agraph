@@ -24,24 +24,25 @@ class Entity:
     source: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """返回实体的哈希值"""
         return hash(self.id)
 
-    def __eq__(self, other):
-        if isinstance(other, Entity):
-            return self.id == other.id
-        return False
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Entity):
+            return NotImplemented
+        return self.id == other.id
 
-    def add_alias(self, alias: str):
+    def add_alias(self, alias: str) -> None:
         """添加别名"""
         if alias and alias not in self.aliases:
             self.aliases.append(alias)
 
-    def add_property(self, key: str, value: Any):
+    def add_property(self, key: str, value: Any) -> None:
         """添加属性"""
         self.properties[key] = value
 
-    def get_property(self, key: str, default=None):
+    def get_property(self, key: str, default: Any = None) -> Any:
         """获取属性"""
         return self.properties.get(key, default)
 

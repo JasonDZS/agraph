@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class BaseEntityExtractor(ABC):
     """实体抽取器基类"""
 
-    def __init__(self):
-        self.entity_patterns = {}
+    def __init__(self) -> None:
+        self.entity_patterns: Dict[str, List[str]] = {}
         self.confidence_threshold = 0.5
         self.stopwords = {
             "the",
@@ -37,7 +37,7 @@ class BaseEntityExtractor(ABC):
         }
 
     @abstractmethod
-    def extract_from_text(self, text: str, context: Dict[str, Any] = None) -> List[Entity]:
+    def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
         """
         从文本中抽取实体
 
@@ -48,7 +48,6 @@ class BaseEntityExtractor(ABC):
         Returns:
             List[Entity]: 抽取的实体列表
         """
-        pass
 
     @abstractmethod
     def extract_from_database(self, schema: Dict[str, Any]) -> List[Entity]:
@@ -61,7 +60,6 @@ class BaseEntityExtractor(ABC):
         Returns:
             List[Entity]: 抽取的实体列表
         """
-        pass
 
     def normalize_entity(self, entity: Entity) -> Entity:
         """
@@ -97,7 +95,7 @@ class BaseEntityExtractor(ABC):
             List[Entity]: 去重后的实体列表
         """
         unique_entities = {}
-        name_to_entity = {}
+        name_to_entity: Dict[str, Entity] = {}
 
         for entity in entities:
             # 基于名称的精确匹配
@@ -120,9 +118,7 @@ class BaseEntityExtractor(ABC):
 
         return list(unique_entities.values())
 
-    def _calculate_entity_confidence(
-        self, entity_name: str, context: Dict[str, Any] = None
-    ) -> float:
+    def _calculate_entity_confidence(self, entity_name: str, context: Optional[Dict[str, Any]] = None) -> float:
         """计算实体置信度"""
         confidence = 0.5  # 基础置信度
 
@@ -146,29 +142,29 @@ class BaseEntityExtractor(ABC):
 class TextEntityExtractor(BaseEntityExtractor):
     """文本实体抽取器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._init_patterns()
 
-    def _init_patterns(self):
+    def _init_patterns(self) -> None:
         """初始化实体识别模式"""
         self.entity_patterns = {
-            EntityType.PERSON: [
+            EntityType.PERSON.value: [
                 r"\b[A-Z][a-z]+ [A-Z][a-z]+\b",  # 人名模式
                 r"\b(?:Mr|Mrs|Ms|Dr|Prof)\.? [A-Z][a-z]+\b",  # 称谓+名字
             ],
-            EntityType.ORGANIZATION: [
+            EntityType.ORGANIZATION.value: [
                 r"\b[A-Z][a-zA-Z\s&]+ (?:Inc|Corp|Ltd|LLC|Company|Organization)\b",
                 r"\b[A-Z][A-Z\s]+\b",  # 全大写可能是组织
             ],
-            EntityType.LOCATION: [
+            EntityType.LOCATION.value: [
                 r"\b[A-Z][a-z]+ (?:City|State|Country|Province|District)\b",
                 r"\bin [A-Z][a-z]+\b",  # 地点介词短语
             ],
-            EntityType.CONCEPT: [r"\b[a-z]+ (?:concept|theory|principle|method|approach)\b"],
+            EntityType.CONCEPT.value: [r"\b[a-z]+ (?:concept|theory|principle|method|approach)\b"],
         }
 
-    def extract_from_text(self, text: str, context: Dict[str, Any] = None) -> List[Entity]:
+    def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
         """从文本中抽取实体"""
         entities = []
 
@@ -188,7 +184,7 @@ class TextEntityExtractor(BaseEntityExtractor):
 
                         entity = Entity(
                             name=entity_name,
-                            entity_type=entity_type,
+                            entity_type=EntityType(entity_type),
                             confidence=confidence,
                             source="text_extraction",
                             properties={
@@ -213,7 +209,7 @@ class TextEntityExtractor(BaseEntityExtractor):
             return self.deduplicate_entities(entities)
 
         except Exception as e:
-            logger.error(f"Error extracting entities from text: {e}")
+            logger.error("Error extracting entities from text: %s", e)
             return []
 
     def extract_from_database(self, schema: Dict[str, Any]) -> List[Entity]:
@@ -274,7 +270,7 @@ class TextEntityExtractor(BaseEntityExtractor):
             return entities
 
         except Exception as e:
-            logger.error(f"Error extracting entities from database schema: {e}")
+            logger.error("Error extracting entities from database schema: %s", e)
             return []
 
     def _extract_concept_keywords(self, text: str) -> List[str]:
@@ -286,7 +282,7 @@ class TextEntityExtractor(BaseEntityExtractor):
         keywords = [word for word in words if word not in self.stopwords]
 
         # 统计词频
-        word_freq = {}
+        word_freq: Dict[str, int] = {}
         for word in keywords:
             word_freq[word] = word_freq.get(word, 0) + 1
 
@@ -298,12 +294,12 @@ class TextEntityExtractor(BaseEntityExtractor):
 class DatabaseEntityExtractor(BaseEntityExtractor):
     """数据库实体抽取器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.table_prefixes = {"tbl_", "tb_", "t_"}
         self.common_columns = {"id", "created_at", "updated_at", "deleted_at"}
 
-    def extract_from_text(self, text: str, context: Dict[str, Any] = None) -> List[Entity]:
+    def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
         """数据库抽取器不处理文本"""
         return []
 
@@ -336,12 +332,12 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             return entities
 
         except Exception as e:
-            logger.error(f"Error in database entity extraction: {e}")
+            logger.error("Error in database entity extraction: %s", e)
             return []
 
     def _extract_table_entities(self, table: Dict[str, Any]) -> List[Entity]:
         """抽取表相关实体"""
-        entities = []
+        entities: List[Entity] = []
         table_name = table.get("name", "")
 
         if not table_name:
@@ -381,7 +377,7 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
 
     def _extract_column_entities(self, table_name: str, column: Dict[str, Any]) -> List[Entity]:
         """抽取列实体"""
-        entities = []
+        entities: List[Entity] = []
         column_name = column.get("name", "")
 
         if not column_name:

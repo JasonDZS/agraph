@@ -113,7 +113,7 @@ graph = builder.build_graph(texts=documents)
 
 # 智能搜索
 result = builder.search_graph(
-    query="查询内容", 
+    query="查询内容",
     search_type="hybrid"  # naive, local, global, hybrid
 )
 
@@ -161,13 +161,13 @@ relations = storage.query_relations(head_entity="entity_id")
 ```python
 storage = Neo4jStorage(
     uri="bolt://localhost:7687",
-    username="neo4j", 
+    username="neo4j",
     password="password"
 )
 
 if storage.connect():
     storage.save_graph(graph)
-    
+
     # 执行Cypher查询
     results = storage.execute_cypher(
         "MATCH (n:Entity) RETURN n LIMIT 10"
@@ -208,7 +208,7 @@ LightRAG生成的GraphML文件包含：
 
 - **naive**: 基础向量检索
 - **local**: 局部图谱搜索，适合具体问题
-- **global**: 全局图谱搜索，适合概览性问题  
+- **global**: 全局图谱搜索，适合概览性问题
 - **hybrid**: 混合搜索，综合多种方法
 
 ### 与现有API集成
@@ -321,7 +321,7 @@ class CustomGraphBuilder(BaseKnowledgeGraphBuilder):
     def build_graph(self, **kwargs):
         # 实现你的图谱构建逻辑
         pass
-    
+
     def update_graph(self, graph, **kwargs):
         # 实现增量更新逻辑
         pass
@@ -334,7 +334,7 @@ class CustomStorage(GraphStorage):
     def save_graph(self, graph):
         # 实现保存逻辑
         pass
-    
+
     def load_graph(self, graph_id):
         # 实现加载逻辑
         pass

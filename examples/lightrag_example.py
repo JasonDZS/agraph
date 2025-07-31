@@ -6,14 +6,8 @@ LightRAG知识图谱构建器使用示例
 
 import asyncio
 import os
-import sys
-from pathlib import Path
 
-# 添加项目根目录到Python路径
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src import LightRAGGraphBuilder, create_lightrag_graph_builder
+from agraph import LightRAGGraphBuilder, create_lightrag_graph_builder
 
 
 async def basic_usage_example():
@@ -131,9 +125,7 @@ async def incremental_update_example(builder: LightRAGGraphBuilder):
         print("正在添加新文档到知识图谱...")
         updated_graph = await builder.add_documents(new_documents, "更新后的示例知识图谱")
 
-        print(
-            f"更新完成! 新的实体数量: {len(updated_graph.entities)}, 关系数量: {len(updated_graph.relations)}"
-        )
+        print(f"更新完成! 新的实体数量: {len(updated_graph.entities)}, 关系数量: {len(updated_graph.relations)}")
 
         # 测试搜索新添加的内容
         print("\n测试搜索新内容:")

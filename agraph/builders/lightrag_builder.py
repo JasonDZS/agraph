@@ -5,8 +5,8 @@ LightRAG知识图谱构建器
 并生成GraphML格式的知识图谱文件。
 """
 
+import asyncio
 import logging
-import os
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -28,14 +28,15 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
     def __init__(self, working_dir: str = "lightrag_storage"):
         super().__init__()
         self.working_dir = Path(working_dir)
-        self.rag_instance = None
+        self.rag_instance: Optional[Any] = None
 
-    async def initialize_lightrag(self):
+    async def initialize_lightrag(self) -> Any:
         """初始化LightRAG实例"""
         if self.rag_instance is not None:
             return self.rag_instance
 
         try:
+            # pylint: disable=import-outside-toplevel
             # 延迟导入LightRAG以避免依赖问题
             from lightrag import LightRAG
             from lightrag.kg.shared_storage import initialize_pipeline_status
@@ -47,9 +48,12 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
 
             # 创建自定义LLM函数
             async def custom_llm_complete(
-                prompt: str, system_prompt: str = None, history_messages: list = None, **kwargs
-            ):
-                return await openai_complete_if_cache(
+                prompt: str,
+                system_prompt: Optional[str] = None,
+                history_messages: Optional[List[Any]] = None,
+                **kwargs: Any,
+            ) -> str:
+                result = await openai_complete_if_cache(
                     prompt=prompt,
                     system_prompt=system_prompt,
                     history_messages=history_messages or [],
@@ -58,15 +62,17 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                     api_key=Settings.OPENAI_API_KEY,
                     **kwargs,
                 )
+                return str(result)
 
             # 创建自定义嵌入函数
-            async def custom_embed(texts: list):
-                return await openai_embed(
+            async def custom_embed(texts: List[str]) -> List[List[float]]:
+                result = await openai_embed(
                     texts,
                     model=Settings.EMBEDDING_MODEL,
                     base_url=Settings.OPENAI_API_BASE,
                     api_key=Settings.OPENAI_API_KEY,
                 )
+                return list(result)
 
             # 初始化LightRAG实例
             self.rag_instance = LightRAG(
@@ -80,10 +86,11 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             )
 
             # 重要：两个初始化调用都是必需的！
-            await self.rag_instance.initialize_storages()  # 初始化存储后端
+            if self.rag_instance:
+                await self.rag_instance.initialize_storages()  # 初始化存储后端
             await initialize_pipeline_status()  # 初始化处理管道
 
-            logger.info(f"LightRAG initialized with working directory: {self.working_dir}")
+            logger.info("LightRAG initialized with working directory: %s", self.working_dir)
             return self.rag_instance
 
         except ImportError:
@@ -91,14 +98,14 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             self.rag_instance = None
             raise
         except Exception as e:
-            logger.error(f"Failed to initialize LightRAG: {e}")
+            logger.error("Failed to initialize LightRAG: %s", e)
             self.rag_instance = None
             raise
 
-    async def build_graph(
+    def build_graph(
         self,
-        texts: List[str] = None,
-        database_schema: Dict[str, Any] = None,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "lightrag_graph",
     ) -> KnowledgeGraph:
         """
@@ -112,19 +119,40 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 构建的知识图谱
         """
+        # 创建事件循环来运行异步方法
+        try:
+            # 获取现有事件循环
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # 如果没有事件循环，创建新的
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self._build_graph_async(texts, database_schema, graph_name))
+
+    async def _build_graph_async(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "lightrag_graph",
+    ) -> KnowledgeGraph:
+        """
+        异步构建知识图谱的内部实现
+        """
         # 初始化RAG实例
         await self.initialize_lightrag()
 
-        if not self.rag_instance:
-            raise RuntimeError("LightRAG not initialized")
+        # 确保实例已初始化
+        if self.rag_instance is None:
+            raise RuntimeError("Failed to initialize LightRAG instance")
 
         try:
-            logger.info(f"Building knowledge graph with LightRAG: {graph_name}")
+            logger.info("Building knowledge graph with LightRAG: %s", graph_name)
 
             # 处理文本输入
             if texts:
                 for i, text in enumerate(texts):
-                    logger.info(f"Inserting text document {i+1}/{len(texts)}")
+                    logger.info("Inserting text document %d/%d", i + 1, len(texts))
                     # 使用异步版本插入文档
                     await self.rag_instance.ainsert(text)
 
@@ -135,22 +163,24 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                 # 从GraphML文件加载知识图谱
                 graph = self._load_graph_from_graphml(str(graphml_file), graph_name)
                 logger.info(
-                    f"Successfully built graph: {len(graph.entities)} entities, {len(graph.relations)} relations"
+                    "Successfully built graph: %d entities, %d relations",
+                    len(graph.entities),
+                    len(graph.relations),
                 )
                 return graph
-            else:
-                logger.warning("GraphML file not generated by LightRAG, creating empty graph")
-                return KnowledgeGraph(name=graph_name)
+
+            logger.warning("GraphML file not generated by LightRAG, creating empty graph")
+            return KnowledgeGraph(name=graph_name)
 
         except Exception as e:
-            logger.error(f"Error building graph with LightRAG: {e}")
+            logger.error("Error building graph with LightRAG: %s", e)
             raise
 
-    async def update_graph(
+    def update_graph(
         self,
         graph: KnowledgeGraph,
-        new_entities: List[Entity] = None,
-        new_relations: List[Relation] = None,
+        new_entities: Optional[List[Entity]] = None,
+        new_relations: Optional[List[Relation]] = None,
     ) -> KnowledgeGraph:
         """
         更新知识图谱（LightRAG方式）
@@ -167,7 +197,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         logger.info("To update the graph, please add new documents using build_graph with texts")
         return graph
 
-    async def add_documents(self, documents: List[str], graph_name: str = None) -> KnowledgeGraph:
+    def add_documents(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
         """
         添加新文档到现有知识图谱
 
@@ -178,38 +208,51 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 更新后的知识图谱
         """
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self._add_documents_async(documents, graph_name))
+
+    async def _add_documents_async(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
+        """
+        异步添加文档的内部实现
+        """
         # 初始化RAG实例
         await self.initialize_lightrag()
 
-        if not self.rag_instance:
-            raise RuntimeError("LightRAG not initialized")
+        # 确保实例已初始化
+        if self.rag_instance is None:
+            raise RuntimeError("Failed to initialize LightRAG instance")
 
         try:
-            logger.info(f"Adding {len(documents)} documents to knowledge graph")
+            logger.info("Adding %d documents to knowledge graph", len(documents))
 
             for i, doc in enumerate(documents):
-                logger.info(f"Adding document {i+1}/{len(documents)}")
+                logger.info("Adding document %d/%d", i + 1, len(documents))
                 await self.rag_instance.ainsert(doc)
 
             # 重新加载图谱
             graphml_file = self.working_dir / "graph_chunk_entity_relation.graphml"
             if graphml_file.exists():
-                graph = self._load_graph_from_graphml(
-                    str(graphml_file), graph_name or "lightrag_graph"
-                )
+                graph = self._load_graph_from_graphml(str(graphml_file), graph_name or "lightrag_graph")
                 logger.info(
-                    f"Updated graph: {len(graph.entities)} entities, {len(graph.relations)} relations"
+                    "Updated graph: %d entities, %d relations",
+                    len(graph.entities),
+                    len(graph.relations),
                 )
                 return graph
-            else:
-                logger.warning("GraphML file not found after adding documents")
-                return KnowledgeGraph(name=graph_name or "lightrag_graph")
+            logger.warning("GraphML file not found after adding documents")
+            return KnowledgeGraph(name=graph_name or "lightrag_graph")
 
         except Exception as e:
-            logger.error(f"Error adding documents: {e}")
+            logger.error("Error adding documents: %s", e)
             raise
 
-    async def search_graph(
+    def search_graph(
         self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
     ) -> Dict[str, Any]:
         """
@@ -222,17 +265,33 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             Dict[str, Any]: 搜索结果
         """
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return loop.run_until_complete(self._search_graph_async(query, search_type))
+
+    async def _search_graph_async(
+        self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
+    ) -> Dict[str, Any]:
+        """
+        异步搜索图谱的内部实现
+        """
         # 初始化RAG实例
         await self.initialize_lightrag()
 
-        if not self.rag_instance:
-            raise RuntimeError("LightRAG not initialized")
+        # 确保实例已初始化
+        if self.rag_instance is None:
+            raise RuntimeError("Failed to initialize LightRAG instance")
 
         try:
-            logger.info(f"Searching graph with query: {query}, type: {search_type}")
+            logger.info("Searching graph with query: %s, type: %s", query, search_type)
 
             # 根据搜索类型调用相应的查询方法
-            from lightrag import QueryParam
+            from lightrag import QueryParam  # pylint: disable=import-outside-toplevel
 
             param = QueryParam(mode=search_type)
             result = await self.rag_instance.aquery(query, param=param)
@@ -245,19 +304,32 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             }
 
         except Exception as e:
-            logger.error(f"Error searching graph: {e}")
+            logger.error("Error searching graph: %s", e)
             raise
 
-    async def cleanup(self):
+    def cleanup(self) -> None:
         """
         清理LightRAG资源
+        """
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(self._cleanup_async())
+
+    async def _cleanup_async(self) -> None:
+        """
+        异步清理的内部实现
         """
         if self.rag_instance:
             try:
                 await self.rag_instance.finalize_storages()
                 logger.info("LightRAG resources cleaned up")
             except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
+                logger.error("Error during cleanup: %s", e)
             finally:
                 self.rag_instance = None
 
@@ -284,11 +356,14 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             graph = KnowledgeGraph(name=graph_name)
 
             # 解析节点（实体）
-            entities_map = {}
+            entities_map: Dict[str, Entity] = {}
             for node in root.findall(".//graphml:node", ns):
+                node_id = node.get("id")
+                if node_id is None:
+                    continue
                 entity = self._parse_graphml_node(node, ns)
                 if entity:
-                    entities_map[node.get("id")] = entity
+                    entities_map[node_id] = entity
                     graph.add_entity(entity)
 
             # 解析边（关系）
@@ -298,15 +373,17 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                     graph.add_relation(relation)
 
             logger.info(
-                f"Loaded graph from GraphML: {len(graph.entities)} entities, {len(graph.relations)} relations"
+                "Loaded graph from GraphML: %d entities, %d relations",
+                len(graph.entities),
+                len(graph.relations),
             )
             return graph
 
         except Exception as e:
-            logger.error(f"Error loading graph from GraphML file {graphml_file}: {e}")
+            logger.error("Error loading graph from GraphML file %s: %s", graphml_file, e)
             raise
 
-    def _parse_graphml_node(self, node, ns) -> Optional[Entity]:
+    def _parse_graphml_node(self, node: Any, ns: Dict[str, str]) -> Optional[Entity]:
         """
         解析GraphML节点为实体
 
@@ -361,10 +438,10 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             return entity
 
         except Exception as e:
-            logger.error(f"Error parsing GraphML node: {e}")
+            logger.error("Error parsing GraphML node: %s", e)
             return None
 
-    def _parse_graphml_edge(self, edge, ns, entities_map) -> Optional[Relation]:
+    def _parse_graphml_edge(self, edge: Any, ns: Dict[str, str], entities_map: Dict[str, Entity]) -> Optional[Relation]:
         """
         解析GraphML边为关系
 
@@ -421,7 +498,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             return relation
 
         except Exception as e:
-            logger.error(f"Error parsing GraphML edge: {e}")
+            logger.error("Error parsing GraphML edge: %s", e)
             return None
 
     def _map_entity_type(self, entity_type_str: str) -> EntityType:
@@ -460,7 +537,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             bool: 导出是否成功
         """
         try:
-            from xml.dom import minidom
+            from xml.dom import minidom  # pylint: disable=import-outside-toplevel
 
             # 创建GraphML根元素
             root = ET.Element("graphml")
@@ -521,25 +598,26 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
 
             # 添加边
             for relation in graph.relations.values():
-                edge_elem = ET.SubElement(graph_elem, "edge")
-                edge_elem.set("source", relation.head_entity.id)
-                edge_elem.set("target", relation.tail_entity.id)
+                if relation.head_entity and relation.tail_entity:
+                    edge_elem = ET.SubElement(graph_elem, "edge")
+                    edge_elem.set("source", relation.head_entity.id)
+                    edge_elem.set("target", relation.tail_entity.id)
 
-                # 添加边属性
-                data_attrs = [
-                    ("d6", str(relation.confidence)),
-                    ("d7", relation.properties.get("description", "")),
-                    ("d8", relation.properties.get("keywords", "")),
-                    ("d9", relation.properties.get("source_id", "")),
-                    ("d10", relation.properties.get("file_path", "")),
-                    ("d11", str(int(relation.created_at.timestamp()))),
-                ]
+                    # 添加边属性
+                    data_attrs = [
+                        ("d6", str(relation.confidence)),
+                        ("d7", relation.properties.get("description", "")),
+                        ("d8", relation.properties.get("keywords", "")),
+                        ("d9", relation.properties.get("source_id", "")),
+                        ("d10", relation.properties.get("file_path", "")),
+                        ("d11", str(int(relation.created_at.timestamp()))),
+                    ]
 
-                for key, value in data_attrs:
-                    if value:
-                        data_elem = ET.SubElement(edge_elem, "data")
-                        data_elem.set("key", key)
-                        data_elem.text = str(value)
+                    for key, value in data_attrs:
+                        if value:
+                            data_elem = ET.SubElement(edge_elem, "data")
+                            data_elem.set("key", key)
+                            data_elem.text = str(value)
 
             # 写入文件
             rough_string = ET.tostring(root, "unicode")
@@ -548,14 +626,14 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             with open(output_path, "w", encoding="utf-8") as f:
                 reparsed.writexml(f, indent="  ", addindent="  ", newl="\n", encoding="utf-8")
 
-            logger.info(f"Graph exported to GraphML: {output_path}")
+            logger.info("Graph exported to GraphML: %s", output_path)
             return True
 
         except Exception as e:
-            logger.error(f"Error exporting graph to GraphML: {e}")
+            logger.error("Error exporting graph to GraphML: %s", e)
             return False
 
-    async def get_graph_statistics(self) -> Dict[str, Any]:
+    def get_graph_statistics(self) -> Dict[str, Any]:
         """
         获取图谱统计信息
 
@@ -584,5 +662,5 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             }
 
         except Exception as e:
-            logger.error(f"Error getting graph statistics: {e}")
+            logger.error("Error getting graph statistics: %s", e)
             return {"entities_count": 0, "relations_count": 0, "status": "error", "error": str(e)}

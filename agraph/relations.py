@@ -5,7 +5,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .entities import Entity
 from .types import RelationType
@@ -16,37 +16,33 @@ class Relation:
     """关系类"""
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    head_entity: Entity = None
-    tail_entity: Entity = None
+    head_entity: Optional[Entity] = None
+    tail_entity: Optional[Entity] = None
     relation_type: RelationType = RelationType.RELATED_TO
     properties: Dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0
     source: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.id)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Relation):
             return self.id == other.id
         return False
 
-    def add_property(self, key: str, value: Any):
+    def add_property(self, key: str, value: Any) -> None:
         """添加属性"""
         self.properties[key] = value
 
-    def get_property(self, key: str, default=None):
+    def get_property(self, key: str, default: Any = None) -> Any:
         """获取属性"""
         return self.properties.get(key, default)
 
     def is_valid(self) -> bool:
         """验证关系有效性"""
-        return (
-            self.head_entity is not None
-            and self.tail_entity is not None
-            and self.head_entity != self.tail_entity
-        )
+        return self.head_entity is not None and self.tail_entity is not None and self.head_entity != self.tail_entity
 
     def reverse(self) -> "Relation":
         """创建反向关系"""
@@ -86,8 +82,10 @@ class Relation:
     @classmethod
     def from_dict(cls, data: Dict[str, Any], entities_map: Dict[str, Entity]) -> "Relation":
         """从字典创建关系"""
-        head_entity = entities_map.get(data.get("head_entity_id"))
-        tail_entity = entities_map.get(data.get("tail_entity_id"))
+        head_entity_id = data.get("head_entity_id")
+        tail_entity_id = data.get("tail_entity_id")
+        head_entity = entities_map.get(head_entity_id) if head_entity_id else None
+        tail_entity = entities_map.get(tail_entity_id) if tail_entity_id else None
 
         relation = cls(
             id=data.get("id", str(uuid.uuid4())),

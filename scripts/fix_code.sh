@@ -15,18 +15,18 @@ NC='\033[0m' # No Color
 
 # 1. 代码格式化 (Black)
 echo -e "\n📝 ${BLUE}使用 Black 格式化代码...${NC}"
-black knowledge_graph/ examples/
+black agraph/ examples/
 echo -e "${GREEN}✅ Black 格式化完成${NC}"
 
 # 2. 导入排序 (isort)
 echo -e "\n🧹 ${BLUE}使用 isort 排序导入...${NC}"
-isort knowledge_graph/ examples/
+isort agraph/ examples/
 echo -e "${GREEN}✅ 导入排序完成${NC}"
 
 # 3. 自动修复简单的 PEP 8 问题 (autopep8)
 if command -v autopep8 &> /dev/null; then
     echo -e "\n🔧 ${BLUE}使用 autopep8 修复 PEP 8 问题...${NC}"
-    autopep8 --in-place --aggressive --aggressive --recursive knowledge_graph/
+    autopep8 --in-place --aggressive --aggressive --recursive agraph/
     autopep8 --in-place --aggressive --aggressive --recursive examples/
     echo -e "${GREEN}✅ autopep8 修复完成${NC}"
 else

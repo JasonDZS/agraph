@@ -30,7 +30,7 @@ jobs:
 
     - name: Run tests with pytest
       run: |
-        pytest --cov=knowledge_graph --cov-report=xml --cov-report=html --verbose
+        pytest --cov=agraph --cov-report=xml --cov-report=html --verbose
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4

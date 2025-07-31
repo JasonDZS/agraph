@@ -3,11 +3,7 @@
 """
 
 from .entity_extractor import BaseEntityExtractor, DatabaseEntityExtractor, TextEntityExtractor
-from .relation_extractor import (
-    BaseRelationExtractor,
-    DatabaseRelationExtractor,
-    TextRelationExtractor,
-)
+from .relation_extractor import BaseRelationExtractor, DatabaseRelationExtractor, TextRelationExtractor
 
 __all__ = [
     "BaseEntityExtractor",

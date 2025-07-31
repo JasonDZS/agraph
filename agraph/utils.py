@@ -2,15 +2,12 @@
 知识图谱工具函数
 """
 
-import json
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from collections import deque
+from typing import Any, Dict, List, Optional
 
-from .entities import Entity
 from .graph import KnowledgeGraph
 from .relations import Relation
-from .types import EntityType, RelationType
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +23,7 @@ def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
         Dict[str, Any]: Cytoscape.js格式的数据
     """
     nodes = []
-    edges = []
+    edges: List[Dict[str, Any]] = []
 
     # 转换实体为节点
     for entity in graph.entities.values():
@@ -43,8 +40,11 @@ def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
         }
         nodes.append(node)
 
-    # 转换关系为边
+    # 处理关系（边）
+    edges = []
     for relation in graph.relations.values():
+        if relation.head_entity is None or relation.tail_entity is None:
+            continue
         edge = {
             "data": {
                 "id": relation.id,
@@ -103,7 +103,12 @@ def export_graph_to_d3(graph: KnowledgeGraph) -> Dict[str, Any]:
 
     # 转换关系为链接
     for relation in graph.relations.values():
-        if relation.head_entity.id in node_id_map and relation.tail_entity.id in node_id_map:
+        if (
+            relation.head_entity is not None
+            and relation.tail_entity is not None
+            and relation.head_entity.id in node_id_map
+            and relation.tail_entity.id in node_id_map
+        ):
 
             link = {
                 "source": node_id_map[relation.head_entity.id],
@@ -127,9 +132,7 @@ def export_graph_to_d3(graph: KnowledgeGraph) -> Dict[str, Any]:
     }
 
 
-def find_shortest_path(
-    graph: KnowledgeGraph, start_entity_id: str, end_entity_id: str
-) -> Optional[List[Relation]]:
+def find_shortest_path(graph: KnowledgeGraph, start_entity_id: str, end_entity_id: str) -> Optional[List[Relation]]:
     """
     查找两个实体间的最短路径
 
@@ -148,23 +151,25 @@ def find_shortest_path(
         return []
 
     # BFS查找最短路径
-    from collections import deque
 
-    queue = deque([(start_entity_id, [])])
+    queue: deque = deque([(start_entity_id, [])])
     visited = {start_entity_id}
 
     while queue:
         current_entity_id, path = queue.popleft()
 
         # 获取当前实体的所有邻居
-        neighbors = graph.get_neighbors(current_entity_id)
+        # neighbors = graph.get_neighbors(current_entity_id)
         relations = graph.get_entity_relations(current_entity_id, direction="out")
 
         for relation in relations:
+            if relation.tail_entity is None:
+                continue
             neighbor_id = relation.tail_entity.id
 
             if neighbor_id == end_entity_id:
-                return path + [relation]
+                result_path: List[Relation] = path + [relation]
+                return result_path
 
             if neighbor_id not in visited:
                 visited.add(neighbor_id)
@@ -250,35 +255,41 @@ def calculate_graph_metrics(graph: KnowledgeGraph) -> Dict[str, Any]:
 
 def _find_connected_components(graph: KnowledgeGraph) -> List[List[str]]:
     """查找连通分量"""
-    visited = set()
+    visited: set[str] = set()
     components = []
 
     for entity_id in graph.entities:
         if entity_id not in visited:
-            component = []
-            stack = [entity_id]
-
-            while stack:
-                current = stack.pop()
-                if current not in visited:
-                    visited.add(current)
-                    component.append(current)
-
-                    # 添加邻居节点
-                    neighbors = graph.get_neighbors(current)
-                    for neighbor in neighbors:
-                        if neighbor.id not in visited:
-                            stack.append(neighbor.id)
-
+            component = _dfs_component(graph, entity_id, visited)
             components.append(component)
 
     return components
 
 
+def _dfs_component(graph: KnowledgeGraph, start_id: str, visited: set) -> List[str]:
+    """使用DFS找到一个连通分量"""
+    component = []
+    stack = [start_id]
+
+    while stack:
+        current = stack.pop()
+        if current not in visited:
+            visited.add(current)
+            component.append(current)
+
+            # 添加邻居节点
+            neighbors = graph.get_neighbors(current)
+            for neighbor in neighbors:
+                if neighbor.id not in visited:
+                    stack.append(neighbor.id)
+
+    return component
+
+
 def _calculate_type_distribution(graph: KnowledgeGraph) -> Dict[str, Any]:
     """计算类型分布"""
-    entity_types = {}
-    relation_types = {}
+    entity_types: Dict[str, int] = {}
+    relation_types: Dict[str, int] = {}
 
     for entity in graph.entities.values():
         entity_type = entity.entity_type.value
@@ -307,16 +318,13 @@ def merge_similar_entities(graph: KnowledgeGraph, similarity_threshold: float = 
 
     entity_list = list(graph.entities.values())
 
-    for i in range(len(entity_list)):
-        if entity_list[i].id in entities_to_remove:
+    for i, entity1 in enumerate(entity_list):
+        if entity1.id in entities_to_remove:
             continue
 
-        for j in range(i + 1, len(entity_list)):
-            if entity_list[j].id in entities_to_remove:
+        for entity2 in entity_list[i + 1 :]:
+            if entity2.id in entities_to_remove:
                 continue
-
-            entity1 = entity_list[i]
-            entity2 = entity_list[j]
 
             # 计算名称相似度
             similarity = _calculate_name_similarity(entity1.name, entity2.name)
@@ -326,7 +334,7 @@ def merge_similar_entities(graph: KnowledgeGraph, similarity_threshold: float = 
                 if graph.merge_entity(entity1, entity2):
                     entities_to_remove.add(entity2.id)
                     merged_count += 1
-                    logger.info(f"Merged entities: {entity1.name} <- {entity2.name}")
+                    logger.info("Merged entities: %s <- %s", entity1.name, entity2.name)
 
     return merged_count
 
@@ -375,33 +383,31 @@ def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
             )
 
     # 检查重复的关系
-    relation_signatures = {}
+    relation_signatures: Dict[str, List[str]] = {}
     for relation in graph.relations.values():
         if relation.head_entity and relation.tail_entity:
-            signature = (
+            signature_tuple = (
                 relation.head_entity.id,
                 relation.tail_entity.id,
                 relation.relation_type.value,
             )
+            signature = str(signature_tuple)
 
             if signature in relation_signatures:
+                relation_signatures[signature].append(relation.id)
                 issues.append(
                     {
                         "type": "duplicate_relation",
-                        "relation_ids": [relation_signatures[signature], relation.id],
+                        "relation_id": relation.id,
                         "description": f"发现重复关系: {signature}",
                     }
                 )
             else:
-                relation_signatures[signature] = relation.id
+                relation_signatures[signature] = [relation.id]
 
     # 检查自环关系
     for relation in graph.relations.values():
-        if (
-            relation.head_entity
-            and relation.tail_entity
-            and relation.head_entity.id == relation.tail_entity.id
-        ):
+        if relation.head_entity and relation.tail_entity and relation.head_entity.id == relation.tail_entity.id:
             issues.append(
                 {
                     "type": "self_loop",
@@ -462,7 +468,7 @@ def create_graph_summary(graph: KnowledgeGraph) -> str:
 
     # 连通性信息
     connectivity = metrics.get("connectivity", {})
-    summary += f"\n连通性:\n"
+    summary += "\n连通性:\n"
     summary += f"- 连通分量数: {connectivity.get('connected_components', 0)}\n"
     summary += f"- 最大连通分量大小: {connectivity.get('largest_component_size', 0)}\n"
     summary += f"- 是否连通: {'是' if connectivity.get('is_connected', False) else '否'}\n"

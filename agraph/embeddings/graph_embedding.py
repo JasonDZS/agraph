@@ -3,6 +3,7 @@
 """
 
 import logging
+import pickle
 import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -10,9 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from ..entities import Entity
 from ..graph import KnowledgeGraph
-from ..relations import Relation
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +21,15 @@ class GraphEmbedding(ABC):
 
     def __init__(self, embedding_dim: int = 128):
         self.embedding_dim = embedding_dim
-        self.entity_embeddings = {}
-        self.relation_embeddings = {}
-        self.entity_to_id = {}
-        self.id_to_entity = {}
-        self.relation_to_id = {}
-        self.id_to_relation = {}
+        self.entity_embeddings: Dict[str, np.ndarray] = {}
+        self.relation_embeddings: Dict[str, np.ndarray] = {}
+        self.entity_to_id: Dict[str, int] = {}
+        self.id_to_entity: Dict[int, str] = {}
+        self.relation_to_id: Dict[str, int] = {}
+        self.id_to_relation: Dict[int, str] = {}
 
     @abstractmethod
-    def train(self, graph: KnowledgeGraph, **kwargs) -> bool:
+    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
         """
         训练图嵌入模型
 
@@ -41,7 +40,7 @@ class GraphEmbedding(ABC):
         Returns:
             bool: 训练是否成功
         """
-        pass
+        raise NotImplementedError("Subclasses must implement train method")
 
     @abstractmethod
     def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
@@ -54,7 +53,7 @@ class GraphEmbedding(ABC):
         Returns:
             np.ndarray: 嵌入向量，如果不存在则返回None
         """
-        pass
+        raise NotImplementedError("Subclasses must implement get_entity_embedding method")
 
     def compute_entity_similarity(self, entity1_id: str, entity2_id: str) -> float:
         """
@@ -83,10 +82,10 @@ class GraphEmbedding(ABC):
                 return 0.0
 
             similarity = dot_product / (norm1 * norm2)
-            return max(0.0, min(1.0, (similarity + 1) / 2))  # 将[-1,1]映射到[0,1]
+            return float(max(0.0, min(1.0, (similarity + 1) / 2)))  # 将[-1,1]映射到[0,1]
 
         except Exception as e:
-            logger.error(f"Error computing entity similarity: {e}")
+            logger.error("Error computing entity similarity: %s", e)
             return 0.0
 
     def recommend_entities(self, entity_id: str, top_k: int = 10) -> List[Tuple[str, float]]:
@@ -113,7 +112,7 @@ class GraphEmbedding(ABC):
             return similarities[:top_k]
 
         except Exception as e:
-            logger.error(f"Error recommending entities: {e}")
+            logger.error("Error recommending entities: %s", e)
             return []
 
     def save_embeddings(self, filepath: str) -> bool:
@@ -127,8 +126,6 @@ class GraphEmbedding(ABC):
             bool: 保存是否成功
         """
         try:
-            import pickle
-
             embedding_data = {
                 "entity_embeddings": self.entity_embeddings,
                 "relation_embeddings": self.relation_embeddings,
@@ -142,11 +139,11 @@ class GraphEmbedding(ABC):
             with open(filepath, "wb") as f:
                 pickle.dump(embedding_data, f)
 
-            logger.info(f"Embeddings saved to {filepath}")
+            logger.info("Embeddings saved to %s", filepath)
             return True
 
         except Exception as e:
-            logger.error(f"Error saving embeddings: {e}")
+            logger.error("Error saving embeddings: %s", e)
             return False
 
     def load_embeddings(self, filepath: str) -> bool:
@@ -160,8 +157,6 @@ class GraphEmbedding(ABC):
             bool: 加载是否成功
         """
         try:
-            import pickle
-
             with open(filepath, "rb") as f:
                 embedding_data = pickle.load(f)
 
@@ -173,20 +168,20 @@ class GraphEmbedding(ABC):
             self.id_to_relation = embedding_data.get("id_to_relation", {})
             self.embedding_dim = embedding_data.get("embedding_dim", self.embedding_dim)
 
-            logger.info(f"Embeddings loaded from {filepath}")
+            logger.info("Embeddings loaded from %s", filepath)
             return True
 
         except Exception as e:
-            logger.error(f"Error loading embeddings: {e}")
+            logger.error("Error loading embeddings: %s", e)
             return False
 
-    def _build_entity_mapping(self, graph: KnowledgeGraph):
+    def _build_entity_mapping(self, graph: KnowledgeGraph) -> None:
         """构建实体映射"""
         entity_list = list(graph.entities.keys())
         self.entity_to_id = {entity: i for i, entity in enumerate(entity_list)}
         self.id_to_entity = {i: entity for entity, i in self.entity_to_id.items()}
 
-    def _build_relation_mapping(self, graph: KnowledgeGraph):
+    def _build_relation_mapping(self, graph: KnowledgeGraph) -> None:
         """构建关系映射"""
         relation_types = set()
         for relation in graph.relations.values():
@@ -205,17 +200,20 @@ class Node2VecEmbedding(GraphEmbedding):
         embedding_dim: int = 128,
         walk_length: int = 80,
         num_walks: int = 10,
-        p: float = 1,
-        q: float = 1,
+        walk_params: Optional[Dict[str, float]] = None,
     ):
         super().__init__(embedding_dim)
         self.walk_length = walk_length
         self.num_walks = num_walks
-        self.p = p  # 返回参数
-        self.q = q  # 进出参数
+        walk_params = walk_params or {}
+        self.p = walk_params.get("p", 1.0)  # 返回参数
+        self.q = walk_params.get("q", 1.0)  # 进出参数
 
-    def train(self, graph: KnowledgeGraph, epochs: int = 100, learning_rate: float = 0.025) -> bool:
+    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
         """训练Node2Vec嵌入"""
+        epochs: int = kwargs.get("epochs", 100)
+        learning_rate: float = kwargs.get("learning_rate", 0.025)
+
         try:
             self._build_entity_mapping(graph)
 
@@ -228,13 +226,11 @@ class Node2VecEmbedding(GraphEmbedding):
             # 训练Skip-gram模型
             self._train_skipgram(walks, epochs, learning_rate)
 
-            logger.info(
-                f"Node2Vec training completed with {len(self.entity_embeddings)} entity embeddings"
-            )
+            logger.info("Node2Vec training completed with %d entity embeddings", len(self.entity_embeddings))
             return True
 
         except Exception as e:
-            logger.error(f"Error training Node2Vec: {e}")
+            logger.error("Error training Node2Vec: %s", e)
             return False
 
     def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
@@ -246,8 +242,14 @@ class Node2VecEmbedding(GraphEmbedding):
         adjacency = defaultdict(list)
 
         for relation in graph.relations.values():
-            head_id = relation.head_entity.id
-            tail_id = relation.tail_entity.id
+            head_entity = relation.head_entity
+            tail_entity = relation.tail_entity
+
+            if head_entity is None or tail_entity is None:
+                continue
+
+            head_id = head_entity.id
+            tail_id = tail_entity.id
 
             # 构建无向图
             adjacency[head_id].append(tail_id)
@@ -292,9 +294,7 @@ class Node2VecEmbedding(GraphEmbedding):
 
         return walk
 
-    def _choose_next_node(
-        self, current: str, prev: str, neighbors: List[str], adjacency: Dict[str, List[str]]
-    ) -> str:
+    def _choose_next_node(self, current: str, prev: str, neighbors: List[str], adjacency: Dict[str, List[str]]) -> str:
         """根据p, q参数选择下一个节点"""
         probs = []
 
@@ -320,7 +320,7 @@ class Node2VecEmbedding(GraphEmbedding):
 
         # 根据概率选择
         r = random.random()
-        cumsum = 0
+        cumsum = 0.0
         for i, prob in enumerate(probs):
             cumsum += prob
             if r <= cumsum:
@@ -328,7 +328,7 @@ class Node2VecEmbedding(GraphEmbedding):
 
         return neighbors[-1]
 
-    def _train_skipgram(self, walks: List[List[str]], epochs: int, learning_rate: float):
+    def _train_skipgram(self, walks: List[List[str]], epochs: int, learning_rate: float) -> None:
         """训练Skip-gram模型"""
         # 简化的Skip-gram实现
         vocabulary = set()
@@ -339,17 +339,13 @@ class Node2VecEmbedding(GraphEmbedding):
         vocab_to_idx = {word: i for i, word in enumerate(vocabulary)}
 
         # 初始化嵌入矩阵
-        W1 = np.random.uniform(
-            -0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (vocab_size, self.embedding_dim)
-        )
-        W2 = np.random.uniform(
-            -0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (self.embedding_dim, vocab_size)
-        )
+        W1 = np.random.uniform(-0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (vocab_size, self.embedding_dim))
+        W2 = np.random.uniform(-0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (self.embedding_dim, vocab_size))
 
         window_size = 5
 
         for epoch in range(epochs):
-            total_loss = 0
+            total_loss = 0.0
 
             for walk in walks:
                 for i, center_word in enumerate(walk):
@@ -374,7 +370,7 @@ class Node2VecEmbedding(GraphEmbedding):
 
                         # 计算损失
                         loss = -np.log(y_pred[context_idx] + 1e-10)
-                        total_loss += loss
+                        total_loss += float(loss)
 
                         # 反向传播
                         e = y_pred.copy()
@@ -385,7 +381,7 @@ class Node2VecEmbedding(GraphEmbedding):
                         W1[center_idx] -= learning_rate * np.dot(W2, e)
 
             if epoch % 10 == 0:
-                logger.info(f"Epoch {epoch}, Loss: {total_loss:.4f}")
+                logger.info("Epoch %d, Loss: %.4f", epoch, total_loss)
 
         # 保存最终嵌入
         for entity_id in vocabulary:
@@ -396,7 +392,8 @@ class Node2VecEmbedding(GraphEmbedding):
     def _softmax(self, x: np.ndarray) -> np.ndarray:
         """Softmax函数"""
         exp_x = np.exp(x - np.max(x))
-        return exp_x / np.sum(exp_x)
+        result = exp_x / np.sum(exp_x)
+        return np.asarray(result, dtype=x.dtype)
 
 
 class TransEEmbedding(GraphEmbedding):
@@ -406,14 +403,12 @@ class TransEEmbedding(GraphEmbedding):
         super().__init__(embedding_dim)
         self.margin = margin
 
-    def train(
-        self,
-        graph: KnowledgeGraph,
-        epochs: int = 100,
-        learning_rate: float = 0.01,
-        batch_size: int = 100,
-    ) -> bool:
+    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
         """训练TransE嵌入"""
+        epochs: int = kwargs.get("epochs", 100)
+        learning_rate: float = kwargs.get("learning_rate", 0.01)
+        batch_size: int = kwargs.get("batch_size", 100)
+
         try:
             self._build_entity_mapping(graph)
             self._build_relation_mapping(graph)
@@ -427,13 +422,11 @@ class TransEEmbedding(GraphEmbedding):
             # 训练模型
             self._train_model(triplets, epochs, learning_rate, batch_size)
 
-            logger.info(
-                f"TransE training completed with {len(self.entity_embeddings)} entity embeddings"
-            )
+            logger.info("TransE training completed with %d entity embeddings", len(self.entity_embeddings))
             return True
 
         except Exception as e:
-            logger.error(f"Error training TransE: {e}")
+            logger.error("Error training TransE: %s", e)
             return False
 
     def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
@@ -449,16 +442,22 @@ class TransEEmbedding(GraphEmbedding):
         triplets = []
 
         for relation in graph.relations.values():
+            head_entity = relation.head_entity
+            tail_entity = relation.tail_entity
+
+            if head_entity is None or tail_entity is None:
+                continue
+
             triplet = (
-                relation.head_entity.id,
+                head_entity.id,
                 relation.relation_type.value,
-                relation.tail_entity.id,
+                tail_entity.id,
             )
             triplets.append(triplet)
 
         return triplets
 
-    def _initialize_embeddings(self):
+    def _initialize_embeddings(self) -> None:
         """初始化嵌入向量"""
         # 初始化实体嵌入
         for entity_id in self.entity_to_id:
@@ -488,7 +487,7 @@ class TransEEmbedding(GraphEmbedding):
         epochs: int,
         learning_rate: float,
         batch_size: int,
-    ):
+    ) -> None:
         """训练TransE模型"""
         for epoch in range(epochs):
             total_loss = 0
@@ -505,9 +504,7 @@ class TransEEmbedding(GraphEmbedding):
                     t_pos = self.entity_embeddings[tail]
 
                     # 生成负样本
-                    neg_head, neg_relation, neg_tail = self._generate_negative_sample(
-                        head, relation, tail, triplets
-                    )
+                    neg_head, neg_relation, neg_tail = self._generate_negative_sample(head, relation, tail, triplets)
 
                     h_neg = self.entity_embeddings[neg_head]
                     r_neg = self.relation_embeddings[neg_relation]
@@ -517,19 +514,21 @@ class TransEEmbedding(GraphEmbedding):
                     pos_score = np.linalg.norm(h_pos + r - t_pos)
                     neg_score = np.linalg.norm(h_neg + r_neg - t_neg)
 
-                    loss = max(0, self.margin + pos_score - neg_score)
-                    batch_loss += loss
+                    loss = max(0.0, float(self.margin + pos_score - neg_score))
+                    batch_loss += int(loss)
 
                     if loss > 0:
                         # 计算梯度并更新
                         self._update_embeddings(
-                            head, relation, tail, neg_head, neg_relation, neg_tail, learning_rate
+                            (head, relation, tail),
+                            (neg_head, neg_relation, neg_tail),
+                            learning_rate,
                         )
 
                 total_loss += batch_loss
 
             if epoch % 10 == 0:
-                logger.info(f"Epoch {epoch}, Loss: {total_loss:.4f}")
+                logger.info("Epoch %d, Loss: %.4f", epoch, total_loss)
 
     def _generate_negative_sample(
         self, head: str, relation: str, tail: str, triplets: List[Tuple[str, str, str]]
@@ -542,24 +541,23 @@ class TransEEmbedding(GraphEmbedding):
             while (neg_head, relation, tail) in triplets:
                 neg_head = random.choice(list(self.entity_to_id.keys()))
             return neg_head, relation, tail
-        else:
-            # 替换尾实体
+
+        # 替换尾实体
+        neg_tail = random.choice(list(self.entity_to_id.keys()))
+        while (head, relation, neg_tail) in triplets:
             neg_tail = random.choice(list(self.entity_to_id.keys()))
-            while (head, relation, neg_tail) in triplets:
-                neg_tail = random.choice(list(self.entity_to_id.keys()))
-            return head, relation, neg_tail
+        return head, relation, neg_tail
 
     def _update_embeddings(
         self,
-        head: str,
-        relation: str,
-        tail: str,
-        neg_head: str,
-        neg_relation: str,
-        neg_tail: str,
+        pos_triplet: Tuple[str, str, str],
+        neg_triplet: Tuple[str, str, str],
         learning_rate: float,
-    ):
+    ) -> None:
         """更新嵌入向量"""
+        head, relation, tail = pos_triplet
+        neg_head, neg_relation, neg_tail = neg_triplet
+
         h_pos = self.entity_embeddings[head]
         r = self.relation_embeddings[relation]
         t_pos = self.entity_embeddings[tail]

@@ -40,13 +40,10 @@
     storage.save_graph(graph)
 """
 
+from typing import Any, Dict, List, Optional
+
 # 构建器
-from .builders import (
-    BaseKnowledgeGraphBuilder,
-    LightRAGGraphBuilder,
-    MultiSourceGraphBuilder,
-    StandardGraphBuilder,
-)
+from .builders import BaseKnowledgeGraphBuilder, LightRAGGraphBuilder, MultiSourceGraphBuilder, StandardGraphBuilder
 
 # 嵌入
 from .embeddings import GraphEmbedding, Node2VecEmbedding, TransEEmbedding
@@ -102,7 +99,7 @@ __all__ = [
 ]
 
 
-def create_standard_graph_builder():
+def create_standard_graph_builder() -> "StandardGraphBuilder":
     """
     创建标准图构建器的便捷函数
 
@@ -112,7 +109,7 @@ def create_standard_graph_builder():
     return StandardGraphBuilder()
 
 
-def create_lightrag_graph_builder(working_dir: str = "lightrag_storage"):
+def create_lightrag_graph_builder(working_dir: str = "lightrag_storage") -> "LightRAGGraphBuilder":
     """
     创建LightRAG图构建器的便捷函数
 
@@ -125,7 +122,7 @@ def create_lightrag_graph_builder(working_dir: str = "lightrag_storage"):
     return LightRAGGraphBuilder(working_dir)
 
 
-def create_json_storage(storage_dir: str = "graphs"):
+def create_json_storage(storage_dir: str = "graphs") -> "JsonStorage":
     """
     创建JSON存储的便捷函数
 
@@ -140,7 +137,7 @@ def create_json_storage(storage_dir: str = "graphs"):
     return storage
 
 
-def create_neo4j_storage(uri: str, username: str, password: str, database: str = "neo4j"):
+def create_neo4j_storage(uri: str, username: str, password: str, database: str = "neo4j") -> Optional["Neo4jStorage"]:
     """
     创建Neo4j存储的便捷函数
 
@@ -160,8 +157,10 @@ def create_neo4j_storage(uri: str, username: str, password: str, database: str =
 
 
 def quick_build_graph(
-    texts: list = None, database_schema: dict = None, graph_name: str = "quick_graph"
-):
+    texts: Optional[List[Any]] = None,
+    database_schema: Optional[Dict[Any, Any]] = None,
+    graph_name: str = "quick_graph",
+) -> "KnowledgeGraph":
     """
     快速构建知识图谱的便捷函数
 

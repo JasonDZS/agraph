@@ -20,10 +20,10 @@ run_check() {
     local name=$1
     local command=$2
     local emoji=$3
-    
+
     echo -e "\n${emoji} ${BLUE}${name}...${NC}"
     echo "----------------------------------------"
-    
+
     if eval $command; then
         echo -e "${GREEN}✅ ${name} 通过${NC}"
         return 0
@@ -39,37 +39,37 @@ passed_checks=0
 
 # 1. 代码格式检查 (Black)
 ((total_checks++))
-if run_check "代码格式检查 (Black)" "black --check --diff knowledge_graph/ examples/" "📝"; then
+if run_check "代码格式检查 (Black)" "black --check --diff agraph/ examples/" "📝"; then
     ((passed_checks++))
 fi
 
 # 2. 导入排序检查 (isort)
 ((total_checks++))
-if run_check "导入排序检查 (isort)" "isort --check-only --diff knowledge_graph/ examples/" "🧹"; then
+if run_check "导入排序检查 (isort)" "isort --check-only --diff agraph/ examples/" "🧹"; then
     ((passed_checks++))
 fi
 
 # 3. 语法检查 (Flake8)
 ((total_checks++))
-if run_check "语法检查 (Flake8)" "flake8 knowledge_graph/ examples/ --max-line-length=100 --extend-ignore=E203,W503" "🔧"; then
+if run_check "语法检查 (Flake8)" "flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503" "🔧"; then
     ((passed_checks++))
 fi
 
 # 4. 类型检查 (MyPy)
 ((total_checks++))
-if run_check "类型检查 (MyPy)" "mypy knowledge_graph/ --ignore-missing-imports --follow-imports=silent" "🎯"; then
+if run_check "类型检查 (MyPy)" "mypy agraph/ --ignore-missing-imports --follow-imports=silent" "🎯"; then
     ((passed_checks++))
 fi
 
 # 5. 代码规范检查 (Pylint)
 ((total_checks++))
-if run_check "代码规范检查 (Pylint)" "pylint knowledge_graph/ --exit-zero --rcfile=.pylintrc" "📋"; then
+if run_check "代码规范检查 (Pylint)" "pylint agraph/ --exit-zero --rcfile=.pylintrc" "📋"; then
     ((passed_checks++))
 fi
 
 # 6. 安全检查 (Bandit)
 ((total_checks++))
-if run_check "安全检查 (Bandit)" "bandit -r knowledge_graph/ -ll || true" "🔒"; then
+if run_check "安全检查 (Bandit)" "bandit -r agraph/ -ll || true" "🔒"; then
     ((passed_checks++))
 fi
 
@@ -92,8 +92,8 @@ if [ $passed_checks -eq $total_checks ]; then
 else
     echo -e "${YELLOW}⚠️  有 $((total_checks - passed_checks)) 个检查失败 ($passed_checks/$total_checks)${NC}"
     echo -e "\n${YELLOW}💡 修复建议：${NC}"
-    echo "  - 运行 'black knowledge_graph/ examples/' 修复格式问题"
-    echo "  - 运行 'isort knowledge_graph/ examples/' 修复导入顺序"
+    echo "  - 运行 'black agraph/ examples/' 修复格式问题"
+    echo "  - 运行 'isort agraph/ examples/' 修复导入顺序"
     echo "  - 查看上面的错误信息了解具体问题"
     exit 1
 fi

@@ -42,7 +42,7 @@ uv sync
 
 ```bash
 # 安装包和开发工具
-pip install -e .[dev,docs]
+pip install -e ".[dev,docs]"
 
 # 安装 pre-commit 钩子
 pre-commit install
@@ -134,10 +134,10 @@ isort agraph/ examples/
 
 ```bash
 # 基本语法检查
-flake8 agraph/ examples/ --max-line-length=100
+flake8 agraph/ examples/ --max-line-length=120
 
 # 详细检查
-flake8 agraph/ examples/ --count --statistics --max-line-length=100
+flake8 agraph/ examples/ --count --statistics --max-line-length=120
 ```
 
 #### 4. 类型检查 (MyPy)
@@ -157,7 +157,7 @@ mypy agraph/ --ignore-missing-imports --show-error-codes --pretty
 pylint agraph/
 
 # 生成详细报告
-pylint agraph/ --output-format=text > pylint_report.txt
+pylint agraph/ --output-outformat=text > pylint_report.txt
 
 # 只显示错误和警告
 pylint agraph/ --errors-only
@@ -265,7 +265,7 @@ git commit -m "refactor: improve graph builder interface"
 
 - `MAJOR.MINOR.PATCH`
 - `1.0.0` → `1.0.1` (补丁)
-- `1.0.0` → `1.1.0` (小版本)  
+- `1.0.0` → `1.1.0` (小版本)
 - `1.0.0` → `2.0.0` (大版本)
 
 ### 发布步骤
@@ -282,7 +282,7 @@ git commit -m "refactor: improve graph builder interface"
    ## [1.1.0] - 2024-01-15
    ### Added
    - 新功能描述
-   ### Fixed  
+   ### Fixed
    - 修复的问题
    ```
 
@@ -308,7 +308,7 @@ git commit -m "refactor: improve graph builder interface"
 {
     "python.defaultInterpreterPath": "./venv/bin/python",
     "python.formatting.provider": "black",
-    "python.formatting.blackArgs": ["--line-length=100"],
+    "python.formatting.blackArgs": ["--line-length=120"],
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
     "python.linting.flake8Enabled": true,
@@ -332,7 +332,7 @@ Pre-commit 已配置以下钩子：
 
 - 代码格式检查
 - 导入排序
-- 语法检查  
+- 语法检查
 - 类型检查
 - 安全扫描
 

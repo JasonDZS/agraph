@@ -2,6 +2,7 @@
 图存储基类
 """
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 class GraphStorage(ABC):
     """图存储基类"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.connection = None
         self.is_connected = False
 
@@ -29,12 +30,10 @@ class GraphStorage(ABC):
         Returns:
             bool: 连接是否成功
         """
-        pass
 
     @abstractmethod
-    def disconnect(self):
+    def disconnect(self) -> None:
         """断开连接"""
-        pass
 
     @abstractmethod
     def save_graph(self, graph: KnowledgeGraph) -> bool:
@@ -47,7 +46,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 保存是否成功
         """
-        pass
 
     @abstractmethod
     def load_graph(self, graph_id: str) -> Optional[KnowledgeGraph]:
@@ -60,7 +58,6 @@ class GraphStorage(ABC):
         Returns:
             KnowledgeGraph: 加载的知识图谱，如果不存在则返回None
         """
-        pass
 
     @abstractmethod
     def delete_graph(self, graph_id: str) -> bool:
@@ -73,7 +70,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 删除是否成功
         """
-        pass
 
     @abstractmethod
     def list_graphs(self) -> List[Dict[str, Any]]:
@@ -83,7 +79,6 @@ class GraphStorage(ABC):
         Returns:
             List[Dict[str, Any]]: 图谱信息列表
         """
-        pass
 
     @abstractmethod
     def query_entities(self, conditions: Dict[str, Any]) -> List[Entity]:
@@ -96,11 +91,13 @@ class GraphStorage(ABC):
         Returns:
             List[Entity]: 查询结果
         """
-        pass
 
     @abstractmethod
     def query_relations(
-        self, head_entity: str = None, tail_entity: str = None, relation_type: RelationType = None
+        self,
+        head_entity: Optional[str] = None,
+        tail_entity: Optional[str] = None,
+        relation_type: Optional[RelationType] = None,
     ) -> List[Relation]:
         """
         查询关系
@@ -113,7 +110,6 @@ class GraphStorage(ABC):
         Returns:
             List[Relation]: 查询结果
         """
-        pass
 
     @abstractmethod
     def add_entity(self, graph_id: str, entity: Entity) -> bool:
@@ -127,7 +123,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 添加是否成功
         """
-        pass
 
     @abstractmethod
     def add_relation(self, graph_id: str, relation: Relation) -> bool:
@@ -141,7 +136,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 添加是否成功
         """
-        pass
 
     @abstractmethod
     def update_entity(self, graph_id: str, entity: Entity) -> bool:
@@ -155,7 +149,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 更新是否成功
         """
-        pass
 
     @abstractmethod
     def update_relation(self, graph_id: str, relation: Relation) -> bool:
@@ -169,7 +162,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 更新是否成功
         """
-        pass
 
     @abstractmethod
     def remove_entity(self, graph_id: str, entity_id: str) -> bool:
@@ -183,7 +175,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 删除是否成功
         """
-        pass
 
     @abstractmethod
     def remove_relation(self, graph_id: str, relation_id: str) -> bool:
@@ -197,7 +188,6 @@ class GraphStorage(ABC):
         Returns:
             bool: 删除是否成功
         """
-        pass
 
     def get_graph_statistics(self, graph_id: str) -> Dict[str, Any]:
         """
@@ -215,7 +205,7 @@ class GraphStorage(ABC):
                 return graph.get_statistics()
             return {}
         except Exception as e:
-            logger.error(f"Error getting graph statistics: {e}")
+            logger.error("Error getting graph statistics: %s", e)
             return {}
 
     def backup_graph(self, graph_id: str, backup_path: str) -> bool:
@@ -237,16 +227,14 @@ class GraphStorage(ABC):
             # 子类可以重写此方法实现具体的备份逻辑
             graph_data = graph.to_dict()
 
-            import json
-
             with open(backup_path, "w", encoding="utf-8") as f:
                 json.dump(graph_data, f, ensure_ascii=False, indent=2)
 
-            logger.info(f"Graph {graph_id} backed up to {backup_path}")
+            logger.info("Graph %s backed up to %s", graph_id, backup_path)
             return True
 
         except Exception as e:
-            logger.error(f"Error backing up graph {graph_id}: {e}")
+            logger.error("Error backing up graph %s: %s", graph_id, e)
             return False
 
     def restore_graph(self, backup_path: str) -> Optional[str]:
@@ -260,7 +248,6 @@ class GraphStorage(ABC):
             str: 恢复的图谱ID，失败返回None
         """
         try:
-            import json
 
             with open(backup_path, "r", encoding="utf-8") as f:
                 graph_data = json.load(f)
@@ -268,22 +255,22 @@ class GraphStorage(ABC):
             graph = KnowledgeGraph.from_dict(graph_data)
 
             if self.save_graph(graph):
-                logger.info(f"Graph restored from {backup_path} with ID {graph.id}")
+                logger.info("Graph restored from %s with ID %s", backup_path, graph.id)
                 return graph.id
 
             return None
 
         except Exception as e:
-            logger.error(f"Error restoring graph from {backup_path}: {e}")
+            logger.error("Error restoring graph from %s: %s", backup_path, e)
             return None
 
-    def export_graph(self, graph_id: str, format: str = "json") -> Optional[Dict[str, Any]]:
+    def export_graph(self, graph_id: str, outformat: str = "json") -> Optional[Dict[str, Any]]:
         """
         导出图谱数据
 
         Args:
             graph_id: 图谱ID
-            format: 导出格式 ('json', 'csv', 'graphml', etc.)
+            outformat: 导出格式 ('json', 'csv', 'graphml', etc.)
 
         Returns:
             Dict[str, Any]: 导出的数据
@@ -293,18 +280,17 @@ class GraphStorage(ABC):
             if not graph:
                 return None
 
-            if format.lower() == "json":
+            if outformat.lower() == "json":
                 return graph.to_dict()
-            elif format.lower() == "csv":
+            if outformat.lower() == "csv":
                 return self._export_to_csv_format(graph)
-            elif format.lower() == "graphml":
+            if outformat.lower() == "graphml":
                 return self._export_to_graphml_format(graph)
-            else:
-                logger.warning(f"Unsupported export format: {format}")
-                return None
+            logger.warning("Unsupported export outformat: %s", outformat)
+            return None
 
         except Exception as e:
-            logger.error(f"Error exporting graph {graph_id}: {e}")
+            logger.error("Error exporting graph %s: %s", graph_id, e)
             return None
 
     def _export_to_csv_format(self, graph: KnowledgeGraph) -> Dict[str, Any]:
@@ -324,6 +310,8 @@ class GraphStorage(ABC):
 
         relations_data = []
         for relation in graph.relations.values():
+            if relation.head_entity is None or relation.tail_entity is None:
+                continue
             relations_data.append(
                 {
                     "id": relation.id,
@@ -354,6 +342,8 @@ class GraphStorage(ABC):
             )
 
         for relation in graph.relations.values():
+            if relation.head_entity is None or relation.tail_entity is None:
+                continue
             edges.append(
                 {
                     "id": relation.id,

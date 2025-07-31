@@ -5,7 +5,7 @@
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 from ..entities import Entity
 from ..relations import Relation
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class BaseRelationExtractor(ABC):
     """关系抽取器基类"""
 
-    def __init__(self):
-        self.relation_patterns = {}
+    def __init__(self) -> None:
+        self.relation_patterns: Dict[str, List[str]] = {}
         self.dependency_parser = None
         self.confidence_threshold = 0.5
 
@@ -34,12 +34,9 @@ class BaseRelationExtractor(ABC):
         Returns:
             List[Relation]: 抽取的关系列表
         """
-        pass
 
     @abstractmethod
-    def extract_from_database(
-        self, schema: Dict[str, Any], entities: List[Entity]
-    ) -> List[Relation]:
+    def extract_from_database(self, schema: Dict[str, Any], entities: List[Entity]) -> List[Relation]:
         """
         从数据库模式中抽取关系
 
@@ -50,7 +47,6 @@ class BaseRelationExtractor(ABC):
         Returns:
             List[Relation]: 抽取的关系列表
         """
-        pass
 
     def validate_relation(self, relation: Relation) -> bool:
         """
@@ -75,9 +71,7 @@ class BaseRelationExtractor(ABC):
 
         return True
 
-    def infer_implicit_relations(
-        self, entities: List[Entity], relations: List[Relation]
-    ) -> List[Relation]:
+    def infer_implicit_relations(self, entities: List[Entity], relations: List[Relation]) -> List[Relation]:
         """
         推断隐式关系
 
@@ -106,6 +100,8 @@ class BaseRelationExtractor(ABC):
 
     def _is_relation_type_valid(self, relation: Relation) -> bool:
         """检查关系类型合理性"""
+        if relation.head_entity is None or relation.tail_entity is None:
+            return False
         head_type = relation.head_entity.entity_type
         tail_type = relation.tail_entity.entity_type
         relation_type = relation.relation_type
@@ -132,6 +128,8 @@ class BaseRelationExtractor(ABC):
                 for r2 in relations:
                     if (
                         r2.relation_type == RelationType.CONTAINS
+                        and r1.tail_entity is not None
+                        and r2.head_entity is not None
                         and r1.tail_entity.id == r2.head_entity.id
                     ):
 
@@ -169,9 +167,7 @@ class BaseRelationExtractor(ABC):
 
         return symmetric_relations
 
-    def _infer_hierarchical_relations(
-        self, entities: List[Entity], relations: List[Relation]
-    ) -> List[Relation]:
+    def _infer_hierarchical_relations(self, entities: List[Entity], relations: List[Relation]) -> List[Relation]:
         """基于层次结构推断关系"""
         hierarchical_relations = []
 
@@ -183,7 +179,7 @@ class BaseRelationExtractor(ABC):
             EntityType.DOCUMENT: [EntityType.CONCEPT, EntityType.KEYWORD],
         }
 
-        entity_by_type = {}
+        entity_by_type: Dict[EntityType, List[Entity]] = {}
         for entity in entities:
             if entity.entity_type not in entity_by_type:
                 entity_by_type[entity.entity_type] = []
@@ -220,9 +216,8 @@ class BaseRelationExtractor(ABC):
             return True
 
         # 检查属性中的关联信息
-        if hasattr(child_entity, "properties"):
-            if "table" in child_entity.properties:
-                return child_entity.properties["table"] == parent_entity.name
+        if child_entity.properties and "table" in child_entity.properties:
+            return bool(child_entity.properties["table"] == parent_entity.name)
 
         return False
 
@@ -230,30 +225,30 @@ class BaseRelationExtractor(ABC):
 class TextRelationExtractor(BaseRelationExtractor):
     """文本关系抽取器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._init_relation_patterns()
 
-    def _init_relation_patterns(self):
+    def _init_relation_patterns(self) -> None:
         """初始化关系模式"""
         self.relation_patterns = {
-            RelationType.BELONGS_TO: [
+            RelationType.BELONGS_TO.value: [
                 r"(.+?) (?:belongs to|is part of|works for) (.+)",
                 r"(.+?) of (.+)",
             ],
-            RelationType.CONTAINS: [
+            RelationType.CONTAINS.value: [
                 r"(.+?) (?:contains|includes|has) (.+)",
                 r"(.+?) with (.+)",
             ],
-            RelationType.SIMILAR_TO: [
+            RelationType.SIMILAR_TO.value: [
                 r"(.+?) (?:is similar to|resembles|is like) (.+)",
                 r"(.+?) and (.+?) are similar",
             ],
-            RelationType.RELATED_TO: [
+            RelationType.RELATED_TO.value: [
                 r"(.+?) (?:is related to|relates to|associated with) (.+)",
                 r"(.+?) and (.+?) are related",
             ],
-            RelationType.DESCRIBES: [
+            RelationType.DESCRIBES.value: [
                 r"(.+?) (?:describes|explains|defines) (.+)",
                 r"(.+?) is described by (.+)",
             ],
@@ -261,41 +256,15 @@ class TextRelationExtractor(BaseRelationExtractor):
 
     def extract_from_text(self, text: str, entities: List[Entity]) -> List[Relation]:
         """从文本中抽取实体关系"""
-        relations = []
+        relations: List[Relation] = []
 
         try:
             # 创建实体名称到实体的映射
             entity_map = {entity.name.lower(): entity for entity in entities}
 
             # 基于模式匹配抽取关系
-            for relation_type, patterns in self.relation_patterns.items():
-                for pattern in patterns:
-                    matches = re.finditer(pattern, text, re.IGNORECASE)
-                    for match in matches:
-                        groups = match.groups()
-                        if len(groups) >= 2:
-                            head_name = groups[0].strip().lower()
-                            tail_name = groups[1].strip().lower()
-
-                            # 查找对应的实体
-                            head_entity = self._find_entity_by_name(head_name, entity_map)
-                            tail_entity = self._find_entity_by_name(tail_name, entity_map)
-
-                            if head_entity and tail_entity:
-                                relation = Relation(
-                                    head_entity=head_entity,
-                                    tail_entity=tail_entity,
-                                    relation_type=relation_type,
-                                    confidence=0.7,
-                                    source="text_pattern_matching",
-                                    properties={
-                                        "pattern": pattern,
-                                        "context": text[
-                                            max(0, match.start() - 50) : match.end() + 50
-                                        ],
-                                    },
-                                )
-                                relations.append(relation)
+            pattern_relations = self._extract_pattern_relations(text, entity_map)
+            relations.extend(pattern_relations)
 
             # 基于共现关系抽取
             cooccurrence_relations = self._extract_cooccurrence_relations(text, entities)
@@ -307,12 +276,43 @@ class TextRelationExtractor(BaseRelationExtractor):
             return valid_relations
 
         except Exception as e:
-            logger.error(f"Error extracting relations from text: {e}")
+            logger.error("Error extracting relations from text: %s", e)
             return []
 
-    def extract_from_database(
-        self, schema: Dict[str, Any], entities: List[Entity]
-    ) -> List[Relation]:
+    def _extract_pattern_relations(self, text: str, entity_map: Dict[str, Entity]) -> List[Relation]:
+        """基于模式匹配抽取关系"""
+        relations: List[Relation] = []
+
+        for relation_type, patterns in self.relation_patterns.items():
+            for pattern in patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    groups = match.groups()
+                    if len(groups) >= 2:
+                        head_name = groups[0].strip().lower()
+                        tail_name = groups[1].strip().lower()
+
+                        # 查找对应的实体
+                        head_entity = self._find_entity_by_name(head_name, entity_map)
+                        tail_entity = self._find_entity_by_name(tail_name, entity_map)
+
+                        if head_entity and tail_entity:
+                            relation = Relation(
+                                head_entity=head_entity,
+                                tail_entity=tail_entity,
+                                relation_type=RelationType(relation_type),
+                                confidence=0.7,
+                                source="text_pattern_matching",
+                                properties={
+                                    "pattern": pattern,
+                                    "context": text[max(0, match.start() - 50) : match.end() + 50],
+                                },
+                            )
+                            relations.append(relation)
+
+        return relations
+
+    def extract_from_database(self, schema: Dict[str, Any], entities: List[Entity]) -> List[Relation]:
         """文本抽取器不处理数据库关系"""
         return []
 
@@ -336,7 +336,7 @@ class TextRelationExtractor(BaseRelationExtractor):
 
     def _extract_cooccurrence_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
         """基于共现抽取关系"""
-        relations = []
+        relations: List[Relation] = []
 
         # 在句子级别寻找共现实体
         sentences = re.split(r"[.!?]+", text)
@@ -349,9 +349,7 @@ class TextRelationExtractor(BaseRelationExtractor):
             # 找到在同一句子中出现的实体
             sentence_entities = []
             for entity in entities:
-                if entity.name.lower() in sentence or any(
-                    alias.lower() in sentence for alias in entity.aliases
-                ):
+                if entity.name.lower() in sentence or bool(any(alias.lower() in sentence for alias in entity.aliases)):
                     sentence_entities.append(entity)
 
             # 为共现实体创建关系
@@ -373,18 +371,13 @@ class TextRelationExtractor(BaseRelationExtractor):
 class DatabaseRelationExtractor(BaseRelationExtractor):
     """数据库关系抽取器"""
 
-    def __init__(self):
-        super().__init__()
-
     def extract_from_text(self, text: str, entities: List[Entity]) -> List[Relation]:
         """数据库抽取器不处理文本"""
         return []
 
-    def extract_from_database(
-        self, schema: Dict[str, Any], entities: List[Entity]
-    ) -> List[Relation]:
+    def extract_from_database(self, schema: Dict[str, Any], entities: List[Entity]) -> List[Relation]:
         """从数据库模式中抽取关系"""
-        relations = []
+        relations: List[Relation] = []
 
         try:
             # 创建实体映射
@@ -409,14 +402,14 @@ class DatabaseRelationExtractor(BaseRelationExtractor):
             return relations
 
         except Exception as e:
-            logger.error(f"Error extracting database relations: {e}")
+            logger.error("Error extracting database relations: %s", e)
             return []
 
     def _extract_database_table_relations(
         self, schema: Dict[str, Any], entity_map: Dict[str, Entity]
     ) -> List[Relation]:
         """抽取数据库-表关系"""
-        relations = []
+        relations: List[Relation] = []
 
         database_name = schema.get("database_name")
         if not database_name or database_name not in entity_map:
@@ -445,11 +438,9 @@ class DatabaseRelationExtractor(BaseRelationExtractor):
 
         return relations
 
-    def _extract_table_column_relations(
-        self, schema: Dict[str, Any], entity_map: Dict[str, Entity]
-    ) -> List[Relation]:
+    def _extract_table_column_relations(self, schema: Dict[str, Any], entity_map: Dict[str, Entity]) -> List[Relation]:
         """抽取表-列关系"""
-        relations = []
+        relations: List[Relation] = []
 
         tables = schema.get("tables", [])
         for table in tables:
@@ -485,11 +476,9 @@ class DatabaseRelationExtractor(BaseRelationExtractor):
 
         return relations
 
-    def _extract_foreign_key_relations(
-        self, schema: Dict[str, Any], entity_map: Dict[str, Entity]
-    ) -> List[Relation]:
+    def _extract_foreign_key_relations(self, schema: Dict[str, Any], entity_map: Dict[str, Entity]) -> List[Relation]:
         """抽取外键关系"""
-        relations = []
+        relations: List[Relation] = []
 
         tables = schema.get("tables", [])
         for table in tables:
@@ -527,11 +516,9 @@ class DatabaseRelationExtractor(BaseRelationExtractor):
 
         return relations
 
-    def _extract_semantic_relations(
-        self, schema: Dict[str, Any], entity_map: Dict[str, Entity]
-    ) -> List[Relation]:
+    def _extract_semantic_relations(self, schema: Dict[str, Any], entity_map: Dict[str, Entity]) -> List[Relation]:
         """抽取基于命名的语义关系"""
-        relations = []
+        relations: List[Relation] = []
 
         # 基于表名相似性的关系
         tables = schema.get("tables", [])

@@ -42,7 +42,9 @@ class KnowledgeGraph:
 
         # 确保相关实体存在
         if (
-            relation.head_entity.id not in self.entities
+            relation.head_entity is None
+            or relation.tail_entity is None
+            or relation.head_entity.id not in self.entities
             or relation.tail_entity.id not in self.entities
         ):
             return False
@@ -62,7 +64,9 @@ class KnowledgeGraph:
         # 删除相关关系
         relations_to_remove = []
         for relation in self.relations.values():
-            if relation.head_entity.id == entity_id or relation.tail_entity.id == entity_id:
+            if (relation.head_entity is not None and relation.head_entity.id == entity_id) or (
+                relation.tail_entity is not None and relation.tail_entity.id == entity_id
+            ):
                 relations_to_remove.append(relation.id)
 
         for relation_id in relations_to_remove:
@@ -101,11 +105,7 @@ class KnowledgeGraph:
     def get_relations_by_type(self, relation_type: RelationType) -> List[Relation]:
         """按类型获取关系"""
         relation_ids = self.relation_index.get(relation_type.value, set())
-        return [
-            self.relations[relation_id]
-            for relation_id in relation_ids
-            if relation_id in self.relations
-        ]
+        return [self.relations[relation_id] for relation_id in relation_ids if relation_id in self.relations]
 
     def get_entity_relations(
         self, entity_id: str, relation_type: Optional[RelationType] = None, direction: str = "both"
@@ -119,9 +119,17 @@ class KnowledgeGraph:
             if relation_type and relation.relation_type != relation_type:
                 continue
 
-            if direction in ["out", "both"] and relation.head_entity.id == entity_id:
+            if (
+                direction in ["out", "both"]
+                and relation.head_entity is not None
+                and relation.head_entity.id == entity_id
+            ):
                 entity_relations.append(relation)
-            elif direction in ["in", "both"] and relation.tail_entity.id == entity_id:
+            elif (
+                direction in ["in", "both"]
+                and relation.tail_entity is not None
+                and relation.tail_entity.id == entity_id
+            ):
                 entity_relations.append(relation)
 
         return entity_relations
@@ -131,19 +139,25 @@ class KnowledgeGraph:
     ) -> List[Entity]:
         """获取邻居实体"""
         relations = self.get_entity_relations(entity_id, relation_type, direction)
-        neighbors = []
+        neighbors: List[Entity] = []
 
         for relation in relations:
-            if relation.head_entity.id == entity_id:
+            if (
+                relation.head_entity is not None
+                and relation.head_entity.id == entity_id
+                and relation.tail_entity is not None
+            ):
                 neighbors.append(relation.tail_entity)
-            elif relation.tail_entity.id == entity_id:
+            elif (
+                relation.tail_entity is not None
+                and relation.tail_entity.id == entity_id
+                and relation.head_entity is not None
+            ):
                 neighbors.append(relation.head_entity)
 
         return neighbors
 
-    def find_path(
-        self, start_entity_id: str, end_entity_id: str, max_depth: int = 3
-    ) -> List[List[Relation]]:
+    def find_path(self, start_entity_id: str, end_entity_id: str, max_depth: int = 3) -> List[List[Relation]]:
         """查找实体间路径"""
         if start_entity_id not in self.entities or end_entity_id not in self.entities:
             return []
@@ -151,7 +165,7 @@ class KnowledgeGraph:
         paths = []
         visited = set()
 
-        def dfs(current_id: str, target_id: str, path: List[Relation], depth: int):
+        def dfs(current_id: str, target_id: str, path: List[Relation], depth: int) -> None:
             if depth > max_depth:
                 return
 
@@ -165,7 +179,7 @@ class KnowledgeGraph:
             visited.add(current_id)
 
             for relation in self.get_entity_relations(current_id, direction="out"):
-                if relation.tail_entity.id not in visited:
+                if relation.tail_entity is not None and relation.tail_entity.id not in visited:
                     path.append(relation)
                     dfs(relation.tail_entity.id, target_id, path, depth + 1)
                     path.pop()
@@ -187,9 +201,9 @@ class KnowledgeGraph:
 
         # 更新关系中的实体引用
         for relation in self.relations.values():
-            if relation.head_entity.id == source_entity.id:
+            if relation.head_entity is not None and relation.head_entity.id == source_entity.id:
                 relation.head_entity = target_entity
-            if relation.tail_entity.id == source_entity.id:
+            if relation.tail_entity is not None and relation.tail_entity.id == source_entity.id:
                 relation.tail_entity = target_entity
 
         # 删除源实体
@@ -219,27 +233,27 @@ class KnowledgeGraph:
             "updated_at": self.updated_at.isoformat(),
         }
 
-    def _index_entity(self, entity: Entity):
+    def _index_entity(self, entity: Entity) -> None:
         """索引实体"""
         entity_type = entity.entity_type.value
         if entity_type not in self.entity_index:
             self.entity_index[entity_type] = set()
         self.entity_index[entity_type].add(entity.id)
 
-    def _unindex_entity(self, entity: Entity):
+    def _unindex_entity(self, entity: Entity) -> None:
         """取消实体索引"""
         entity_type = entity.entity_type.value
         if entity_type in self.entity_index:
             self.entity_index[entity_type].discard(entity.id)
 
-    def _index_relation(self, relation: Relation):
+    def _index_relation(self, relation: Relation) -> None:
         """索引关系"""
         relation_type = relation.relation_type.value
         if relation_type not in self.relation_index:
             self.relation_index[relation_type] = set()
         self.relation_index[relation_type].add(relation.id)
 
-    def _unindex_relation(self, relation: Relation):
+    def _unindex_relation(self, relation: Relation) -> None:
         """取消关系索引"""
         relation_type = relation.relation_type.value
         if relation_type in self.relation_index:
