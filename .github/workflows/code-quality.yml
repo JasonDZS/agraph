@@ -28,7 +28,7 @@ jobs:
 
     - name: Code formatting check with Black
       run: |
-        black --check --diff agraph/ examples/
+        black --check --diff --max-line-length=120 agraph/ examples/
 
     - name: Import sorting check with isort
       run: |

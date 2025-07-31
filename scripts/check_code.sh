@@ -39,7 +39,7 @@ passed_checks=0
 
 # 1. 代码格式检查 (Black)
 ((total_checks++))
-if run_check "代码格式检查 (Black)" "black --check --diff agraph/ examples/" "📝"; then
+if run_check "代码格式检查 (Black)" "black --check --diff --max-line-length=120 agraph/ examples/" "📝"; then
     ((passed_checks++))
 fi
 

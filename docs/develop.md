@@ -114,10 +114,10 @@ make check
 
 ```bash
 # 检查格式
-black --check --diff agraph/ examples/
+black --check --diff  --line-length=120 agraph/ examples/
 
 # 自动格式化
-black agraph/ examples/
+black --line-length=120 agraph/ examples/
 ```
 
 #### 2. 导入排序 (isort)
