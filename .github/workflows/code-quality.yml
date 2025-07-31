@@ -1,0 +1,64 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Code formatting check with Black
+      run: |
+        black --check --diff knowledge_graph/ examples/
+
+    - name: Linting with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 knowledge_graph/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 knowledge_graph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+
+    - name: Type checking with mypy
+      run: |
+        mypy knowledge_graph/ --ignore-missing-imports --follow-imports=silent
+
+    - name: Linting with pylint
+      run: |
+        pylint knowledge_graph/ --exit-zero --rcfile=.pylintrc || true
+
+    - name: Import sorting check with isort
+      run: |
+        pip install isort
+        isort --check-only --diff knowledge_graph/ examples/
+
+    - name: Security check with bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r knowledge_graph/ -f json -o bandit-report.json || true
+        bandit -r knowledge_graph/ || true
+
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-report-${{ matrix.python-version }}
+        path: bandit-report.json

@@ -1,0 +1,19 @@
+# Core dependencies
+lightrag-hku>=1.4.4
+neo4j>=5.28.2
+numpy>=2.0.0
+openai>=1.98.0
+python-dotenv>=1.0.0
+
+# Optional dependencies for development
+pytest>=7.0
+pytest-cov>=4.0
+black>=23.0
+flake8>=6.0
+mypy>=1.0
+pre-commit>=3.0
+
+# Optional dependencies for documentation
+sphinx>=5.0
+sphinx-rtd-theme>=1.0
+myst-parser>=2.0
