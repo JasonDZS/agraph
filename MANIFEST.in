@@ -4,11 +4,11 @@ include pyproject.toml
 include MANIFEST.in
 
 # Include all Python files
-recursive-include knowledge_graph *.py
+recursive-include agraph *.py
 recursive-include examples *.py
 
 # Include configuration files
-recursive-include knowledge_graph *.json *.yaml *.yml *.txt *.md
+recursive-include agraph *.json *.yaml *.yml *.txt *.md
 
 # Exclude development and build files
 exclude .gitignore

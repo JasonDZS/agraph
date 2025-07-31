@@ -28,33 +28,33 @@ jobs:
 
     - name: Code formatting check with Black
       run: |
-        black --check --diff knowledge_graph/ examples/
+        black --check --diff agraph/ examples/
 
     - name: Linting with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        flake8 knowledge_graph/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 agraph/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 knowledge_graph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        flake8 agraph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
     - name: Type checking with mypy
       run: |
-        mypy knowledge_graph/ --ignore-missing-imports --follow-imports=silent
+        mypy agraph/ --ignore-missing-imports --follow-imports=silent
 
     - name: Linting with pylint
       run: |
-        pylint knowledge_graph/ --exit-zero --rcfile=.pylintrc || true
+        pylint agraph/ --exit-zero --rcfile=.pylintrc || true
 
     - name: Import sorting check with isort
       run: |
         pip install isort
-        isort --check-only --diff knowledge_graph/ examples/
+        isort --check-only --diff agraph/ examples/
 
     - name: Security check with bandit
       run: |
         pip install bandit[toml]
-        bandit -r knowledge_graph/ -f json -o bandit-report.json || true
-        bandit -r knowledge_graph/ || true
+        bandit -r agraph/ -f json -o bandit-report.json || true
+        bandit -r agraph/ || true
 
     - name: Upload bandit report
       uses: actions/upload-artifact@v4

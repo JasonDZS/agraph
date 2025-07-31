@@ -47,14 +47,14 @@ fix:
 
 format:
 	@echo "📝 格式化代码..."
-	black knowledge_graph/ examples/
-	isort knowledge_graph/ examples/
+	black agraph/ examples/
+	isort agraph/ examples/
 
 lint:
 	@echo "📋 运行代码检查工具..."
-	flake8 knowledge_graph/ examples/ --max-line-length=100
-	pylint knowledge_graph/ --exit-zero
-	mypy knowledge_graph/ --ignore-missing-imports
+	flake8 agraph/ examples/ --max-line-length=100
+	pylint agraph/ --exit-zero
+	mypy agraph/ --ignore-missing-imports
 
 # 测试
 test:
@@ -63,7 +63,7 @@ test:
 
 test-cov:
 	@echo "🧪 运行测试并生成覆盖率报告..."
-	pytest --cov=knowledge_graph --cov-report=html --cov-report=term
+	pytest --cov=agraph --cov-report=html --cov-report=term
 	@echo "📊 查看覆盖率报告: open htmlcov/index.html"
 
 # 文档
