@@ -186,8 +186,8 @@ bandit -r agraph/ -s B101,B601
 make fix
 
 # 手动修复格式问题
-black agraph/ examples/
-isort agraph/ examples/
+black --line-length=120 agraph/ examples/
+isort --line-length=120 agraph/ examples/
 ```
 
 ## 测试

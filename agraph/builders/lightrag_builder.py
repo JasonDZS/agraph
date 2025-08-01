@@ -6,11 +6,12 @@ LightRAG知识图谱构建器
 """
 
 import asyncio
+import concurrent.futures
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Coroutine, Dict, List, Literal, Optional, TypeVar
 
 from ..config import Settings
 from ..entities import Entity
@@ -21,6 +22,9 @@ from .graph_builder import BaseKnowledgeGraphBuilder
 
 logger = logging.getLogger(__name__)
 
+# 定义类型变量
+T = TypeVar("T")
+
 
 class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
     """LightRAG知识图谱构建器"""
@@ -29,6 +33,29 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         super().__init__()
         self.working_dir = Path(working_dir)
         self.rag_instance: Optional[Any] = None
+
+    def _run_async(self, coro: Coroutine[Any, Any, T]) -> T:
+        """运行异步协程的辅助方法，处理事件循环"""
+        try:
+            # 尝试获取当前运行的事件循环
+            _ = asyncio.get_running_loop()
+        except RuntimeError:
+            # 如果没有正在运行的事件循环，直接使用 asyncio.run
+            return asyncio.run(coro)
+
+        # 如果有正在运行的循环，需要在新的线程中运行
+
+        def run_in_thread() -> T:
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(coro)
+            finally:
+                new_loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
 
     async def initialize_lightrag(self) -> Any:
         """初始化LightRAG实例"""
@@ -119,16 +146,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 构建的知识图谱
         """
-        # 创建事件循环来运行异步方法
-        try:
-            # 获取现有事件循环
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # 如果没有事件循环，创建新的
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._build_graph_async(texts, database_schema, graph_name))
+        return self._run_async(self._build_graph_async(texts, database_schema, graph_name))
 
     async def _build_graph_async(
         self,
@@ -208,14 +226,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 更新后的知识图谱
         """
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._add_documents_async(documents, graph_name))
+        return self._run_async(self._add_documents_async(documents, graph_name))
 
     async def _add_documents_async(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
         """
@@ -265,14 +276,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             Dict[str, Any]: 搜索结果
         """
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(self._search_graph_async(query, search_type))
+        return self._run_async(self._search_graph_async(query, search_type))
 
     async def _search_graph_async(
         self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
@@ -311,14 +315,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         """
         清理LightRAG资源
         """
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        loop.run_until_complete(self._cleanup_async())
+        self._run_async(self._cleanup_async())
 
     async def _cleanup_async(self) -> None:
         """

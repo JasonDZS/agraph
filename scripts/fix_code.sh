@@ -15,12 +15,12 @@ NC='\033[0m' # No Color
 
 # 1. 代码格式化 (Black)
 echo -e "\n📝 ${BLUE}使用 Black 格式化代码...${NC}"
-black agraph/ examples/
+black --line-length=120 agraph/ examples/
 echo -e "${GREEN}✅ Black 格式化完成${NC}"
 
 # 2. 导入排序 (isort)
 echo -e "\n🧹 ${BLUE}使用 isort 排序导入...${NC}"
-isort agraph/ examples/
+isort --line-length=120 agraph/ examples/
 echo -e "${GREEN}✅ 导入排序完成${NC}"
 
 # 3. 自动修复简单的 PEP 8 问题 (autopep8)
