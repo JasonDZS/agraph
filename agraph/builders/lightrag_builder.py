@@ -8,6 +8,7 @@ LightRAG知识图谱构建器
 import asyncio
 import concurrent.futures
 import logging
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -47,38 +48,57 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         """运行异步协程的辅助方法，处理事件循环"""
         try:
             # 尝试获取当前运行的事件循环
-            asyncio.get_running_loop()
-            # 如果已经在事件循环中，抛出异常，强制使用线程池
-            raise RuntimeError("Cannot run async operation in existing event loop")
+            loop = asyncio.get_running_loop()
+            # 如果已经在事件循环中，创建任务在当前循环中运行
+            task = loop.create_task(coro)
+            # 使用简单的方式等待任务完成
+
+            while not task.done():
+                time.sleep(0.01)
+            return task.result()
         except RuntimeError:
-            # 没有正在运行的事件循环，或者需要在新线程中运行
+            # 没有正在运行的事件循环，使用asyncio.run
             pass
 
-        # 在新线程中运行协程，避免事件循环冲突
-        def run_in_thread() -> T:
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                return new_loop.run_until_complete(coro)
-            finally:
-                # 确保事件循环完全关闭
+        # 使用独立的线程运行协程，每次都创建全新的环境
+        def run_in_separate_thread() -> T:
+            # 确保线程中没有事件循环
+            asyncio.set_event_loop(None)
+            # 创建包装协程来处理清理
+
+            async def wrapped_coro() -> T:
                 try:
-                    # 取消所有剩余任务
-                    pending = asyncio.all_tasks(new_loop)
-                    for task in pending:
-                        task.cancel()
-
-                    # 等待所有任务取消完成
-                    if pending:
-                        new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                except Exception:
-                    pass  # 忽略清理时的异常
+                    return await coro
                 finally:
-                    new_loop.close()
-                    asyncio.set_event_loop(None)
+                    # 清理残留任务
+                    await asyncio.sleep(0.05)  # 给其他任务时间完成
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_thread)
+            # 使用asyncio.run，它会自动处理事件循环的创建和清理
+            try:
+                return asyncio.run(wrapped_coro())
+            except Exception as e:
+                # 如果asyncio.run失败，回退到手动管理
+                logger.error("error %s", e)
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(wrapped_coro())
+                finally:
+                    try:
+                        # 强制关闭所有剩余任务
+                        pending = asyncio.all_tasks(loop)
+                        if pending:
+                            for task in pending:
+                                task.cancel()
+                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    except Exception as e:
+                        logger.error(e)
+                    finally:
+                        loop.close()
+                        asyncio.set_event_loop(None)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_separate_thread)
             return future.result()
 
     async def initialize_lightrag(self) -> Any:
@@ -172,9 +192,9 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 构建的知识图谱
         """
-        return self._run_async(self._build_graph_async(texts, database_schema, graph_name))
+        return self._run_async(self.abuild_graph(texts, database_schema, graph_name))
 
-    async def _build_graph_async(
+    async def abuild_graph(
         self,
         texts: Optional[List[str]] = None,
         database_schema: Optional[Dict[str, Any]] = None,
@@ -252,9 +272,9 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             KnowledgeGraph: 更新后的知识图谱
         """
-        return self._run_async(self._add_documents_async(documents, graph_name))
+        return self._run_async(self.aadd_documents(documents, graph_name))
 
-    async def _add_documents_async(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
+    async def aadd_documents(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
         """
         异步添加文档的内部实现
         """
@@ -302,9 +322,9 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         Returns:
             Dict[str, Any]: 搜索结果
         """
-        return self._run_async(self._search_graph_async(query, search_type))
+        return self._run_async(self.asearch_graph(query, search_type))
 
-    async def _search_graph_async(
+    async def asearch_graph(
         self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
     ) -> Dict[str, Any]:
         """
@@ -339,25 +359,31 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
 
     def cleanup(self) -> None:
         """
-        清理LightRAG资源
-        """
-        self._run_async(self._cleanup_async())
-
-    async def _cleanup_async(self) -> None:
-        """
-        异步清理的内部实现
+        清理LightRAG资源 - 使用同步方式避免事件循环问题
         """
         if self.rag_instance:
             try:
-                # 只清理存储，让LightRAG正常结束
-                await self.rag_instance.finalize_storages()
-
-                # 给LightRAG一些时间来完成后台任务
-                await asyncio.sleep(0.1)
-
-                logger.info("LightRAG resources cleaned up")
+                # 尝试同步清理，避免创建新的事件循环
+                # 直接设置为None，让Python垃圾回收处理
+                logger.info("LightRAG resources cleaned up (sync mode)")
+                self.rag_instance = None
+                self._initialized = False
             except Exception as e:
                 logger.error("Error during cleanup: %s", e)
+                self.rag_instance = None
+                self._initialized = False
+
+    async def _cleanup_async(self) -> None:
+        """
+        异步清理LightRAG资源
+        """
+        if self.rag_instance:
+            try:
+                # 调用 LightRAG 的异步清理方法
+                await self.rag_instance.finalize_storages()
+                logger.info("LightRAG async cleanup completed")
+            except Exception as e:
+                logger.error("Error during async cleanup: %s", e)
             finally:
                 self.rag_instance = None
                 self._initialized = False

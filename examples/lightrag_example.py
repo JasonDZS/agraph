@@ -39,7 +39,7 @@ async def basic_usage_example():
     try:
         # 3. 构建知识图谱
         print("正在构建知识图谱...")
-        graph = builder.build_graph(texts=documents, graph_name="示例知识图谱")
+        graph = await builder.abuild_graph(texts=documents, graph_name="示例知识图谱")
 
         print(f"构建完成! 实体数量: {len(graph.entities)}, 关系数量: {len(graph.relations)}")
 
@@ -89,7 +89,7 @@ async def search_example(builder: LightRAGGraphBuilder):
             print(f"\n查询: {query}")
             print(f"搜索类型: {search_type}")
 
-            result = builder.search_graph(query, search_type)
+            result = await builder.asearch_graph(query, search_type)
 
             print("搜索结果:")
             print(result.get("result", "无结果")[:200] + "...")
@@ -123,20 +123,20 @@ async def incremental_update_example(builder: LightRAGGraphBuilder):
 
     try:
         print("正在添加新文档到知识图谱...")
-        updated_graph = builder.add_documents(new_documents, "更新后的示例知识图谱")
+        updated_graph = await builder.aadd_documents(new_documents, "更新后的示例知识图谱")
 
         print(f"更新完成! 新的实体数量: {len(updated_graph.entities)}, 关系数量: {len(updated_graph.relations)}")
 
         # 测试搜索新添加的内容
         print("\n测试搜索新内容:")
-        result = builder.search_graph("上海是什么样的城市？", "hybrid")
+        result = await builder.asearch_graph("上海是什么样的城市？", "hybrid")
         print("搜索结果:", result.get("result", "无结果")[:200] + "...")
 
     except Exception as e:
         print(f"更新过程中出现错误: {e}")
 
 
-async def export_example(builder: LightRAGGraphBuilder):
+def export_example(builder: LightRAGGraphBuilder):
     """导出示例"""
     print("=== 导出GraphML示例 ===")
 
@@ -169,7 +169,7 @@ async def export_example(builder: LightRAGGraphBuilder):
         print(f"导出过程中出现错误: {e}")
 
 
-async def statistics_example(builder: LightRAGGraphBuilder):
+def statistics_example(builder: LightRAGGraphBuilder):
     """统计信息示例"""
     print("=== 图谱统计信息示例 ===")
 
@@ -226,7 +226,7 @@ async def advanced_usage_example():
             print(f"处理{category}...")
             all_texts.extend(texts)
 
-        graph = custom_builder.build_graph(texts=all_texts, graph_name="综合知识图谱")
+        graph = await custom_builder.abuild_graph(texts=all_texts, graph_name="综合知识图谱")
         print(f"综合图谱构建完成: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
 
         # 获取详细统计
@@ -237,7 +237,12 @@ async def advanced_usage_example():
         print(f"高级示例执行失败: {e}")
     finally:
         # 清理高级示例的资源
-        custom_builder.cleanup()
+        try:
+            custom_builder.cleanup()
+        except Exception:
+            # 如果清理失败，直接设置为None
+            custom_builder.rag_instance = None
+            custom_builder._initialized = False
 
 
 async def main():
@@ -255,19 +260,24 @@ async def main():
     await incremental_update_example(builder)
 
     # 4. 导出示例
-    await export_example(builder)
+    export_example(builder)
 
     # 5. 统计信息示例
-    await statistics_example(builder)
+    statistics_example(builder)
+
+    # 清理主要builder的资源
+    if builder:
+        try:
+            builder.cleanup()
+        except Exception:
+            # 如果清理失败，直接设置为None
+            builder.rag_instance = None
+            builder._initialized = False
 
     # 6. 高级使用示例
     await advanced_usage_example()
 
     print("\n所有示例执行完成!")
-
-    # 清理主要builder的资源
-    if builder:
-        builder.cleanup()
 
 
 if __name__ == "__main__":

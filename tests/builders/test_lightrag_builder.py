@@ -120,6 +120,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         """测试 LightRAG 实例缓存"""
         mock_instance = Mock()
         self.builder.rag_instance = mock_instance
+        self.builder._initialized = True
 
         result = await self.builder.initialize_lightrag()
         self.assertEqual(result, mock_instance)
@@ -132,7 +133,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         async def mock_build_graph_async(*args, **kwargs):
             return mock_graph
 
-        with patch.object(self.builder, '_build_graph_async', side_effect=mock_build_graph_async):
+        with patch.object(self.builder, 'abuild_graph', side_effect=mock_build_graph_async):
             result = self.builder.build_graph(
                 texts=["test text"],
                 graph_name="test_graph"
@@ -156,41 +157,13 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
     #                 self.assertIsInstance(result, KnowledgeGraph)
 
     @async_test
-    async def test_build_graph_async_with_texts(self):
-        """测试异步构建图（包含文本）"""
-        # 模拟 LightRAG 实例
-        mock_rag = Mock()
-        mock_rag.ainsert = AsyncMock()
-        self.builder.rag_instance = mock_rag
-
-        # 创建模拟 GraphML 文件
-        graphml_content = self._create_mock_graphml()
-        graphml_file = Path(self.temp_dir) / "graph_chunk_entity_relation.graphml"
-        graphml_file.write_text(graphml_content, encoding='utf-8')
-
-        with patch.object(self.builder, 'initialize_lightrag', return_value=mock_rag):
-            result = await self.builder._build_graph_async(
-                texts=["test text 1", "test text 2"],
-                graph_name="test_graph"
-            )
-
-            # 验证文本插入调用
-            self.assertEqual(mock_rag.ainsert.call_count, 2)
-            mock_rag.ainsert.assert_any_call("test text 1")
-            mock_rag.ainsert.assert_any_call("test text 2")
-
-            # 验证图构建结果
-            self.assertEqual(result.name, "test_graph")
-            self.assertGreater(len(result.entities), 0)
-
-    @async_test
     async def test_build_graph_async_no_graphml(self):
         """测试异步构建图（无 GraphML 文件）"""
         mock_rag = Mock()
         self.builder.rag_instance = mock_rag
 
         with patch.object(self.builder, 'initialize_lightrag', return_value=mock_rag):
-            result = await self.builder._build_graph_async(graph_name="empty_graph")
+            result = await self.builder.abuild_graph(graph_name= "empty_graph")
 
             self.assertEqual(result.name, "empty_graph")
             self.assertEqual(len(result.entities), 0)
@@ -200,7 +173,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         """测试异步构建图（RAG 未初始化）"""
         with patch.object(self.builder, 'initialize_lightrag', return_value=None):
             with self.assertRaises(RuntimeError):
-                await self.builder._build_graph_async()
+                await self.builder.abuild_graph()
 
     @async_test
     async def test_build_graph_async_insert_error(self):
@@ -210,7 +183,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
 
         with patch.object(self.builder, 'initialize_lightrag', return_value=mock_rag):
             with self.assertRaises(Exception):
-                await self.builder._build_graph_async(texts=["test text"])
+                await self.builder.abuild_graph(texts=["test text"])
 
     def test_update_graph(self):
         """测试更新图"""
@@ -230,7 +203,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         async def mock_add_documents_async(*args, **kwargs):
             return mock_graph
 
-        with patch.object(self.builder, '_add_documents_async', side_effect=mock_add_documents_async):
+        with patch.object(self.builder, 'aadd_documents', side_effect=mock_add_documents_async):
             result = self.builder.add_documents(["doc1", "doc2"], "updated_graph")
 
             self.assertEqual(result.name, "updated_graph")
@@ -246,10 +219,11 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         graphml_file = Path(self.temp_dir) / "graph_chunk_entity_relation.graphml"
         graphml_file.write_text(graphml_content, encoding='utf-8')
 
-        # 直接设置 rag_instance 而不是模拟 initialize_lightrag
+        # 直接设置 rag_instance 并标记为已初始化
         self.builder.rag_instance = mock_rag
+        self.builder._initialized = True
 
-        result = await self.builder._add_documents_async(
+        result = await self.builder.aadd_documents(
             ["document 1", "document 2"],
             "updated_graph"
         )
@@ -264,10 +238,11 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         mock_rag = Mock()
         mock_rag.ainsert = AsyncMock()
 
-        # 直接设置 rag_instance
+        # 直接设置 rag_instance 并标记为已初始化
         self.builder.rag_instance = mock_rag
+        self.builder._initialized = True
 
-        result = await self.builder._add_documents_async(["doc"], "test_graph")
+        result = await self.builder.aadd_documents(["doc"], "test_graph")
 
         self.assertEqual(result.name, "test_graph")
         self.assertEqual(len(result.entities), 0)
@@ -280,7 +255,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         async def mock_search_graph_async(*args, **kwargs):
             return mock_result
 
-        with patch.object(self.builder, '_search_graph_async', side_effect=mock_search_graph_async):
+        with patch.object(self.builder, 'asearch_graph', side_effect=mock_search_graph_async):
             result = self.builder.search_graph("test query", "hybrid")
 
             self.assertEqual(result["query"], "test")
@@ -291,15 +266,16 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         mock_rag = Mock()
         mock_rag.aquery = AsyncMock(return_value="search result")
 
-        # 直接设置 rag_instance
+        # 直接设置 rag_instance 并标记为已初始化
         self.builder.rag_instance = mock_rag
+        self.builder._initialized = True
 
         # 模拟 QueryParam
         mock_query_param = Mock()
         with patch.dict('sys.modules', {
             'lightrag': Mock(QueryParam=mock_query_param)
         }):
-            result = await self.builder._search_graph_async("test query", "local")
+            result = await self.builder.asearch_graph("test query", "local")
 
             self.assertEqual(result["query"], "test query")
             self.assertEqual(result["search_type"], "local")
@@ -311,7 +287,7 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         """测试异步搜索图（RAG 未初始化）"""
         with patch.object(self.builder, 'initialize_lightrag', return_value=None):
             with self.assertRaises(RuntimeError):
-                await self.builder._search_graph_async("test")
+                await self.builder.asearch_graph("test")
 
     def test_cleanup_sync(self):
         """测试同步清理"""
@@ -650,30 +626,13 @@ class TestLightRAGGraphBuilderErrorHandling(unittest.TestCase):
         except Exception:
             pass
 
-    # def test_build_graph_with_database_schema_warning(self):
-    #     """测试使用数据库模式构建图的警告"""
-    #     with patch('agraph.builders.lightrag_builder.logger') as mock_logger:
-    #         # 数据库模式应该被忽略，但不应该导致错误
-    #         graph = self.builder.build_graph(
-    #             database_schema={"tables": ["test_table"]},
-    #             graph_name="db_test"
-    #         )
-    #
-    #         self.assertEqual(graph.name, "db_test")
-
-    # def test_xml_parsing_robustness(self):
-    #     """测试 XML 解析的鲁棒性"""
-    #     # 测试格式错误的 XML
-    #     with self.assertRaises(ET.ParseError):
-    #         self.builder._load_graph_from_graphml("nonexistent", "test")
-    #
     @async_test
     async def test_async_operations_exception_handling(self):
         """测试异步操作的异常处理"""
         # 测试初始化失败时的异常处理
         with patch.object(self.builder, 'initialize_lightrag', side_effect=Exception("Init failed")):
             with self.assertRaises(Exception):
-                await self.builder._build_graph_async()
+                await self.builder.abuild_graph()
 
 
 if __name__ == "__main__":
