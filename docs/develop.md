@@ -127,7 +127,7 @@ black --line-length=120 agraph/ examples/
 isort --check-only --diff agraph/ examples/
 
 # 自动排序
-isort agraph/ examples/
+isort --line-length=120 agraph/ examples/
 ```
 
 #### 3. 语法检查 (Flake8)
