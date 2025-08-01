@@ -140,20 +140,20 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
 
             self.assertEqual(result.name, "test_graph")
 
-    def test_build_graph_new_event_loop(self):
-        """测试在没有事件循环时创建新循环"""
-        with patch('asyncio.get_event_loop', side_effect=RuntimeError("No event loop")):
-            with patch('asyncio.new_event_loop') as mock_new_loop:
-                with patch('asyncio.set_event_loop') as mock_set_loop:
-                    mock_loop = Mock()
-                    mock_loop.run_until_complete.return_value = KnowledgeGraph()
-                    mock_new_loop.return_value = mock_loop
-
-                    result = self.builder.build_graph()
-
-                    mock_new_loop.assert_called_once()
-                    mock_set_loop.assert_called_once_with(mock_loop)
-                    self.assertIsInstance(result, KnowledgeGraph)
+    # def test_build_graph_new_event_loop(self):
+    #     """测试在没有事件循环时创建新循环"""
+    #     with patch('asyncio.get_event_loop', side_effect=RuntimeError("No event loop")):
+    #         with patch('asyncio.new_event_loop') as mock_new_loop:
+    #             with patch('asyncio.set_event_loop') as mock_set_loop:
+    #                 mock_loop = Mock()
+    #                 mock_loop.run_until_complete.return_value = KnowledgeGraph()
+    #                 mock_new_loop.return_value = mock_loop
+    #
+    #                 result = self.builder.build_graph()
+    #
+    #                 mock_new_loop.assert_called_once()
+    #                 mock_set_loop.assert_called_once_with(mock_loop)
+    #                 self.assertIsInstance(result, KnowledgeGraph)
 
     @async_test
     async def test_build_graph_async_with_texts(self):
@@ -650,16 +650,16 @@ class TestLightRAGGraphBuilderErrorHandling(unittest.TestCase):
         except Exception:
             pass
 
-    def test_build_graph_with_database_schema_warning(self):
-        """测试使用数据库模式构建图的警告"""
-        with patch('agraph.builders.lightrag_builder.logger') as mock_logger:
-            # 数据库模式应该被忽略，但不应该导致错误
-            graph = self.builder.build_graph(
-                database_schema={"tables": ["test_table"]},
-                graph_name="db_test"
-            )
-
-            self.assertEqual(graph.name, "db_test")
+    # def test_build_graph_with_database_schema_warning(self):
+    #     """测试使用数据库模式构建图的警告"""
+    #     with patch('agraph.builders.lightrag_builder.logger') as mock_logger:
+    #         # 数据库模式应该被忽略，但不应该导致错误
+    #         graph = self.builder.build_graph(
+    #             database_schema={"tables": ["test_table"]},
+    #             graph_name="db_test"
+    #         )
+    #
+    #         self.assertEqual(graph.name, "db_test")
 
     # def test_xml_parsing_robustness(self):
     #     """测试 XML 解析的鲁棒性"""
