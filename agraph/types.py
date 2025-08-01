@@ -17,6 +17,8 @@ class EntityType(Enum):
     DATABASE = "database"
     DOCUMENT = "document"
     KEYWORD = "keyword"
+    PRODUCT = "product"
+    SOFTWARE = "software"
     UNKNOWN = "unknown"
 
 
@@ -33,3 +35,6 @@ class RelationType(Enum):
     MENTIONS = "mentions"  # 提及关系
     DESCRIBES = "describes"  # 描述关系
     SYNONYMS = "synonyms"  # 同义词关系
+    DEVELOPS = "develops"  # 开发关系
+    CREATES = "creates"  # 创造关系
+    FOUNDED_BY = "founded_by"  # 创立关系

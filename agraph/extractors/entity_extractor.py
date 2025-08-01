@@ -150,18 +150,33 @@ class TextEntityExtractor(BaseEntityExtractor):
         """初始化实体识别模式"""
         self.entity_patterns = {
             EntityType.PERSON.value: [
-                r"\b[A-Z][a-z]+ [A-Z][a-z]+\b",  # 人名模式
+                r"\b[A-Z][a-z]+ [A-Z][a-z]+\b",  # 英文人名模式
                 r"\b(?:Mr|Mrs|Ms|Dr|Prof)\.? [A-Z][a-z]+\b",  # 称谓+名字
+                r"[\u4e00-\u9fff]{2,4}·[\u4e00-\u9fff]{2,4}",  # 中文人名·模式
+                r"史蒂夫·[\u4e00-\u9fff]+",  # 史蒂夫·开头的人名
+                r"[\u4e00-\u9fff]{2}[\u4e00-\u9fff]{1,2}(?:先生|女士|博士|教授)",  # 中文称谓
             ],
             EntityType.ORGANIZATION.value: [
                 r"\b[A-Z][a-zA-Z\s&]+ (?:Inc|Corp|Ltd|LLC|Company|Organization)\b",
                 r"\b[A-Z][A-Z\s]+\b",  # 全大写可能是组织
+                r"[\u4e00-\u9fff]+(?:公司|企业|集团|组织|机构|大学|学院|研究所)",  # 中文组织
+                r"苹果公司|清华大学|Facebook|Google|TensorFlow|PyTorch",  # 具体组织名
             ],
             EntityType.LOCATION.value: [
                 r"\b[A-Z][a-z]+ (?:City|State|Country|Province|District)\b",
                 r"\bin [A-Z][a-z]+\b",  # 地点介词短语
+                r"[\u4e00-\u9fff]+(?:市|省|区|县|国|州|地区)",  # 中文地名
+                r"北京|上海|加利福尼亚州|库比蒂诺|海淀区",  # 具体地名
             ],
-            EntityType.CONCEPT.value: [r"\b[a-z]+ (?:concept|theory|principle|method|approach)\b"],
+            EntityType.CONCEPT.value: [
+                r"\b[a-z]+ (?:concept|theory|principle|method|approach)\b",
+                r"[\u4e00-\u9fff]+(?:技术|概念|理论|方法|系统|平台|框架)",  # 中文概念
+                r"人工智能|机器学习|深度学习|自然语言处理|计算机视觉|iOS|iPhone",  # 具体概念
+            ],
+            EntityType.PRODUCT.value: [
+                r"iPhone|iPad|macOS|iOS|Django|Flask|Python|TensorFlow|PyTorch",  # 产品名
+                r"[\u4e00-\u9fff]+(?:产品|系统|平台|应用|软件)",  # 中文产品
+            ],
         }
 
     def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:

@@ -33,25 +33,49 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         super().__init__()
         self.working_dir = Path(working_dir)
         self.rag_instance: Optional[Any] = None
+        self._initialized: bool = False
+
+    def __del__(self) -> None:
+        """确保资源被正确清理"""
+        if self._initialized and self.rag_instance:
+            try:
+                self.cleanup()
+            except Exception:
+                pass
 
     def _run_async(self, coro: Coroutine[Any, Any, T]) -> T:
         """运行异步协程的辅助方法，处理事件循环"""
         try:
             # 尝试获取当前运行的事件循环
-            _ = asyncio.get_running_loop()
+            asyncio.get_running_loop()
+            # 如果已经在事件循环中，抛出异常，强制使用线程池
+            raise RuntimeError("Cannot run async operation in existing event loop")
         except RuntimeError:
-            # 如果没有正在运行的事件循环，直接使用 asyncio.run
-            return asyncio.run(coro)
+            # 没有正在运行的事件循环，或者需要在新线程中运行
+            pass
 
-        # 如果有正在运行的循环，需要在新的线程中运行
-
+        # 在新线程中运行协程，避免事件循环冲突
         def run_in_thread() -> T:
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
                 return new_loop.run_until_complete(coro)
             finally:
-                new_loop.close()
+                # 确保事件循环完全关闭
+                try:
+                    # 取消所有剩余任务
+                    pending = asyncio.all_tasks(new_loop)
+                    for task in pending:
+                        task.cancel()
+
+                    # 等待所有任务取消完成
+                    if pending:
+                        new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass  # 忽略清理时的异常
+                finally:
+                    new_loop.close()
+                    asyncio.set_event_loop(None)
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_in_thread)
@@ -59,7 +83,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
 
     async def initialize_lightrag(self) -> Any:
         """初始化LightRAG实例"""
-        if self.rag_instance is not None:
+        if self._initialized and self.rag_instance is not None:
             return self.rag_instance
 
         try:
@@ -117,6 +141,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                 await self.rag_instance.initialize_storages()  # 初始化存储后端
             await initialize_pipeline_status()  # 初始化处理管道
 
+            self._initialized = True
             logger.info("LightRAG initialized with working directory: %s", self.working_dir)
             return self.rag_instance
 
@@ -127,6 +152,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         except Exception as e:
             logger.error("Failed to initialize LightRAG: %s", e)
             self.rag_instance = None
+            self._initialized = False
             raise
 
     def build_graph(
@@ -323,12 +349,18 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         """
         if self.rag_instance:
             try:
+                # 只清理存储，让LightRAG正常结束
                 await self.rag_instance.finalize_storages()
+
+                # 给LightRAG一些时间来完成后台任务
+                await asyncio.sleep(0.1)
+
                 logger.info("LightRAG resources cleaned up")
             except Exception as e:
                 logger.error("Error during cleanup: %s", e)
             finally:
                 self.rag_instance = None
+                self._initialized = False
 
     def _load_graph_from_graphml(self, graphml_file: str, graph_name: str) -> KnowledgeGraph:
         """

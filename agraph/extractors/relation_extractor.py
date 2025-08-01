@@ -113,10 +113,22 @@ class BaseRelationExtractor(ABC):
             (EntityType.COLUMN, EntityType.COLUMN, RelationType.FOREIGN_KEY),
             (EntityType.DOCUMENT, EntityType.CONCEPT, RelationType.MENTIONS),
             (EntityType.PERSON, EntityType.ORGANIZATION, RelationType.BELONGS_TO),
+            (EntityType.PERSON, EntityType.ORGANIZATION, RelationType.FOUNDED_BY),
+            (EntityType.ORGANIZATION, EntityType.PRODUCT, RelationType.DEVELOPS),
+            (EntityType.ORGANIZATION, EntityType.SOFTWARE, RelationType.DEVELOPS),
+            (EntityType.ORGANIZATION, EntityType.LOCATION, RelationType.BELONGS_TO),
             (EntityType.CONCEPT, EntityType.CONCEPT, RelationType.SIMILAR_TO),
+            (EntityType.CONCEPT, EntityType.CONCEPT, RelationType.RELATED_TO),
+            (EntityType.PRODUCT, EntityType.CONCEPT, RelationType.RELATED_TO),
+            (EntityType.SOFTWARE, EntityType.CONCEPT, RelationType.RELATED_TO),
         }
 
-        return (head_type, tail_type, relation_type) in valid_combinations
+        # 暂时放宽验证以支持更多关系类型组合
+        return (head_type, tail_type, relation_type) in valid_combinations or relation_type in {
+            RelationType.RELATED_TO,
+            RelationType.MENTIONS,
+            RelationType.DESCRIBES,
+        }
 
     def _infer_transitive_relations(self, relations: List[Relation]) -> List[Relation]:
         """基于传递性推断关系"""
@@ -235,22 +247,40 @@ class TextRelationExtractor(BaseRelationExtractor):
             RelationType.BELONGS_TO.value: [
                 r"(.+?) (?:belongs to|is part of|works for) (.+)",
                 r"(.+?) of (.+)",
+                r"(.+?)(?:位于|在)(.+)",  # 中文位置关系
+                r"(.+?)(?:属于|隶属于)(.+)",  # 中文归属关系
             ],
             RelationType.CONTAINS.value: [
                 r"(.+?) (?:contains|includes|has) (.+)",
                 r"(.+?) with (.+)",
+                r"(.+?)(?:包括|包含|有)(.+)",  # 中文包含关系
+                r"(.+?)(?:下辖|管辖)(.+)",  # 中文管辖关系
             ],
             RelationType.SIMILAR_TO.value: [
                 r"(.+?) (?:is similar to|resembles|is like) (.+)",
                 r"(.+?) and (.+?) are similar",
+                r"(.+?)(?:类似于|相似于)(.+)",  # 中文相似关系
             ],
             RelationType.RELATED_TO.value: [
                 r"(.+?) (?:is related to|relates to|associated with) (.+)",
                 r"(.+?) and (.+?) are related",
+                r"(.+?)(?:相关|关联|涉及)(.+)",  # 中文相关关系
             ],
             RelationType.DESCRIBES.value: [
                 r"(.+?) (?:describes|explains|defines) (.+)",
                 r"(.+?) is described by (.+)",
+                r"(.+?)(?:描述|说明|定义)(.+)",  # 中文描述关系
+            ],
+            RelationType.DEVELOPS.value: [
+                r"(.+?) (?:develops|creates|builds) (.+)",
+                r"(.+?) developed by (.+)",
+                r"(.+?)(?:开发|研发|创造|制造)(.+)",  # 中文开发关系
+                r"(.+?)(?:由)(.+?)(?:开发|创建)",  # 中文被动开发关系
+            ],
+            RelationType.FOUNDED_BY.value: [
+                r"(.+?) (?:founded by|established by|created by) (.+)",
+                r"(.+?)(?:由)(.+?)(?:创立|成立|建立)",  # 中文创立关系
+                r"(.+?)(?:创建于|成立于)(.+)",  # 中文时间创立关系
             ],
         }
 

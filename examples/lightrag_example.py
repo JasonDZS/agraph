@@ -39,7 +39,7 @@ async def basic_usage_example():
     try:
         # 3. 构建知识图谱
         print("正在构建知识图谱...")
-        graph = await builder.build_graph(texts=documents, graph_name="示例知识图谱")
+        graph = builder.build_graph(texts=documents, graph_name="示例知识图谱")
 
         print(f"构建完成! 实体数量: {len(graph.entities)}, 关系数量: {len(graph.relations)}")
 
@@ -89,7 +89,7 @@ async def search_example(builder: LightRAGGraphBuilder):
             print(f"\n查询: {query}")
             print(f"搜索类型: {search_type}")
 
-            result = await builder.search_graph(query, search_type)
+            result = builder.search_graph(query, search_type)
 
             print("搜索结果:")
             print(result.get("result", "无结果")[:200] + "...")
@@ -123,13 +123,13 @@ async def incremental_update_example(builder: LightRAGGraphBuilder):
 
     try:
         print("正在添加新文档到知识图谱...")
-        updated_graph = await builder.add_documents(new_documents, "更新后的示例知识图谱")
+        updated_graph = builder.add_documents(new_documents, "更新后的示例知识图谱")
 
         print(f"更新完成! 新的实体数量: {len(updated_graph.entities)}, 关系数量: {len(updated_graph.relations)}")
 
         # 测试搜索新添加的内容
         print("\n测试搜索新内容:")
-        result = await builder.search_graph("上海是什么样的城市？", "hybrid")
+        result = builder.search_graph("上海是什么样的城市？", "hybrid")
         print("搜索结果:", result.get("result", "无结果")[:200] + "...")
 
     except Exception as e:
@@ -178,7 +178,7 @@ async def statistics_example(builder: LightRAGGraphBuilder):
         return
 
     try:
-        stats = await builder.get_graph_statistics()
+        stats = builder.get_graph_statistics()
 
         print("图谱统计信息:")
         print(f"- 实体数量: {stats.get('entities_count', 0)}")
@@ -226,18 +226,18 @@ async def advanced_usage_example():
             print(f"处理{category}...")
             all_texts.extend(texts)
 
-        graph = await custom_builder.build_graph(texts=all_texts, graph_name="综合知识图谱")
+        graph = custom_builder.build_graph(texts=all_texts, graph_name="综合知识图谱")
         print(f"综合图谱构建完成: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
 
         # 获取详细统计
-        stats = await custom_builder.get_graph_statistics()
+        stats = custom_builder.get_graph_statistics()
         print("详细统计:", stats)
 
     except Exception as e:
         print(f"高级示例执行失败: {e}")
     finally:
         # 清理高级示例的资源
-        await custom_builder.cleanup()
+        custom_builder.cleanup()
 
 
 async def main():
@@ -267,7 +267,7 @@ async def main():
 
     # 清理主要builder的资源
     if builder:
-        await builder.cleanup()
+        builder.cleanup()
 
 
 if __name__ == "__main__":
