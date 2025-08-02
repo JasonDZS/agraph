@@ -1,0 +1,49 @@
+{
+  "products": [
+    {
+      "name": "智能分析平台",
+      "type": "数据分析产品",
+      "description": "基于机器学习的企业数据分析平台，支持实时数据处理和可视化展示",
+      "features": [
+        "实时数据处理",
+        "智能报表生成",
+        "预测分析",
+        "数据可视化"
+      ],
+      "technology": ["Python", "TensorFlow", "React", "PostgreSQL"],
+      "target_users": "大中型企业"
+    },
+    {
+      "name": "NLP文本分析工具",
+      "type": "自然语言处理产品",
+      "description": "专业的中文文本分析工具，支持情感分析、实体识别、关系抽取等功能",
+      "features": [
+        "情感分析",
+        "命名实体识别",
+        "关系抽取",
+        "文本分类",
+        "关键词提取"
+      ],
+      "technology": ["Python", "PyTorch", "BERT", "FastAPI"],
+      "target_users": "媒体公司、金融机构"
+    },
+    {
+      "name": "智能客服系统",
+      "type": "对话AI产品",
+      "description": "基于大语言模型的智能客服系统，支持多轮对话和知识库问答",
+      "features": [
+        "多轮对话",
+        "知识库问答",
+        "情绪识别",
+        "多渠道接入"
+      ],
+      "technology": ["Python", "OpenAI API", "Vue.js", "MongoDB"],
+      "target_users": "电商、教育、医疗机构"
+    }
+  ],
+  "company_info": {
+    "total_products": 3,
+    "main_technologies": ["Python", "机器学习", "自然语言处理"],
+    "research_areas": ["深度学习", "知识图谱", "多模态AI"]
+  }
+}

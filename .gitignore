@@ -163,3 +163,4 @@ cython_debug/
 .idea/
 .claude/
 workdir/
+CLAUDE.md

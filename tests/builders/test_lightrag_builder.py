@@ -204,7 +204,8 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
             return mock_graph
 
         with patch.object(self.builder, 'aadd_documents', side_effect=mock_add_documents_async):
-            result = self.builder.add_documents(["doc1", "doc2"], "updated_graph")
+            # 使用 asyncio.run 来运行协程
+            result = asyncio.run(self.builder.aadd_documents(["doc1", "doc2"], "updated_graph"))
 
             self.assertEqual(result.name, "updated_graph")
 
@@ -256,7 +257,8 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
             return mock_result
 
         with patch.object(self.builder, 'asearch_graph', side_effect=mock_search_graph_async):
-            result = self.builder.search_graph("test query", "hybrid")
+            # 使用 asyncio.run 来运行协程
+            result = asyncio.run(self.builder.asearch_graph("test query", "hybrid"))
 
             self.assertEqual(result["query"], "test")
 
@@ -288,38 +290,6 @@ class TestLightRAGGraphBuilder(unittest.TestCase):
         with patch.object(self.builder, 'initialize_lightrag', return_value=None):
             with self.assertRaises(RuntimeError):
                 await self.builder.asearch_graph("test")
-
-    def test_cleanup_sync(self):
-        """测试同步清理"""
-        # 模拟异步方法，确保正确返回协程
-        async def mock_cleanup_async():
-            return None
-
-        with patch.object(self.builder, '_cleanup_async', side_effect=mock_cleanup_async):
-            self.builder.cleanup()
-
-    @async_test
-    async def test_cleanup_async(self):
-        """测试异步清理"""
-        mock_rag = Mock()
-        mock_rag.finalize_storages = AsyncMock()
-        self.builder.rag_instance = mock_rag
-
-        await self.builder._cleanup_async()
-
-        mock_rag.finalize_storages.assert_called_once()
-        self.assertIsNone(self.builder.rag_instance)
-
-    @async_test
-    async def test_cleanup_async_error(self):
-        """测试异步清理错误"""
-        mock_rag = Mock()
-        mock_rag.finalize_storages = AsyncMock(side_effect=Exception("Cleanup failed"))
-        self.builder.rag_instance = mock_rag
-
-        # 不应该抛出异常
-        await self.builder._cleanup_async()
-        self.assertIsNone(self.builder.rag_instance)
 
     def test_load_graph_from_graphml(self):
         """测试从 GraphML 加载图"""
@@ -599,7 +569,7 @@ class TestLightRAGGraphBuilderIntegration(unittest.TestCase):
             self.assertEqual(graph.name, "integration_test")
 
             # 测试搜索
-            search_result = self.builder.search_graph("test query")
+            search_result = asyncio.run(self.builder.asearch_graph("test query"))
             self.assertIn("result", search_result)
 
             # 测试清理
