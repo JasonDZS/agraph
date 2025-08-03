@@ -1,7 +1,7 @@
 """Tests for document processor factory and manager."""
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 

@@ -4,6 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Generator
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -215,3 +216,14 @@ def skip_if_no_module(module_name: str):
         return False
     except ImportError:
         return True
+
+
+@pytest.fixture(autouse=True)
+def mock_image_processor():
+    """Automatically mock ImageProcessor to avoid API key requirements in tests."""
+    with patch.dict('os.environ', {'OPENAI_API_KEY': 'test_key'}), \
+         patch('agraph.processer.image_processor.OpenAIVisionModel') as mock_vision_model:
+        # Mock the OpenAI vision model to avoid actual API calls
+        mock_instance = Mock()
+        mock_vision_model.return_value = mock_instance
+        yield mock_instance
