@@ -44,7 +44,7 @@ class Neo4jStorage(GraphStorage):
             with self.driver.session(database=self.database) as session:
                 session.run("RETURN 1")
 
-            self.is_connected = True
+            self.set_connected(True)
             logger.info("Connected to Neo4j database at %s", self.uri)
 
             # 创建索引
@@ -54,7 +54,7 @@ class Neo4jStorage(GraphStorage):
 
         except Exception as e:
             logger.error("Failed to connect to Neo4j: %s", e)
-            self.is_connected = False
+            self.set_connected(False)
             return False
 
     def disconnect(self) -> None:
@@ -62,12 +62,12 @@ class Neo4jStorage(GraphStorage):
         if self.driver:
             self.driver.close()
             self.driver = None
-            self.is_connected = False
+            self.set_connected(False)
             logger.info("Disconnected from Neo4j database")
 
     def create_indexes(self) -> None:
         """创建图数据库索引"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             return
 
         try:
@@ -90,7 +90,7 @@ class Neo4jStorage(GraphStorage):
 
     def save_graph(self, graph: KnowledgeGraph) -> bool:
         """保存知识图谱"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return False
 
@@ -121,7 +121,7 @@ class Neo4jStorage(GraphStorage):
 
     def load_graph(self, graph_id: str) -> Optional[KnowledgeGraph]:
         """加载知识图谱"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return None
 
@@ -159,7 +159,7 @@ class Neo4jStorage(GraphStorage):
 
     def delete_graph(self, graph_id: str) -> bool:
         """删除知识图谱"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return False
 
@@ -178,7 +178,7 @@ class Neo4jStorage(GraphStorage):
 
     def list_graphs(self) -> List[Dict[str, Any]]:
         """列出所有图谱"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return []
 
@@ -211,7 +211,7 @@ class Neo4jStorage(GraphStorage):
 
     def query_entities(self, conditions: Dict[str, Any]) -> List[Entity]:
         """查询实体"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return []
 
@@ -263,7 +263,7 @@ class Neo4jStorage(GraphStorage):
         relation_type: Optional[RelationType] = None,
     ) -> List[Relation]:
         """查询关系"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return []
 
@@ -315,7 +315,7 @@ class Neo4jStorage(GraphStorage):
 
     def add_entity(self, graph_id: str, entity: Entity) -> bool:
         """添加实体"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             return False
 
         try:
@@ -328,7 +328,7 @@ class Neo4jStorage(GraphStorage):
 
     def add_relation(self, graph_id: str, relation: Relation) -> bool:
         """添加关系"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             return False
 
         try:
@@ -349,7 +349,7 @@ class Neo4jStorage(GraphStorage):
 
     def remove_entity(self, graph_id: str, entity_id: str) -> bool:
         """删除实体"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             return False
 
         try:
@@ -369,7 +369,7 @@ class Neo4jStorage(GraphStorage):
 
     def remove_relation(self, graph_id: str, relation_id: str) -> bool:
         """删除关系"""
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             return False
 
         try:
@@ -398,7 +398,7 @@ class Neo4jStorage(GraphStorage):
         Returns:
             List[Dict[str, Any]]: 查询结果
         """
-        if not self.is_connected or not self.driver:
+        if not self.is_connected() or not self.driver:
             logger.error("Not connected to Neo4j database")
             return []
 

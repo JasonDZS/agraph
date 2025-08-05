@@ -1,364 +1,218 @@
 # 知识图谱模块
-
-本模块提供了完整的知识图谱构建、存储和查询功能，支持多种构建器和存储后端。
-
-**要求**: Python 3.10+
-
-## 📋 目录结构
-
-```
-agraph/
-├── __init__.py                    # 模块入口和便捷函数
-├── types.py                       # 类型定义和枚举
-├── entities.py                    # 实体数据结构
-├── relations.py                   # 关系数据结构
-├── graph.py                       # 知识图谱核心结构
-├── utils.py                       # 工具函数
-├── extractors/                    # 抽取器模块
-│   ├── __init__.py
-│   ├── entity_extractor.py        # 实体抽取器
-│   └── relation_extractor.py      # 关系抽取器
-├── builders/                      # 构建器模块
-│   ├── __init__.py
-│   ├── graph_builder.py           # 标准图谱构建器
-│   └── lightrag_builder.py        # LightRAG构建器
-├── storage/                       # 存储模块
-│   ├── __init__.py
-│   ├── base_storage.py            # 存储基类
-│   ├── neo4j_storage.py           # Neo4j存储
-│   └── json_storage.py            # JSON文件存储
-└── embeddings/                    # 嵌入模块
-    ├── __init__.py
-    └── graph_embedding.py         # 图嵌入算法
-examples/                          # 使用示例
-├── __init__.py
-└── lightrag_example.py           # LightRAG使用示例
-```
-
 ## 🚀 快速开始
 
-### 基本使用
+### 1. 基本知识图谱构建
 
 ```python
-from agraph import (
-    create_standard_graph_builder,
-    create_lightrag_graph_builder,
-    create_json_storage
-)
+import asyncio
+from agraph.builders import MinimalLLMGraphBuilder
+from agraph.embeddings import JsonVectorStorage
 
-# 创建标准图构建器
-builder = create_standard_graph_builder()
-graph = builder.build_graph(
-    texts = ["知识图谱是一种结构化的知识表示方法"],
-    graph_name = "demo_graph"
-)
-
-# 使用JSON存储保存图谱
-storage = create_json_storage("./graphs")
-storage.save_graph(graph)
-```
-
-### LightRAG构建器使用
-
-```python
-from agraph import create_lightrag_graph_builder
-
-# 创建LightRAG构建器
-builder = create_lightrag_graph_builder("./lightrag_storage")
-
-# 构建知识图谱
-documents = [
-    "北京是中华人民共和国的首都，位于华北地区。",
-    "清华大学是中国著名的高等学府，位于北京市海淀区。"
-]
-
-graph = builder.build_graph(texts = documents, graph_name = "示例图谱")
-
-# 搜索知识图谱
-result = builder.search_graph("北京有什么特点？", search_type = "hybrid")
-print(result["result"])
-
-# 添加新文档
-new_docs = ["上海是中华人民共和国的直辖市。"]
-updated_graph = builder.add_documents(new_docs)
-```
-
-## 📚 构建器类型
-
-### 1. StandardGraphBuilder（标准构建器）
-
-- **特点**: 基于规则和模式的实体关系抽取
-- **适用**: 结构化数据、特定领域文本
-- **优势**: 可控性高、可定制性强
-
-```python
-builder = StandardGraphBuilder()
-graph = builder.build_graph(
-    texts=["文本内容"],
-    database_schema={"tables": [...]}  # 支持数据库模式
-)
-```
-
-### 2. LightRAGGraphBuilder（LightRAG构建器）
-
-- **特点**: 基于LightRAG框架的智能图谱构建
-- **适用**: 大规模文档、复杂文本理解
-- **优势**: 自动化程度高、质量好
-
-```python
-builder = LightRAGGraphBuilder("./storage_dir")
-
-# 构建图谱
-graph = builder.build_graph(texts=documents)
-
-# 智能搜索
-result = builder.search_graph(
-    query="查询内容",
-    search_type="hybrid"  # naive, local, global, hybrid
-)
-
-# 增量更新
-updated_graph = builder.add_documents(new_documents)
-
-# 导出GraphML格式
-builder.export_to_graphml(graph, "output.graphml")
-```
-
-### 3. MultiSourceGraphBuilder（多源构建器）
-
-- **特点**: 支持多种数据源的图谱合并
-- **适用**: 复杂数据集成场景
-- **优势**: 数据源权重控制、冲突处理
-
-```python
-builder = MultiSourceGraphBuilder()
-sources = [
-    {"type": "text", "data": ["文本1", "文本2"], "weight": 1.0},
-    {"type": "database", "data": database_schema, "weight": 0.8}
-]
-graph = builder.build_graph_from_multiple_sources(sources)
-```
-
-## 💾 存储后端
-
-### 1. JsonStorage（JSON文件存储）
-
-```python
-storage = JsonStorage("./graphs")
-storage.connect()
-
-# 保存和加载
-storage.save_graph(graph)
-loaded_graph = storage.load_graph(graph_id)
-
-# 查询
-entities = storage.query_entities({"entity_type": "person"})
-relations = storage.query_relations(head_entity="entity_id")
-```
-
-### 2. Neo4jStorage（Neo4j图数据库）
-
-```python
-storage = Neo4jStorage(
-    uri="bolt://localhost:7687",
-    username="neo4j",
-    password="password"
-)
-
-if storage.connect():
-    storage.save_graph(graph)
-
-    # 执行Cypher查询
-    results = storage.execute_cypher(
-        "MATCH (n:Entity) RETURN n LIMIT 10"
+async def build_knowledge_graph():
+    # 创建图构建器
+    builder = MinimalLLMGraphBuilder(
+        openai_api_key="your-openai-api-key",
+        llm_model="gpt-4o-mini",  # 指定LLM模型
+        temperature=0.1
     )
+
+    # 从文本构建知识图谱
+    texts = [
+        "苹果公司是由史蒂夫·乔布斯创立的科技公司。",
+        "iPhone是苹果公司的旗舰智能手机产品。",
+        "史蒂夫·乔布斯在2011年之前担任苹果公司CEO。"
+    ]
+
+    graph = await builder.build_graph(texts=texts, graph_name="科技公司")
+
+    print(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
+    return graph, builder
+
+# 运行示例
+if __name__ == "__main__":
+    graph, builder = asyncio.run(build_knowledge_graph())
 ```
 
-## 🎯 LightRAG构建器详细说明
-
-### 核心特性
-
-1. **自动实体关系抽取**: 基于LLM的智能抽取
-2. **GraphML格式支持**: 与现有系统完全兼容
-3. **多种搜索模式**: naive、local、global、hybrid
-4. **增量更新**: 支持动态添加文档
-5. **统计分析**: 实时图谱统计信息
-
-### GraphML文件结构
-
-LightRAG生成的GraphML文件包含：
-
-**节点属性**:
-- `d0`: entity_id（实体ID）
-- `d1`: entity_type（实体类型）
-- `d2`: description（描述）
-- `d3`: source_id（源ID）
-- `d4`: file_path（文件路径）
-- `d5`: created_at（创建时间）
-
-**边属性**:
-- `d6`: weight（权重）
-- `d7`: description（关系描述）
-- `d8`: keywords（关键词）
-- `d9`: source_id（源ID）
-- `d10`: file_path（文件路径）
-- `d11`: created_at（创建时间）
-
-### 搜索模式说明
-
-- **naive**: 基础向量检索
-- **local**: 局部图谱搜索，适合具体问题
-- **global**: 全局图谱搜索，适合概览性问题
-- **hybrid**: 混合搜索，综合多种方法
-
-### 与现有API集成
-
-LightRAG构建器与 `knowledge_base.py` API完全兼容：
+### 2. 知识问答功能
 
 ```python
-# API中的GraphML解析函数可直接使用
-def _parse_graphml_to_kg_json(graphml_file_path: str) -> Dict[str, Any]:
-    # 解析LightRAG生成的GraphML文件
-    # 返回前端可视化所需的JSON格式
+import asyncio
+from agraph import KnowledgeRetriever
+from agraph.builders import FlexibleLLMGraphBuilder
+from agraph.embeddings import JsonVectorStorage
+
+async def question_answering():
+    # 首先创建带搜索功能的构建器
+    builder = FlexibleLLMGraphBuilder(
+        openai_api_key="your-openai-api-key",
+        llm_model="gpt-4o-mini",
+        embedding_model="text-embedding-3-small",
+        vector_storage=JsonVectorStorage("./vectors.json")
+    )
+
+    # 构建知识图谱
+    texts = [
+        "苹果公司是由史蒂夫·乔布斯创立的科技公司。",
+        "iPhone是苹果公司的旗舰智能手机产品。",
+        "史蒂夫·乔布斯在2011年之前担任苹果公司CEO。"
+    ]
+
+    graph = await builder.build_graph(texts=texts, graph_name="科技公司")
+
+    # 创建知识检索器（与构建器分离）
+    retriever = KnowledgeRetriever(
+        graph=graph,
+        graph_embedding=builder.graph_embedding
+    )
+
+    # 对知识图谱进行问答
+    questions = [
+        "谁创立了苹果公司？",
+        "苹果公司生产什么产品？",
+        "史蒂夫·乔布斯什么时候离开苹果？"
+    ]
+
+    for question in questions:
+        # 搜索相关实体
+        entities = await retriever.search_entities(question, top_k=3)
+        print(f"问题: {question}")
+        print(f"相关实体: {[entity['entity_name'] for entity in entities]}")
+        print()
+
+# 运行问答示例
+if __name__ == "__main__":
+    asyncio.run(question_answering())
 ```
 
-## 🛠 工具函数
+### 3. 文档处理示例
 
 ```python
-from agraph.utils import (
-    export_graph_to_cytoscape,
-    export_graph_to_d3,
-    find_shortest_path,
-    calculate_graph_metrics,
-    merge_similar_entities,
-    validate_graph_consistency
-)
+import asyncio
+from agraph.builders import FlexibleLLMGraphBuilder
+from agraph.processer.factory import DocumentProcessorFactory
+from agraph.embeddings import JsonVectorStorage
 
-# 导出为可视化格式
-cytoscape_data = export_graph_to_cytoscape(graph)
-d3_data = export_graph_to_d3(graph)
+async def process_documents():
+    # 创建文档处理构建器
+    builder = FlexibleLLMGraphBuilder(
+        openai_api_key="your-openai-api-key",
+        llm_model="gpt-4o-mini",
+        embedding_model="text-embedding-3-small",
+        vector_storage=JsonVectorStorage("./doc_vectors.json")
+    )
 
-# 图分析
-metrics = calculate_graph_metrics(graph)
-path = find_shortest_path(graph, "entity1", "entity2")
+    # 处理不同类型的文档
+    document_paths = [
+        "./examples/documents/company_info.txt",
+        "./examples/documents/products.json",
+        "./examples/documents/team.html"
+    ]
+
+    texts = []
+    processor_factory = DocumentProcessorFactory()
+
+    for doc_path in document_paths:
+        processor = processor_factory.get_processor(doc_path)
+        content = processor.process(doc_path)
+        texts.append(f"文档: {doc_path}\n{content}")
+
+    # 从处理后的文档构建图谱
+    graph = await builder.build_graph(texts=texts, graph_name="文档知识库")
+
+    print(f"处理了 {len(document_paths)} 个文档")
+    print(f"构建了包含 {len(graph.entities)} 个实体的图谱")
+
+if __name__ == "__main__":
+    asyncio.run(process_documents())
 ```
 
-## 📊 图嵌入算法
+## 📚 主要功能特性
 
-```python
-from agraph.embeddings import (
-    Node2VecEmbedding,
-    TransEEmbedding
-)
+### 🏗️ 知识图谱构建
+- **智能实体识别**: 基于LLM自动抽取实体和关系
+- **多格式支持**: PDF、Word、HTML、JSON、CSV等文档类型
+- **增量更新**: 支持动态添加新文档到现有图谱
+- **向量化存储**: 支持语义相似度搜索
+- **多种构建器**: 提供MinimalLLMGraphBuilder、FlexibleLLMGraphBuilder等不同功能的构建器
 
-# Node2Vec嵌入
-node2vec = Node2VecEmbedding(embedding_dim = 128)
-node2vec.train(graph)
-similarity = node2vec.compute_entity_similarity("entity1", "entity2")
+### 🔍 知识问答检索
+- **语义搜索**: 基于向量相似度的智能搜索
+- **实体查询**: 查找相关实体和它们的属性
+- **关系探索**: 发现实体间的复杂关系
+- **智能问答**: 专门的KnowledgeRetriever提供问答功能
+- **多种搜索模式**: 支持实体搜索、关系搜索和综合搜索
 
-# TransE嵌入
-transe = TransEEmbedding(embedding_dim = 128)
-transe.train(graph)
-entity_emb = transe.get_entity_embedding("entity_id")
+### 💾 灵活存储方案
+- **JSON存储**: 轻量级文件存储，适合小规模应用
+- **Neo4j存储**: 企业级图数据库，支持复杂查询
+- **向量存储**: JsonVectorStorage支持高效的相似度搜索
+- **LightRAG集成**: 支持GraphML格式和LightRAG工作目录结构
+
+## 🔧 环境配置
+
+### 安装依赖
+
+```bash
+# 开发安装（推荐）
+make install-dev
+
+# 或者直接安装
+pip install -e .
+
+# 可选依赖（根据需要安装）
+pip install beautifulsoup4  # HTML处理
+pip install pypdf          # PDF处理
+pip install python-docx    # Word文档处理
+pip install pandas         # Excel/CSV处理
+pip install pillow          # 图像处理
+pip install pytesseract     # OCR功能
 ```
 
-## 🔧 配置说明
+### API密钥设置
 
-### LightRAG配置
+```bash
+# 设置OpenAI API密钥（必需）
+export OPENAI_API_KEY="your-openai-api-key"
 
-```python
-builder = LightRAGGraphBuilder(
-    working_dir="./lightrag_storage"  # 工作目录
-)
-
-# 需要实现的函数
-def custom_llm_func(prompt, system_prompt=None, **kwargs):
-    # 调用你的LLM服务
-    return llm_response
-
-def custom_embedding_func(texts):
-    # 调用你的嵌入服务
-    return embeddings
-
-builder._llm_model_func = custom_llm_func
-builder._embedding_func = custom_embedding_func
+# 可选：自定义API地址
+export OPENAI_API_BASE="https://api.openai.com/v1"
 ```
 
-### 存储配置
+## 📖 更多示例
 
-```python
-# JSON存储配置
-json_storage = JsonStorage(
-    storage_dir="./graphs"  # 存储目录
-)
+查看 `examples/` 目录获取更多完整示例：
 
-# Neo4j存储配置
-neo4j_storage = Neo4jStorage(
-    uri="bolt://localhost:7687",
-    username="neo4j",
-    password="password",
-    database="neo4j"
-)
-```
+- **基础功能**: `llm_builder_example.py` - 展示多种LLM构建器的使用
+- **LightRAG集成**: `lightrag_example.py` - LightRAG构建器使用示例
+- **文档处理**: `llm_builder_folder.py` - 批量文档处理示例
+- **示例文档**: `documents/` - 包含各种格式的示例文档
 
-## 📖 完整示例
+## ⚡ 核心优势
 
-查看 `examples/lightrag_example.py` 获取完整的使用示例，包括：
-
-- 基本图谱构建
-- 多种搜索模式
-- 增量更新
-- GraphML导出
-- 统计信息获取
-- 高级用法
-
-## 🤝 扩展开发
-
-### 自定义构建器
-
-```python
-class CustomGraphBuilder(BaseKnowledgeGraphBuilder):
-    def build_graph(self, **kwargs):
-        # 实现你的图谱构建逻辑
-        pass
-
-    def update_graph(self, graph, **kwargs):
-        # 实现增量更新逻辑
-        pass
-```
-
-### 自定义存储
-
-```python
-class CustomStorage(GraphStorage):
-    def save_graph(self, graph):
-        # 实现保存逻辑
-        pass
-
-    def load_graph(self, graph_id):
-        # 实现加载逻辑
-        pass
-```
+- **🤖 智能化**: 基于LLM的自动实体关系抽取，无需手工规则
+- **🔍 语义化**: 支持向量相似度搜索，理解语义而非仅匹配关键词
+- **📄 多格式**: 自动处理PDF、Word、HTML等多种文档格式
+- **⚡ 高性能**: 支持增量更新和批量处理，适合大规模应用
+- **🔧 易扩展**: 模块化设计，支持自定义构建器和存储后端
+- **🏗️ SOLID设计**: 严格遵循SOLID原则，提供专门的构建器和检索器
+- **🔌 LightRAG集成**: 深度集成LightRAG框架，支持高级知识图谱功能
 
 ## 📝 注意事项
 
-1. **依赖要求**: LightRAG构建器需要安装 `lightrag` 包
-2. **LLM配置**: 需要配置实际的LLM和嵌入服务
-3. **内存使用**: 大规模图谱可能需要较多内存
-4. **并发安全**: 多线程环境下注意线程安全
-5. **错误处理**: 建议添加适当的异常处理
+1. **API费用**: 使用OpenAI API会产生费用，建议先用小数据集测试
+2. **网络连接**: 构建图谱时需要稳定的网络连接访问LLM服务
+3. **内存使用**: 大规模文档可能需要较多内存，建议分批处理
+4. **异步编程**: 所有构建和搜索操作都是异步的，需要使用`asyncio.run()`
 
-## 🔍 故障排除
+## 🆘 快速问题解决
 
-### 常见问题
+- **安装问题**: 运行 `make install-dev` 或 `pip install -e .`
+- **API密钥**: 确保设置了有效的`OPENAI_API_KEY`
+- **文档处理失败**: 安装相应的可选依赖包
+- **内存不足**: 减少单次处理的文档数量或文档大小
+- **测试运行**: 使用 `make test` 运行所有测试
+- **代码检查**: 使用 `make check` 进行代码质量检查
 
-1. **LightRAG未安装**: `pip install lightrag`
-2. **GraphML文件未生成**: 检查LLM和嵌入函数配置
-3. **搜索无结果**: 确认图谱已正确构建
-4. **内存不足**: 考虑分批处理大文档
+---
 
-### 调试技巧
-
-- 启用详细日志: `logging.getLogger("backend.app.core.graph").setLevel(logging.DEBUG)`
-- 检查GraphML文件: 确认 `working_dir/graph_chunk_entity_relation.graphml` 存在
-- 验证图谱统计: 使用 `get_graph_statistics()` 检查构建结果
+🚀 **开始构建你的知识图谱吧！** 从简单的文本开始，逐步探索更多高级功能。
