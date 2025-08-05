@@ -1,23 +1,39 @@
 """
-LightRAG知识图谱构建器
+Improved LightRAG builders following Interface Segregation Principle
 
-基于LightRAG框架构建知识图谱，支持从文档中自动抽取实体和关系，
-并生成GraphML格式的知识图谱文件。
+These builders implement only the interfaces they need, demonstrating
+proper ISP compliance through composition and focused responsibilities.
+
+Based on LightRAG framework for knowledge graph construction with automatic
+entity and relation extraction from documents, generating GraphML format files.
 """
 
-import asyncio
 import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, TypeVar
 
-from ..config import Settings
+from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
 from ..types import EntityType, RelationType
-from .graph_builder import BaseKnowledgeGraphBuilder
+from .interfaces import (
+    BasicGraphBuilder,
+    BatchGraphBuilder,
+    FullFeaturedGraphBuilder,
+    GraphExporter,
+    StreamingGraphBuilder,
+    UpdatableGraphBuilder,
+)
+from .mixins import (
+    GraphExporterMixin,
+    GraphMergerMixin,
+    GraphStatisticsMixin,
+    GraphValidatorMixin,
+    IncrementalBuilderMixin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +41,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
-    """LightRAG知识图谱构建器"""
+class LightRAGCore:
+    """LightRAG核心功能类 - 单一职责：管理LightRAG实例和GraphML解析"""
 
     def __init__(self, working_dir: str = "lightrag_storage"):
-        super().__init__()
         self.working_dir = Path(working_dir)
         self.rag_instance: Optional[Any] = None
         self._initialized: bool = False
@@ -69,9 +84,9 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                     prompt=prompt,
                     system_prompt=system_prompt,
                     history_messages=history_messages or [],
-                    model=Settings.LLM_MODEL,
-                    base_url=Settings.OPENAI_API_BASE,
-                    api_key=Settings.OPENAI_API_KEY,
+                    model=settings.LLM_MODEL,
+                    base_url=settings.OPENAI_API_BASE,
+                    api_key=settings.OPENAI_API_KEY,
                     **kwargs,
                 )
                 return str(result)
@@ -80,9 +95,9 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             async def custom_embed(texts: List[str]) -> List[List[float]]:
                 result = await openai_embed(
                     texts,
-                    model=Settings.EMBEDDING_MODEL,
-                    base_url=Settings.OPENAI_API_BASE,
-                    api_key=Settings.OPENAI_API_KEY,
+                    model=settings.EMBEDDING_MODEL,
+                    base_url=settings.OPENAI_API_BASE,
+                    api_key=settings.OPENAI_API_KEY,
                 )
                 return list(result)
 
@@ -91,8 +106,8 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
                 working_dir=str(self.working_dir),
                 llm_model_func=custom_llm_complete,
                 embedding_func=EmbeddingFunc(
-                    embedding_dim=Settings.EMBEDDING_DIM,
-                    max_token_size=Settings.EMBEDDING_MAX_TOKEN_SIZE,
+                    embedding_dim=settings.EMBEDDING_DIM,
+                    max_token_size=settings.EMBEDDING_MAX_TOKEN_SIZE,
                     func=custom_embed,
                 ),
             )
@@ -116,16 +131,14 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             self._initialized = False
             raise
 
-    def build_graph(
+    async def build_graph_async(
         self,
         texts: Optional[List[str]] = None,
         database_schema: Optional[Dict[str, Any]] = None,
-        graph_name: str = "agraph",
+        graph_name: str = "lightrag_graph",
     ) -> KnowledgeGraph:
-        """
-        构建知识图谱的内部实现
-        """
-        return asyncio.run(self.abuild_graph(texts, database_schema, graph_name))
+        """异步构建知识图谱的核心实现"""
+        return await self.abuild_graph(texts, database_schema, graph_name)
 
     async def abuild_graph(
         self,
@@ -173,26 +186,13 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             logger.error("Error building graph with LightRAG: %s", e)
             raise
 
-    def update_graph(
+    async def update_graph_with_texts_async(
         self,
-        graph: KnowledgeGraph,
-        new_entities: Optional[List[Entity]] = None,
-        new_relations: Optional[List[Relation]] = None,
+        texts: List[str],
+        graph_name: Optional[str] = None,
     ) -> KnowledgeGraph:
-        """
-        更新知识图谱（LightRAG方式）
-
-        Args:
-            graph: 现有知识图谱
-            new_entities: 新增实体（LightRAG不直接支持）
-            new_relations: 新增关系（LightRAG不直接支持）
-
-        Returns:
-            KnowledgeGraph: 更新后的知识图谱
-        """
-        logger.warning("LightRAG does not support direct entity/relation updates")
-        logger.info("To update the graph, please add new documents using build_graph with texts")
-        return graph
+        """使用新文本更新图谱的核心实现"""
+        return await self.aadd_documents(texts, graph_name)
 
     async def aadd_documents(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
         """
@@ -578,7 +578,7 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
             logger.error("Error exporting graph to GraphML: %s", e)
             return False
 
-    def get_graph_statistics(self) -> Dict[str, Any]:
+    def get_basic_statistics(self) -> Dict[str, Any]:
         """
         获取图谱统计信息
 
@@ -609,3 +609,320 @@ class LightRAGGraphBuilder(BaseKnowledgeGraphBuilder):
         except Exception as e:
             logger.error("Error getting graph statistics: %s", e)
             return {"entities_count": 0, "relations_count": 0, "status": "error", "error": str(e)}
+
+
+# ============================================================================
+# ISP-compliant LightRAG Builder Implementations
+# ============================================================================
+
+
+class MinimalLightRAGBuilder(BasicGraphBuilder):
+    """
+    最小化的LightRAG图构建器 - 只实现核心构建功能
+
+    适用于只需要基本图构建而不需要更新、合并或其他高级功能的客户端。
+    """
+
+    def __init__(self, working_dir: str = "minimal_lightrag_storage"):
+        """初始化最小化LightRAG图构建器"""
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def build_graph(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "minimal_lightrag_graph",
+    ) -> KnowledgeGraph:
+        """构建知识图谱 - 异步版本"""
+        return await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+class FlexibleLightRAGBuilder(UpdatableGraphBuilder):
+    """
+    灵活的LightRAG图构建器 - 支持构建和更新
+
+    适用于需要更新图谱但不需要合并、验证等高级功能的客户端。
+    """
+
+    def __init__(self, working_dir: str = "flexible_lightrag_storage"):
+        """初始化灵活LightRAG图构建器"""
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def build_graph(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "flexible_lightrag_graph",
+    ) -> KnowledgeGraph:
+        """异步构建知识图谱"""
+        return await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
+
+    async def update_graph(
+        self,
+        graph: KnowledgeGraph,
+        new_entities: Optional[List[Entity]] = None,
+        new_relations: Optional[List[Relation]] = None,
+    ) -> KnowledgeGraph:
+        """更新现有图谱"""
+        logger.warning("LightRAG does not support direct entity/relation updates")
+        logger.info("To update the graph, please add new documents using update_graph_with_texts")
+        return graph
+
+    async def update_graph_with_texts(
+        self,
+        texts: List[str],
+        graph_name: Optional[str] = None,
+    ) -> KnowledgeGraph:
+        """使用新文本更新图谱"""
+        return await self.lightrag_core.update_graph_with_texts_async(texts, graph_name)
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+class LightRAGBuilder(
+    GraphMergerMixin,
+    GraphValidatorMixin,
+    GraphExporterMixin,
+    GraphStatisticsMixin,
+    FullFeaturedGraphBuilder,
+):
+    """
+    全功能LightRAG图构建器 - 包含所有功能
+
+    只有需要所有功能的客户端才应该使用这个类。
+    大多数客户端应该使用更专注的接口。
+    """
+
+    def __init__(self, working_dir: str = "comprehensive_lightrag_storage"):
+        """初始化全功能LightRAG图构建器"""
+        super().__init__()
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def build_graph(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "comprehensive_lightrag_graph",
+    ) -> KnowledgeGraph:
+        """构建全功能图谱"""
+        # 委托给核心构建器
+        graph = await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
+
+        # 执行验证
+        validation_result = await self.validate_graph(graph)
+        if not validation_result.get("valid", True):
+            logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
+
+        return graph
+
+    async def update_graph(
+        self,
+        graph: KnowledgeGraph,
+        new_entities: Optional[List[Entity]] = None,
+        new_relations: Optional[List[Relation]] = None,
+    ) -> KnowledgeGraph:
+        """更新图谱并验证"""
+        logger.warning("LightRAG does not support direct entity/relation updates")
+        logger.info("To update the graph, please add new documents using update_graph_with_texts")
+
+        # 执行验证
+        validation_result = await self.validate_graph(graph)
+        if not validation_result.get("valid", True):
+            logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
+
+        return graph
+
+    async def update_graph_with_texts(
+        self,
+        texts: List[str],
+        graph_name: Optional[str] = None,
+    ) -> KnowledgeGraph:
+        """使用新文本更新图谱并验证"""
+        graph = await self.lightrag_core.update_graph_with_texts_async(texts, graph_name)
+
+        # 执行验证
+        validation_result = await self.validate_graph(graph)
+        if not validation_result.get("valid", True):
+            logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
+
+        return graph
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取统计信息"""
+        return self.lightrag_core.get_basic_statistics()
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+class StreamingLightRAGBuilder(StreamingGraphBuilder, IncrementalBuilderMixin):
+    """
+    流式LightRAG图构建器 - 适用于实时增量更新
+
+    专为需要实时处理文档流而不需要合并或验证功能的应用设计。
+    """
+
+    def __init__(self, working_dir: str = "streaming_lightrag_storage"):
+        """初始化流式LightRAG图构建器"""
+        super().__init__()
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def build_graph(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "streaming_lightrag_graph",
+    ) -> KnowledgeGraph:
+        """构建初始图谱用于流式处理"""
+        graph = await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
+        self._current_graph = graph
+        return graph
+
+    async def add_documents(self, documents: List[str], document_ids: Optional[List[str]] = None) -> KnowledgeGraph:
+        """添加新文档到流式图谱"""
+        if not documents:
+            return self._current_graph or KnowledgeGraph()
+
+        logger.info(f"Adding {len(documents)} documents to streaming LightRAG graph")
+
+        # 直接使用LightRAG的增量更新功能
+        graph = await self.lightrag_core.update_graph_with_texts_async(documents)
+        self._current_graph = graph
+
+        # 记录文档（简化版，基于时间戳）
+        doc_timestamp = datetime.now().timestamp()
+        for i, _ in enumerate(documents):
+            doc_id = f"lightrag_doc_{doc_timestamp}_{i}"
+            self._document_registry[doc_id] = [f"lightrag_entities_{doc_timestamp}_{i}"]
+
+        return graph
+
+    async def remove_documents(self, document_ids: List[str]) -> KnowledgeGraph:
+        """移除文档（LightRAG不直接支持，返回当前图谱）"""
+        logger.warning("LightRAG does not support document removal")
+        logger.info("Consider rebuilding the graph from scratch if document removal is required")
+
+        # 清理注册表
+        for doc_id in document_ids:
+            if doc_id in self._document_registry:
+                del self._document_registry[doc_id]
+
+        return self._current_graph or KnowledgeGraph()
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+class BatchLightRAGBuilder(GraphMergerMixin, BatchGraphBuilder):
+    """
+    批量LightRAG图构建器 - 优化批量处理多个数据源
+
+    适用于需要处理多个数据源并合并它们，但不需要增量更新或验证的场景。
+    """
+
+    def __init__(self, working_dir: str = "batch_lightrag_storage"):
+        """初始化批量LightRAG图构建器"""
+        super().__init__()
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def build_graph(
+        self,
+        texts: Optional[List[str]] = None,
+        database_schema: Optional[Dict[str, Any]] = None,
+        graph_name: str = "batch_lightrag_graph",
+    ) -> KnowledgeGraph:
+        """构建批量图谱"""
+        return await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
+
+    async def build_from_multiple_sources(
+        self, sources: List[Dict[str, Any]], graph_name: str = "multi_source_lightrag_graph"
+    ) -> KnowledgeGraph:
+        """从多个异构数据源构建图谱"""
+        # LightRAG处理多个数据源的策略：顺序处理并合并到同一个工作目录
+        all_texts = []
+
+        for source in sources:
+            source_type = source.get("type")
+            source_data = source.get("data")
+
+            if source_type == "text":
+                texts = source_data if isinstance(source_data, list) else [source_data]
+                all_texts.extend(texts)
+            elif source_type == "mixed":
+                if source_data is not None:
+                    texts = source_data.get("texts", [])
+                    all_texts.extend(texts)
+            else:
+                logger.warning(f"Unknown source type: {source_type}")
+
+        if not all_texts:
+            return KnowledgeGraph(name=graph_name)
+
+        # 使用单个LightRAG实例处理所有文本
+        logger.info(f"Building LightRAG graph from {len(all_texts)} texts across {len(sources)} sources")
+        graph = await self.lightrag_core.build_graph_async(all_texts, None, graph_name)
+
+        return graph
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+class LightRAGSearchBuilder(GraphExporter):
+    """
+    LightRAG搜索构建器 - 专门用于搜索和导出功能
+
+    遵循ISP：只实现搜索和导出相关的接口，不包含构建功能。
+    """
+
+    def __init__(self, working_dir: str = "search_lightrag_storage"):
+        """初始化搜索构建器"""
+        self.lightrag_core = LightRAGCore(working_dir)
+
+    async def search_graph(
+        self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
+    ) -> Dict[str, Any]:
+        """搜索图谱"""
+        return await self.lightrag_core.asearch_graph(query, search_type)
+
+    async def export_to_format(self, graph: KnowledgeGraph, format: str) -> Dict[str, Any]:
+        """导出图谱到指定格式"""
+        format_lower = format.lower()
+
+        if format_lower == "graphml":
+            # LightRAG原生支持GraphML
+            success = self.lightrag_core.export_to_graphml(graph, f"{graph.name}.graphml")
+            return {"success": success, "format": "graphml", "message": "Exported to GraphML"}
+        elif format_lower == "json":
+            return graph.to_dict()
+        else:
+            raise ValueError(f"Unsupported export format: {format}")
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取统计信息"""
+        return self.lightrag_core.get_basic_statistics()
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        self.lightrag_core.cleanup()
+
+
+# 导出所有公共类
+__all__ = [
+    "LightRAGCore",
+    "MinimalLightRAGBuilder",
+    "FlexibleLightRAGBuilder",
+    "LightRAGBuilder",
+    "StreamingLightRAGBuilder",
+    "BatchLightRAGBuilder",
+    "LightRAGSearchBuilder",
+]

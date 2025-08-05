@@ -16,13 +16,14 @@ class Entity:
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    entity_type: EntityType = EntityType.UNKNOWN
+    entity_type: Any = field(default_factory=lambda: EntityType.UNKNOWN)
     description: str = ""
     properties: Dict[str, Any] = field(default_factory=dict)
     aliases: List[str] = field(default_factory=list)
     confidence: float = 1.0
     source: str = ""
     created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
 
     def __hash__(self) -> int:
         """返回实体的哈希值"""
@@ -51,7 +52,7 @@ class Entity:
         return {
             "id": self.id,
             "name": self.name,
-            "entity_type": self.entity_type.value,
+            "entity_type": getattr(self.entity_type, "value", str(self.entity_type)),
             "description": self.description,
             "properties": self.properties,
             "aliases": self.aliases,
@@ -63,10 +64,16 @@ class Entity:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Entity":
         """从字典创建实体"""
+        entity_type_value = data.get("entity_type", "UNKNOWN")
+        try:
+            entity_type = EntityType(entity_type_value)
+        except (ValueError, AttributeError):
+            entity_type = getattr(EntityType, "UNKNOWN", None) or EntityType._member_map_.get("UNKNOWN")
+
         entity = cls(
             id=data.get("id", str(uuid.uuid4())),
             name=data.get("name", ""),
-            entity_type=EntityType(data.get("entity_type", EntityType.UNKNOWN.value)),
+            entity_type=entity_type,
             description=data.get("description", ""),
             properties=data.get("properties", {}),
             aliases=data.get("aliases", []),

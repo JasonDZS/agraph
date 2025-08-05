@@ -1,10 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Union, cast
 
-try:
-    import yaml  # type: ignore
-except ImportError:
-    yaml = None
+import yaml  # type: ignore[import-untyped]
 
 from .base import DocumentProcessor, ProcessingError
 

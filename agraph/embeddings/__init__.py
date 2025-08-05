@@ -2,6 +2,11 @@
 图嵌入模块
 """
 
-from .graph_embedding import GraphEmbedding, Node2VecEmbedding, TransEEmbedding
+from .graph_embedding import GraphEmbedding, JsonVectorStorage, OpenAIEmbedding, VectorStorage
 
-__all__ = ["GraphEmbedding", "Node2VecEmbedding", "TransEEmbedding"]
+__all__ = [
+    "GraphEmbedding",
+    "OpenAIEmbedding",
+    "VectorStorage",
+    "JsonVectorStorage",
+]

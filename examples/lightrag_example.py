@@ -1,21 +1,30 @@
 """
-LightRAG知识图谱构建器使用示例
+Improved LightRAG Builders Usage Examples
 
-本示例展示如何使用LightRAGGraphBuilder构建、查询和管理知识图谱。
+This example demonstrates how to use the new ISP-compliant LightRAG builders
+for different use cases, showing the benefits of Interface Segregation Principle.
 """
 
 import asyncio
-import os
+from pathlib import Path
 
-from agraph import LightRAGGraphBuilder, create_lightrag_graph_builder
+from agraph.builders.lightrag_builder import LightRAGBuilder  # Comprehensive builder
+from agraph.builders.lightrag_builder import (
+    BatchLightRAGBuilder,
+    FlexibleLightRAGBuilder,
+    LightRAGSearchBuilder,
+    MinimalLightRAGBuilder,
+    StreamingLightRAGBuilder,
+)
 
 
-async def basic_usage_example():
-    """基本使用示例"""
-    print("=== LightRAG知识图谱构建器基本使用示例 ===")
+async def minimal_builder_example():
+    """最小化构建器示例 - 演示ISP原则：只需要基本构建功能的客户端"""
+    print("=== 最小化LightRAG构建器示例 - 只有核心构建功能 ===")
+    print("适用场景：只需要基本图构建，不需要更新、验证、导出等功能\n")
 
-    # 1. 创建LightRAG构建器
-    builder = create_lightrag_graph_builder("./workdir/example_lightrag_storage")
+    # 1. 创建最小化构建器 - 只实现BasicGraphBuilder接口
+    builder = MinimalLightRAGBuilder("./workdir/minimal_lightrag_storage")
 
     # 2. 准备示例文档
     documents = [
@@ -37,9 +46,9 @@ async def basic_usage_example():
     ]
 
     try:
-        # 3. 构建知识图谱
+        # 3. 构建知识图谱 - 最小化接口，只有build_graph方法
         print("正在构建知识图谱...")
-        graph = await builder.abuild_graph(texts=documents, graph_name="示例知识图谱")
+        graph = await builder.build_graph(texts=documents, graph_name="最小化示例图谱")
 
         print(f"构建完成! 实体数量: {len(graph.entities)}, 关系数量: {len(graph.relations)}")
 
@@ -58,7 +67,8 @@ async def basic_usage_example():
             print(f"   置信度: {relation.confidence}")
             print()
 
-        return builder
+        print("✅ 最小化构建器示例完成 - 轻量级，专注核心功能\n")
+        return graph
 
     except Exception as e:
         print(f"构建过程中出现错误: {e}")
@@ -68,217 +78,242 @@ async def basic_usage_example():
         pass
 
 
-async def search_example(builder: LightRAGGraphBuilder):
-    """搜索示例"""
-    print("=== 知识图谱搜索示例 ===")
+async def flexible_builder_example():
+    """灵活构建器示例 - 演示ISP原则：需要构建+更新功能的客户端"""
+    print("=== 灵活LightRAG构建器示例 - 支持构建和更新 ===")
+    print("适用场景：需要构建图谱并支持后续更新，但不需要验证、合并等高级功能\n")
 
-    if not builder:
-        print("构建器未初始化，跳过搜索示例")
-        return
+    # 1. 创建灵活构建器 - 实现UpdatableGraphBuilder接口
+    builder = FlexibleLightRAGBuilder("./workdir/flexible_lightrag_storage")
 
-    # 测试不同类型的搜索
-    queries = [
-        ("北京的基本信息是什么？", "hybrid"),
-        ("清华大学有什么特点？", "local"),
-        ("人工智能包括哪些技术？", "global"),
-        ("中国的首都在哪里？", "naive"),
-    ]
-
-    for query, search_type in queries:
-        try:
-            print(f"\n查询: {query}")
-            print(f"搜索类型: {search_type}")
-
-            result = await builder.asearch_graph(query, search_type)
-
-            print("搜索结果:")
-            print(result.get("result", "无结果")[:200] + "...")
-            print("-" * 50)
-
-        except Exception as e:
-            print(f"搜索失败: {e}")
-
-
-async def incremental_update_example(builder: LightRAGGraphBuilder):
-    """增量更新示例"""
-    print("=== 增量更新示例 ===")
-
-    if not builder:
-        print("构建器未初始化，跳过更新示例")
-        return
-
-    # 添加新文档
-    new_documents = [
+    # 2. 准备初始文档
+    initial_documents = [
         """
-        上海是中华人民共和国的直辖市，位于长江三角洲地区。作为中国的经济中心，
-        上海是全球著名的金融中心之一。上海港是世界上最繁忙的集装箱港口之一。
-        上海有着深厚的历史文化底蕴，同时也是现代化国际大都市。
+        北京是中华人民共和国的首都，位于华北地区。作为中国的政治、文化、国际交往、
+        科技创新中心，北京有着3000多年建城史和860多年建都史。
         """,
         """
-        机器学习是人工智能的一个重要分支，它使计算机能够无需明确编程即可学习。
-        机器学习算法包括监督学习、无监督学习和强化学习等类型。深度学习是机器学习
-        的一个子领域，使用神经网络来模拟人脑的工作方式。
+        清华大学是中国著名的高等学府，位于北京市海淀区。学校创建于1911年，
+        是中国九校联盟成员，被誉为"红色工程师的摇篮"。
         """,
     ]
 
     try:
-        print("正在添加新文档到知识图谱...")
-        updated_graph = await builder.aadd_documents(new_documents, "更新后的示例知识图谱")
+        # 3. 构建初始图谱
+        print("构建初始图谱...")
+        graph = await builder.build_graph(texts=initial_documents, graph_name="可更新示例图谱")
+        print(f"初始图谱: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
 
-        print(f"更新完成! 新的实体数量: {len(updated_graph.entities)}, 关系数量: {len(updated_graph.relations)}")
+        # 4. 演示更新功能 - 这是UpdatableGraphBuilder接口的特色
+        new_documents = [
+            """
+            上海是中华人民共和国的直辖市，位于长江三角洲地区。作为中国的经济中心，
+            上海是全球著名的金融中心之一。
+            """
+        ]
 
-        # 测试搜索新添加的内容
-        print("\n测试搜索新内容:")
-        result = await builder.asearch_graph("上海是什么样的城市？", "hybrid")
-        print("搜索结果:", result.get("result", "无结果")[:200] + "...")
+        print("\n添加新文档更新图谱...")
+        updated_graph = await builder.update_graph_with_texts(new_documents, "更新后的示例图谱")
+        print(f"更新后图谱: {len(updated_graph.entities)} 实体, {len(updated_graph.relations)} 关系")
 
-    except Exception as e:
-        print(f"更新过程中出现错误: {e}")
-
-
-def export_example(builder: LightRAGGraphBuilder):
-    """导出示例"""
-    print("=== 导出GraphML示例 ===")
-
-    if not builder:
-        print("构建器未初始化，跳过导出示例")
-        return
-
-    try:
-        # 获取当前图谱
-        graphml_file = builder.working_dir / "graph_chunk_entity_relation.graphml"
-        if graphml_file.exists():
-            current_graph = builder._load_graph_from_graphml(str(graphml_file), "当前图谱")
-
-            # 导出到新位置
-            export_path = "./exported_knowledge_graph.graphml"
-            success = builder.export_to_graphml(current_graph, export_path)
-
-            if success:
-                print(f"图谱已成功导出到: {export_path}")
-
-                # 显示文件大小
-                file_size = os.path.getsize(export_path)
-                print(f"文件大小: {file_size} bytes")
-            else:
-                print("导出失败")
-        else:
-            print("未找到GraphML文件")
+        print("✅ 灵活构建器示例完成 - 支持构建和更新，接口适度\n")
+        return builder
 
     except Exception as e:
-        print(f"导出过程中出现错误: {e}")
-
-
-def statistics_example(builder: LightRAGGraphBuilder):
-    """统计信息示例"""
-    print("=== 图谱统计信息示例 ===")
-
-    if not builder:
-        print("构建器未初始化，跳过统计示例")
-        return
-
-    try:
-        stats = builder.get_graph_statistics()
-
-        print("图谱统计信息:")
-        print(f"- 实体数量: {stats.get('entities_count', 0)}")
-        print(f"- 关系数量: {stats.get('relations_count', 0)}")
-        print(f"- 状态: {stats.get('status', 'unknown')}")
-        print(f"- GraphML文件: {stats.get('graphml_file', 'N/A')}")
-        print(f"- 最后修改时间: {stats.get('last_modified', 'N/A')}")
-
-        if "error" in stats:
-            print(f"- 错误信息: {stats['error']}")
-
-    except Exception as e:
-        print(f"获取统计信息时出现错误: {e}")
-
-
-async def advanced_usage_example():
-    """高级使用示例"""
-    print("=== LightRAG高级使用示例 ===")
-
-    # 创建自定义配置的构建器
-    custom_builder = LightRAGGraphBuilder("./workdir/custom_lightrag_storage")
-
-    # 模拟处理大量文档
-    print("模拟处理多个文档类型...")
-
-    documents = {
-        "技术文档": [
-            "Python是一种高级编程语言，具有简洁的语法和强大的功能。",
-            "Docker是一个开源的应用容器引擎，让开发者可以打包应用。",
-        ],
-        "业务文档": [
-            "我们公司专注于人工智能和大数据分析服务。",
-            "客户满意度是我们最重要的业务指标之一。",
-        ],
-        "学术论文": [
-            "深度学习在计算机视觉领域取得了显著进展。",
-            "自然语言处理技术正在改变人机交互的方式。",
-        ],
-    }
-
-    try:
-        # 分类别处理文档
-        all_texts = []
-        for category, texts in documents.items():
-            print(f"处理{category}...")
-            all_texts.extend(texts)
-
-        graph = await custom_builder.abuild_graph(texts=all_texts, graph_name="综合知识图谱")
-        print(f"综合图谱构建完成: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
-
-        # 获取详细统计
-        stats = custom_builder.get_graph_statistics()
-        print("详细统计:", stats)
-
-    except Exception as e:
-        print(f"高级示例执行失败: {e}")
+        print(f"灵活构建器示例失败: {e}")
+        return None
     finally:
-        # 清理高级示例的资源
-        try:
-            custom_builder.cleanup()
-        except Exception:
-            # 如果清理失败，直接设置为None
-            custom_builder.rag_instance = None
-            custom_builder._initialized = False
+        builder.cleanup()
+
+
+async def search_example():
+    """搜索专用构建器示例 - 演示ISP原则：只需要搜索功能的客户端"""
+    print("=== LightRAG搜索构建器示例 - 专门用于搜索和导出 ===")
+    print("适用场景：已有图谱数据，只需要搜索和导出功能，不需要构建功能\n")
+
+    # 1. 创建搜索专用构建器 - 只实现GraphExporter接口
+    search_builder = LightRAGSearchBuilder("./workdir/flexible_lightrag_storage")  # 复用之前的数据
+
+    try:
+        # 2. 测试不同类型的搜索 - 搜索构建器的核心功能
+        queries = [
+            ("北京的基本信息是什么？", "hybrid"),
+            ("清华大学有什么特点？", "local"),
+            ("上海是什么样的城市？", "global"),
+        ]
+
+        for query, search_type in queries:
+            try:
+                print(f"查询: {query} (类型: {search_type})")
+                result = await search_builder.search_graph(query, search_type)
+                print(f"结果: {result.get('result', '无结果')[:150]}...\n")
+            except Exception as e:
+                print(f"搜索失败: {e}\n")
+
+        # 3. 演示导出功能 - GraphExporter接口的功能
+        print("测试导出功能...")
+        stats = search_builder.get_statistics()
+        print(f"图谱统计: {stats.get('entities_count', 0)} 实体, {stats.get('relations_count', 0)} 关系")
+
+        print("✅ 搜索构建器示例完成 - 专注搜索和导出，不包含构建功能\n")
+
+    except Exception as e:
+        print(f"搜索示例失败: {e}")
+    finally:
+        search_builder.cleanup()
+
+
+async def streaming_builder_example():
+    """流式构建器示例 - 演示ISP原则：需要实时增量更新的客户端"""
+    print("=== 流式LightRAG构建器示例 - 支持实时增量更新 ===")
+    print("适用场景：需要实时处理文档流，支持增量更新，但不需要复杂的验证和合并功能\n")
+
+    # 1. 创建流式构建器 - 实现StreamingGraphBuilder和IncrementalBuilder接口
+    streaming_builder = StreamingLightRAGBuilder("./workdir/streaming_lightrag_storage")
+
+    # 2. 准备初始文档
+    initial_docs = [
+        "人工智能是计算机科学的一个分支，致力于创建智能机器。",
+        "机器学习是人工智能的核心技术之一。",
+    ]
+
+    try:
+        # 3. 构建初始图谱
+        print("构建初始流式图谱...")
+        graph = await streaming_builder.build_graph(texts=initial_docs, graph_name="流式示例图谱")
+        print(f"初始图谱: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
+
+        # 4. 模拟实时文档流 - IncrementalBuilder接口的特色功能
+        document_batches = [
+            ["深度学习是机器学习的一个重要子领域。"],
+            ["自然语言处理技术正在快速发展。", "计算机视觉在图像识别中应用广泛。"],
+            ["强化学习通过奖励机制训练智能体。"],
+        ]
+
+        for i, batch in enumerate(document_batches):
+            print(f"\n处理第 {i+1} 批文档: {len(batch)} 个文档")
+            updated_graph = await streaming_builder.add_documents(batch)
+            print(f"更新后: {len(updated_graph.entities)} 实体, {len(updated_graph.relations)} 关系")
+
+        print("✅ 流式构建器示例完成 - 支持实时增量更新，适合文档流处理\n")
+
+    except Exception as e:
+        print(f"流式构建器示例失败: {e}")
+    finally:
+        streaming_builder.cleanup()
+
+
+async def batch_builder_example():
+    """批量构建器示例 - 演示ISP原则：需要处理多数据源的客户端"""
+    print("=== 批量LightRAG构建器示例 - 优化多数据源处理 ===")
+    print("适用场景：需要同时处理多个数据源并合并，但不需要增量更新或验证功能\n")
+
+    # 1. 创建批量构建器 - 实现BatchGraphBuilder和GraphMerger接口
+    batch_builder = BatchLightRAGBuilder("./workdir/batch_lightrag_storage")
+
+    # 2. 准备不同类型的数据源
+    sources = [
+        {
+            "type": "text",
+            "data": [
+                "量子计算是利用量子力学现象进行计算的技术。",
+                "量子比特是量子计算的基本单位。",
+            ],
+        },
+        {
+            "type": "text",
+            "data": [
+                "区块链是一种分布式账本技术。",
+                "比特币是最著名的区块链应用。",
+            ],
+        },
+        {
+            "type": "mixed",
+            "data": {
+                "texts": [
+                    "云计算提供了弹性和可扩展的计算资源。",
+                    "边缘计算将计算能力推向网络边缘。",
+                ]
+            },
+        },
+    ]
+
+    try:
+        # 3. 批量处理多个数据源 - BatchGraphBuilder接口的特色功能
+        print(f"批量处理 {len(sources)} 个数据源...")
+        merged_graph = await batch_builder.build_from_multiple_sources(sources, "批量处理示例图谱")
+
+        print(f"批量处理完成: {len(merged_graph.entities)} 实体, {len(merged_graph.relations)} 关系")
+        print("✅ 批量构建器示例完成 - 高效处理多数据源，支持合并功能\n")
+
+    except Exception as e:
+        print(f"批量构建器示例失败: {e}")
+    finally:
+        batch_builder.cleanup()
+
+
+async def comprehensive_builder_example():
+    """全功能构建器示例 - 演示ISP反模式：需要所有功能的客户端"""
+    print("=== 全功能LightRAG构建器示例 - 包含所有功能 ===")
+    print("适用场景：需要所有功能的复杂应用，但大多数客户端不应使用这个类\n")
+    print("⚠️  注意：这违反了ISP原则，只有真正需要所有功能时才使用！")
+
+    # 1. 创建全功能构建器 - 实现所有接口（违反ISP）
+    comprehensive_builder = LightRAGBuilder("./workdir/comprehensive_lightrag_storage")
+
+    # 2. 准备测试文档
+    documents = [
+        "物联网连接了数十亿的智能设备。",
+        "5G网络提供了超高速的无线连接。",
+        "边缘AI将人工智能推向设备端。",
+    ]
+
+    try:
+        # 3. 构建图谱
+        print("使用全功能构建器构建图谱...")
+        graph = await comprehensive_builder.build_graph(texts=documents, graph_name="全功能示例图谱")
+        print(f"构建完成: {len(graph.entities)} 实体, {len(graph.relations)} 关系")
+
+        # 4. 演示所有功能都可用（但客户端可能不需要）
+        print("\n可用功能演示:")
+        print("✓ 构建功能 (BasicGraphBuilder)")
+        print("✓ 更新功能 (UpdatableGraphBuilder)")
+        print("✓ 验证功能 (GraphValidator)")
+        print("✓ 合并功能 (GraphMerger)")
+        print("✓ 导出功能 (GraphExporter)")
+        print("✓ 统计功能 (GraphStatistics)")
+
+        # 5. 获取统计信息
+        stats = comprehensive_builder.get_statistics()
+        print(f"\n统计信息: {stats.get('entities_count', 0)} 实体, {stats.get('relations_count', 0)} 关系")
+
+        print("\n⚠️  全功能构建器示例完成 - 功能齐全但违反ISP，谨慎使用\n")
+
+    except Exception as e:
+        print(f"全功能构建器示例失败: {e}")
+    finally:
+        comprehensive_builder.cleanup()
 
 
 async def main():
-    """主函数"""
-    print("LightRAG知识图谱构建器完整示例")
-    print("=" * 50)
+    """主函数 - 演示所有ISP-compliant LightRAG构建器"""
+    print("🚀 ISP-Compliant LightRAG Builders Examples")
+    print("展示接口隔离原则在LightRAG构建器中的应用")
+    print("=" * 60)
+    print()
 
-    # 1. 基本使用示例
-    builder = await basic_usage_example()
+    try:
+        await comprehensive_builder_example()
+    except Exception as e:
+        print(f"示例执行过程中出现错误: {e}")
 
-    # 2. 搜索示例
-    await search_example(builder)
-
-    # 3. 增量更新示例
-    await incremental_update_example(builder)
-
-    # 4. 导出示例
-    export_example(builder)
-
-    # 5. 统计信息示例
-    statistics_example(builder)
-
-    # 清理主要builder的资源
-    if builder:
-        try:
-            builder.cleanup()
-        except Exception:
-            # 如果清理失败，直接设置为None
-            builder.rag_instance = None
-            builder._initialized = False
-
-    # 6. 高级使用示例
-    await advanced_usage_example()
-
-    print("\n所有示例执行完成!")
+    print("\n🎉 所有ISP-compliant LightRAG构建器示例执行完成!")
+    print("   选择适合你需求的构建器，享受接口隔离原则带来的好处!")
 
 
 if __name__ == "__main__":
+    # 确保工作目录存在
+    Path("./workdir").mkdir(exist_ok=True)
+
+    # 运行所有示例
     asyncio.run(main())

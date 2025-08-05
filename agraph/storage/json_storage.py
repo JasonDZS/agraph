@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
-from ..types import RelationType
 from .base_storage import GraphStorage
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,7 @@ class JsonStorage(GraphStorage):
         """连接到文件系统"""
         try:
             self.ensure_storage_dir()
-            self.is_connected = True
+            self._is_connected = True
             logger.info("Connected to JSON storage at %s", self.storage_dir)
             return True
         except Exception as e:
@@ -45,14 +44,14 @@ class JsonStorage(GraphStorage):
 
     def disconnect(self) -> None:
         """断开连接"""
-        self.is_connected = False
+        self._is_connected = False
         logger.info("Disconnected from JSON storage")
 
     def save_graph(self, graph: KnowledgeGraph) -> bool:
         """保存知识图谱"""
-        if not self.is_connected:
-            logger.error("Not connected to storage")
-            return False
+        if not self.is_connected():
+            if not self.connect():
+                return False
 
         try:
             # 保存图谱数据到单独文件
@@ -74,7 +73,7 @@ class JsonStorage(GraphStorage):
 
     def load_graph(self, graph_id: str) -> Optional[KnowledgeGraph]:
         """加载知识图谱"""
-        if not self.is_connected:
+        if not self.is_connected():
             logger.error("Not connected to storage")
             return None
 
@@ -98,7 +97,7 @@ class JsonStorage(GraphStorage):
 
     def delete_graph(self, graph_id: str) -> bool:
         """删除知识图谱"""
-        if not self.is_connected:
+        if not self.is_connected():
             logger.error("Not connected to storage")
             return False
 
@@ -120,7 +119,7 @@ class JsonStorage(GraphStorage):
 
     def list_graphs(self) -> List[Dict[str, Any]]:
         """列出所有图谱"""
-        if not self.is_connected:
+        if not self.is_connected():
             logger.error("Not connected to storage")
             return []
 
@@ -140,7 +139,7 @@ class JsonStorage(GraphStorage):
 
     def query_entities(self, conditions: Dict[str, Any]) -> List[Entity]:
         """查询实体"""
-        if not self.is_connected:
+        if not self.is_connected():
             logger.error("Not connected to storage")
             return []
 
@@ -159,7 +158,7 @@ class JsonStorage(GraphStorage):
             # 应用过滤条件
             if "entity_type" in conditions:
                 entity_type = conditions["entity_type"]
-                entities = [e for e in entities if e.entity_type.value == entity_type]
+                entities = [e for e in entities if getattr(e.entity_type, "value", str(e.entity_type)) == entity_type]
 
             if "name" in conditions:
                 name_filter = conditions["name"].lower()
@@ -181,15 +180,16 @@ class JsonStorage(GraphStorage):
         self,
         head_entity: Optional[str] = None,
         tail_entity: Optional[str] = None,
-        relation_type: Optional[RelationType] = None,
-        graph_id: Optional[str] = None,
+        relation_type: Optional[Any] = None,
+        **kwargs: Any,
     ) -> List[Relation]:
         """查询关系"""
-        if not self.is_connected:
+        if not self.is_connected():
             logger.error("Not connected to storage")
             return []
 
         try:
+            graph_id = kwargs.get("graph_id")
             if not graph_id:
                 logger.error("graph_id is required for relation query")
                 return []
@@ -417,7 +417,7 @@ class JsonStorage(GraphStorage):
                 "total_size_mb": round(total_size / (1024 * 1024), 2),
                 "file_count": file_count,
                 "graphs_count": graphs_count,
-                "is_connected": self.is_connected,
+                "is_connected": self.is_connected(),
             }
 
         except Exception as e:

@@ -7,46 +7,18 @@
 - 知识图谱的构建和管理
 - 多种存储后端支持 (JSON, Neo4j)
 - 图嵌入和相似度计算
-
-主要组件：
-- types: 实体类型和关系类型定义
-- entities: 实体数据结构和操作
-- relations: 关系数据结构和操作
-- graph: 知识图谱核心数据结构
-- extractors: 实体和关系抽取器
-- builders: 图谱构建器
-- storage: 存储后端
-- embeddings: 图嵌入处理
-
-使用示例：
-    from agraph import (
-        KnowledgeGraph,
-        StandardGraphBuilder,
-        JsonStorage
-    )
-
-    # 创建图构建器
-    builder = StandardGraphBuilder()
-
-    # 构建图谱
-    graph = builder.build_graph(
-        texts=["知识图谱是一种结构化的知识表示方法"],
-        graph_name="demo_graph"
-    )
-
-    # 保存图谱
-    storage = JsonStorage("./graphs")
-    storage.connect()
-    storage.save_graph(graph)
 """
 
-from typing import Any, Dict, List, Optional
-
-# 构建器
-from .builders import BaseKnowledgeGraphBuilder, LightRAGGraphBuilder, MultiSourceGraphBuilder, StandardGraphBuilder
+from .builders import (
+    BatchBuilder,
+    ComprehensiveGraphBuilder,
+    FlexibleGraphBuilder,
+    MinimalGraphBuilder,
+    StreamingBuilder,
+)
 
 # 嵌入
-from .embeddings import GraphEmbedding, Node2VecEmbedding, TransEEmbedding
+from .embeddings import GraphEmbedding
 from .entities import Entity
 
 # 抽取器
@@ -61,8 +33,15 @@ from .extractors import (
 from .graph import KnowledgeGraph
 from .relations import Relation
 
+# 检索
+from .retrieval import KnowledgeRetriever
+
+# 服务
+from .services import EntityMerger, GraphAnalyzer, GraphPathFinder, GraphValidator
+
 # 存储
 from .storage import GraphStorage, JsonStorage, Neo4jStorage
+from .storage.interfaces import BasicGraphStorage, FullGraphStorage, QueryableGraphStorage
 
 # 核心数据结构
 from .types import EntityType, RelationType
@@ -83,94 +62,27 @@ __all__ = [
     "BaseRelationExtractor",
     "TextRelationExtractor",
     "DatabaseRelationExtractor",
-    # 构建器
-    "BaseKnowledgeGraphBuilder",
-    "StandardGraphBuilder",
-    "MultiSourceGraphBuilder",
-    "LightRAGGraphBuilder",
+    # 图构建器
+    "MinimalGraphBuilder",
+    "FlexibleGraphBuilder",
+    "StreamingBuilder",
+    "BatchBuilder",
+    "ComprehensiveGraphBuilder",
     # 存储
     "GraphStorage",
     "Neo4jStorage",
     "JsonStorage",
     # 嵌入
     "GraphEmbedding",
-    "Node2VecEmbedding",
-    "TransEEmbedding",
+    # 检索
+    "KnowledgeRetriever",
+    # 服务
+    "GraphAnalyzer",
+    "GraphPathFinder",
+    "EntityMerger",
+    "GraphValidator",
+    # 存储接口
+    "BasicGraphStorage",
+    "QueryableGraphStorage",
+    "FullGraphStorage",
 ]
-
-
-def create_standard_graph_builder() -> "StandardGraphBuilder":
-    """
-    创建标准图构建器的便捷函数
-
-    Returns:
-        StandardGraphBuilder: 配置好的标准图构建器
-    """
-    return StandardGraphBuilder()
-
-
-def create_lightrag_graph_builder(working_dir: str = "lightrag_storage") -> "LightRAGGraphBuilder":
-    """
-    创建LightRAG图构建器的便捷函数
-
-    Args:
-        working_dir: LightRAG工作目录
-
-    Returns:
-        LightRAGGraphBuilder: 配置好的LightRAG图构建器
-    """
-    return LightRAGGraphBuilder(working_dir)
-
-
-def create_json_storage(storage_dir: str = "graphs") -> "JsonStorage":
-    """
-    创建JSON存储的便捷函数
-
-    Args:
-        storage_dir: 存储目录路径
-
-    Returns:
-        JsonStorage: 配置好的JSON存储实例
-    """
-    storage = JsonStorage(storage_dir)
-    storage.connect()
-    return storage
-
-
-def create_neo4j_storage(uri: str, username: str, password: str, database: str = "neo4j") -> Optional["Neo4jStorage"]:
-    """
-    创建Neo4j存储的便捷函数
-
-    Args:
-        uri: Neo4j数据库URI
-        username: 用户名
-        password: 密码
-        database: 数据库名称
-
-    Returns:
-        Neo4jStorage: 配置好的Neo4j存储实例，如果连接失败返回None
-    """
-    storage = Neo4jStorage(uri, username, password, database)
-    if storage.connect():
-        return storage
-    return None
-
-
-def quick_build_graph(
-    texts: Optional[List[Any]] = None,
-    database_schema: Optional[Dict[Any, Any]] = None,
-    graph_name: str = "quick_graph",
-) -> "KnowledgeGraph":
-    """
-    快速构建知识图谱的便捷函数
-
-    Args:
-        texts: 文本列表
-        database_schema: 数据库模式
-        graph_name: 图谱名称
-
-    Returns:
-        KnowledgeGraph: 构建的知识图谱
-    """
-    builder = create_standard_graph_builder()
-    return builder.build_graph(texts=texts, database_schema=database_schema, graph_name=graph_name)
