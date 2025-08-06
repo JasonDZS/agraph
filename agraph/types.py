@@ -3,38 +3,32 @@
 """
 
 from enum import Enum
+from typing import Any, Union
+
+from .config import settings
 
 
-class EntityType(Enum):
-    """实体类型枚举"""
-
-    PERSON = "person"
-    ORGANIZATION = "organization"
-    LOCATION = "location"
-    CONCEPT = "concept"
-    TABLE = "table"
-    COLUMN = "column"
-    DATABASE = "database"
-    DOCUMENT = "document"
-    KEYWORD = "keyword"
-    PRODUCT = "product"
-    SOFTWARE = "software"
-    UNKNOWN = "unknown"
+def create_entity_type_enum() -> Any:
+    """从配置动态创建实体类型枚举"""
+    entity_types = {
+        entity_type.upper().replace("-", "_").replace(" ", "_"): entity_type for entity_type in settings.ENTITY_TYPES
+    }
+    return Enum("EntityType", entity_types)
 
 
-class RelationType(Enum):
-    """关系类型枚举"""
+def create_relation_type_enum() -> Any:
+    """从配置动态创建关系类型枚举"""
+    relation_types = {
+        relation_type.upper().replace("-", "_").replace(" ", "_"): relation_type
+        for relation_type in settings.RELATION_TYPES
+    }
+    return Enum("RelationType", relation_types)
 
-    CONTAINS = "contains"  # 包含关系
-    BELONGS_TO = "belongs_to"  # 属于关系
-    REFERENCES = "references"  # 引用关系
-    SIMILAR_TO = "similar_to"  # 相似关系
-    RELATED_TO = "related_to"  # 相关关系
-    DEPENDS_ON = "depends_on"  # 依赖关系
-    FOREIGN_KEY = "foreign_key"  # 外键关系
-    MENTIONS = "mentions"  # 提及关系
-    DESCRIBES = "describes"  # 描述关系
-    SYNONYMS = "synonyms"  # 同义词关系
-    DEVELOPS = "develops"  # 开发关系
-    CREATES = "creates"  # 创造关系
-    FOUNDED_BY = "founded_by"  # 创立关系
+
+# 创建动态枚举类型
+EntityType = create_entity_type_enum()
+RelationType = create_relation_type_enum()
+
+# 类型别名，用于类型注解
+EntityTypeType = Union[Any, Enum]
+RelationTypeType = Union[Any, Enum]

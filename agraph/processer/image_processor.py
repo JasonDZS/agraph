@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from ..config import Settings
+from ..config import settings
 from .base import DocumentProcessor, ProcessingError
 
 
@@ -54,7 +54,7 @@ class OpenAIVisionModel(MultimodalModel):
         except ImportError:
             raise ProcessingError("openai package is required for OpenAI vision. Install with: pip install openai")
 
-        self.client = openai.OpenAI(api_key=Settings.OPENAI_API_KEY, base_url=Settings.OPENAI_API_BASE)
+        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_API_BASE)
         self.model = model
 
     def analyze_image(self, image_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:

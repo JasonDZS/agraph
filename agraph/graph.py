@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Set
 
 from .entities import Entity
 from .relations import Relation
-from .types import EntityType, RelationType
 
 
 @dataclass
@@ -97,18 +96,20 @@ class KnowledgeGraph:
         """获取关系"""
         return self.relations.get(relation_id)
 
-    def get_entities_by_type(self, entity_type: EntityType) -> List[Entity]:
+    def get_entities_by_type(self, entity_type: Any) -> List[Entity]:
         """按类型获取实体"""
-        entity_ids = self.entity_index.get(entity_type.value, set())
+        entity_type_value = getattr(entity_type, "value", str(entity_type))
+        entity_ids = self.entity_index.get(entity_type_value, set())
         return [self.entities[entity_id] for entity_id in entity_ids if entity_id in self.entities]
 
-    def get_relations_by_type(self, relation_type: RelationType) -> List[Relation]:
+    def get_relations_by_type(self, relation_type: Any) -> List[Relation]:
         """按类型获取关系"""
-        relation_ids = self.relation_index.get(relation_type.value, set())
+        relation_type_value = getattr(relation_type, "value", str(relation_type))
+        relation_ids = self.relation_index.get(relation_type_value, set())
         return [self.relations[relation_id] for relation_id in relation_ids if relation_id in self.relations]
 
     def get_entity_relations(
-        self, entity_id: str, relation_type: Optional[RelationType] = None, direction: str = "both"
+        self, entity_id: str, relation_type: Optional[Any] = None, direction: str = "both"
     ) -> List[Relation]:
         """获取实体的关系"""
         if entity_id not in self.entities:
@@ -135,7 +136,7 @@ class KnowledgeGraph:
         return entity_relations
 
     def get_neighbors(
-        self, entity_id: str, relation_type: Optional[RelationType] = None, direction: str = "both"
+        self, entity_id: str, relation_type: Optional[Any] = None, direction: str = "both"
     ) -> List[Entity]:
         """获取邻居实体"""
         relations = self.get_entity_relations(entity_id, relation_type, direction)
@@ -157,105 +158,38 @@ class KnowledgeGraph:
 
         return neighbors
 
-    def find_path(self, start_entity_id: str, end_entity_id: str, max_depth: int = 3) -> List[List[Relation]]:
-        """查找实体间路径"""
-        if start_entity_id not in self.entities or end_entity_id not in self.entities:
-            return []
-
-        paths = []
-        visited = set()
-
-        def dfs(current_id: str, target_id: str, path: List[Relation], depth: int) -> None:
-            if depth > max_depth:
-                return
-
-            if current_id == target_id and path:
-                paths.append(path.copy())
-                return
-
-            if current_id in visited:
-                return
-
-            visited.add(current_id)
-
-            for relation in self.get_entity_relations(current_id, direction="out"):
-                if relation.tail_entity is not None and relation.tail_entity.id not in visited:
-                    path.append(relation)
-                    dfs(relation.tail_entity.id, target_id, path, depth + 1)
-                    path.pop()
-
-            visited.remove(current_id)
-
-        dfs(start_entity_id, end_entity_id, [], 0)
-        return paths
-
-    def merge_entity(self, target_entity: Entity, source_entity: Entity) -> bool:
-        """合并实体"""
-        if target_entity.id not in self.entities or source_entity.id not in self.entities:
-            return False
-
-        # 合并属性和别名
-        target_entity.aliases.extend(source_entity.aliases)
-        target_entity.aliases = list(set(target_entity.aliases))  # 去重
-        target_entity.properties.update(source_entity.properties)
-
-        # 更新关系中的实体引用
-        for relation in self.relations.values():
-            if relation.head_entity is not None and relation.head_entity.id == source_entity.id:
-                relation.head_entity = target_entity
-            if relation.tail_entity is not None and relation.tail_entity.id == source_entity.id:
-                relation.tail_entity = target_entity
-
-        # 删除源实体
-        self.remove_entity(source_entity.id)
-        return True
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """获取图谱统计信息"""
-        entity_type_counts = {}
-        for entity_type in EntityType:
-            count = len(self.get_entities_by_type(entity_type))
-            if count > 0:
-                entity_type_counts[entity_type.value] = count
-
-        relation_type_counts = {}
-        for relation_type in RelationType:
-            count = len(self.get_relations_by_type(relation_type))
-            if count > 0:
-                relation_type_counts[relation_type.value] = count
-
+    def get_basic_statistics(self) -> Dict[str, Any]:
+        """获取基础图谱统计信息 (轻量级版本)"""
         return {
             "total_entities": len(self.entities),
             "total_relations": len(self.relations),
-            "entity_types": entity_type_counts,
-            "relation_types": relation_type_counts,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
 
     def _index_entity(self, entity: Entity) -> None:
         """索引实体"""
-        entity_type = entity.entity_type.value
+        entity_type = getattr(entity.entity_type, "value", str(entity.entity_type))
         if entity_type not in self.entity_index:
             self.entity_index[entity_type] = set()
         self.entity_index[entity_type].add(entity.id)
 
     def _unindex_entity(self, entity: Entity) -> None:
         """取消实体索引"""
-        entity_type = entity.entity_type.value
+        entity_type = getattr(entity.entity_type, "value", str(entity.entity_type))
         if entity_type in self.entity_index:
             self.entity_index[entity_type].discard(entity.id)
 
     def _index_relation(self, relation: Relation) -> None:
         """索引关系"""
-        relation_type = relation.relation_type.value
+        relation_type = getattr(relation.relation_type, "value", str(relation.relation_type))
         if relation_type not in self.relation_index:
             self.relation_index[relation_type] = set()
         self.relation_index[relation_type].add(relation.id)
 
     def _unindex_relation(self, relation: Relation) -> None:
         """取消关系索引"""
-        relation_type = relation.relation_type.value
+        relation_type = getattr(relation.relation_type, "value", str(relation.relation_type))
         if relation_type in self.relation_index:
             self.relation_index[relation_type].discard(relation.id)
 

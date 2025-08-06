@@ -20,7 +20,20 @@ class GraphStorage(ABC):
 
     def __init__(self) -> None:
         self.connection = None
-        self.is_connected = False
+        self._is_connected = False
+
+    def is_connected(self) -> bool:
+        """
+        检查是否已连接到存储后端
+
+        Returns:
+            bool: 如果已连接返回True
+        """
+        return self._is_connected
+
+    def set_connected(self, value: bool) -> None:
+        """设置连接状态"""
+        self._is_connected = value
 
     @abstractmethod
     def connect(self) -> bool:
@@ -202,7 +215,7 @@ class GraphStorage(ABC):
         try:
             graph = self.load_graph(graph_id)
             if graph:
-                return graph.get_statistics()
+                return graph.get_basic_statistics()
             return {}
         except Exception as e:
             logger.error("Error getting graph statistics: %s", e)

@@ -1,46 +1,246 @@
 """
 图嵌入处理器模块
+
+专注于知识图谱的嵌入向量生成和管理，不包含检索功能
 """
 
+import asyncio
+import json
 import logging
-import pickle
-import random
+import os
 from abc import ABC, abstractmethod
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from openai import AsyncOpenAI
 
+from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..relations import Relation
 
 logger = logging.getLogger(__name__)
 
 
-class GraphEmbedding(ABC):
-    """图嵌入基类"""
+class VectorStorage(ABC):
+    """向量存储基类"""
 
-    def __init__(self, embedding_dim: int = 128):
+    @abstractmethod
+    def add_vector(self, vector_id: str, vector: np.ndarray, metadata: Optional[Dict] = None) -> bool:
+        """添加向量"""
+        pass
+
+    @abstractmethod
+    def get_vector(self, vector_id: str) -> Optional[np.ndarray]:
+        """获取向量"""
+        pass
+
+    @abstractmethod
+    def delete_vector(self, vector_id: str) -> bool:
+        """删除向量"""
+        pass
+
+    @abstractmethod
+    def search_similar_vectors(
+        self, query_vector: np.ndarray, top_k: int = 10, threshold: float = 0.0
+    ) -> List[Tuple[str, float]]:
+        """搜索相似向量"""
+        pass
+
+    @abstractmethod
+    def save_vectors(self, vectors: Dict[str, np.ndarray], metadata: Optional[Dict] = None) -> bool:
+        """批量保存向量"""
+        pass
+
+    @abstractmethod
+    def load_vectors(self) -> Tuple[Dict[str, np.ndarray], Dict]:
+        """加载所有向量"""
+        pass
+
+    @abstractmethod
+    def clear(self) -> bool:
+        """清空所有向量"""
+        pass
+
+    def compute_cosine_similarity(self, vector1: np.ndarray, vector2: np.ndarray) -> float:
+        """计算余弦相似度"""
+        try:
+            dot_product = np.dot(vector1, vector2)
+            norm_a = np.linalg.norm(vector1)
+            norm_b = np.linalg.norm(vector2)
+
+            if norm_a == 0 or norm_b == 0:
+                return 0.0
+
+            return float(dot_product / (norm_a * norm_b))
+        except Exception as e:
+            logger.error("Error computing cosine similarity: %s", e)
+            return 0.0
+
+
+class JsonVectorStorage(VectorStorage):
+    """基于JSON的向量存储实现"""
+
+    def __init__(self, file_path: str = "vectors.json"):
+        self.file_path = file_path
+        self.vectors: Dict[str, np.ndarray] = {}
+        self.metadata: Dict = {}
+        self._ensure_file_exists()
+
+    def _ensure_file_exists(self) -> None:
+        """确保存储文件存在"""
+        if not os.path.exists(self.file_path):
+            dir_path = os.path.dirname(self.file_path)
+            if dir_path:  # Only create directory if there is a directory part
+                os.makedirs(dir_path, exist_ok=True)
+            self._save_to_file({}, {})
+
+    def _save_to_file(self, vectors: Dict[str, np.ndarray], metadata: Dict) -> None:
+        """保存到文件"""
+        try:
+            data = {"vectors": {k: v.tolist() for k, v in vectors.items()}, "metadata": metadata}
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error("Error saving vectors to file: %s", e)
+
+    def _load_from_file(self) -> Tuple[Dict[str, np.ndarray], Dict]:
+        """从文件加载"""
+        try:
+            if not os.path.exists(self.file_path):
+                return {}, {}
+
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            vectors = {k: np.array(v, dtype=np.float32) for k, v in data.get("vectors", {}).items()}
+            metadata = data.get("metadata", {})
+            return vectors, metadata
+        except Exception as e:
+            logger.error("Error loading vectors from file: %s", e)
+            return {}, {}
+
+    def add_vector(self, vector_id: str, vector: np.ndarray, metadata: Optional[Dict] = None) -> bool:
+        """添加向量"""
+        try:
+            self.vectors[vector_id] = vector.astype(np.float32)
+            if metadata:
+                if "vector_metadata" not in self.metadata:
+                    self.metadata["vector_metadata"] = {}
+                self.metadata["vector_metadata"][vector_id] = metadata
+            return True
+        except Exception as e:
+            logger.error("Error adding vector %s: %s", vector_id, e)
+            return False
+
+    def get_vector(self, vector_id: str) -> Optional[np.ndarray]:
+        """获取向量"""
+        return self.vectors.get(vector_id)
+
+    def delete_vector(self, vector_id: str) -> bool:
+        """删除向量"""
+        try:
+            if vector_id in self.vectors:
+                del self.vectors[vector_id]
+                if "vector_metadata" in self.metadata and vector_id in self.metadata["vector_metadata"]:
+                    del self.metadata["vector_metadata"][vector_id]
+                return True
+            return False
+        except Exception as e:
+            logger.error("Error deleting vector %s: %s", vector_id, e)
+            return False
+
+    def search_similar_vectors(
+        self, query_vector: np.ndarray, top_k: int = 10, threshold: float = 0.0
+    ) -> List[Tuple[str, float]]:
+        """搜索相似向量"""
+        try:
+            similarities = []
+            for vector_id, vector in self.vectors.items():
+                similarity = self.compute_cosine_similarity(query_vector, vector)
+                if similarity >= threshold:
+                    similarities.append((vector_id, similarity))
+
+            # 按相似度降序排序
+            similarities.sort(key=lambda x: x[1], reverse=True)
+            return similarities[:top_k]
+        except Exception as e:
+            logger.error("Error searching similar vectors: %s", e)
+            return []
+
+    def save_vectors(self, vectors: Dict[str, np.ndarray], metadata: Optional[Dict] = None) -> bool:
+        """批量保存向量"""
+        try:
+            # 更新内存中的向量
+            for vector_id, vector in vectors.items():
+                self.vectors[vector_id] = vector.astype(np.float32)
+
+            # 更新元数据
+            if metadata:
+                self.metadata.update(metadata)
+
+            # 保存到文件
+            self._save_to_file(self.vectors, self.metadata)
+            return True
+        except Exception as e:
+            logger.error("Error saving vectors: %s", e)
+            return False
+
+    def load_vectors(self) -> Tuple[Dict[str, np.ndarray], Dict]:
+        """加载所有向量"""
+        try:
+            self.vectors, self.metadata = self._load_from_file()
+            return self.vectors, self.metadata
+        except Exception as e:
+            logger.error("Error loading vectors: %s", e)
+            return {}, {}
+
+    def clear(self) -> bool:
+        """清空所有向量"""
+        try:
+            self.vectors.clear()
+            self.metadata.clear()
+            self._save_to_file(self.vectors, self.metadata)
+            return True
+        except Exception as e:
+            logger.error("Error clearing vectors: %s", e)
+            return False
+
+    def save(self) -> None:
+        """保存当前状态到文件"""
+        self._save_to_file(self.vectors, self.metadata)
+
+
+class GraphEmbedding(ABC):
+    """图嵌入基类 - 专注于图相关的嵌入向量生成和管理"""
+
+    def __init__(
+        self,
+        embedding_dim: int = 128,
+        vector_storage: Optional[VectorStorage] = None,
+        openai_api_key: Optional[str] = None,
+        embedding_model: str = "text-embedding-3-small",
+    ):
         self.embedding_dim = embedding_dim
-        self.entity_embeddings: Dict[str, np.ndarray] = {}
-        self.relation_embeddings: Dict[str, np.ndarray] = {}
+        self.vector_storage = vector_storage or JsonVectorStorage("embeddings.json")
         self.entity_to_id: Dict[str, int] = {}
         self.id_to_entity: Dict[int, str] = {}
         self.relation_to_id: Dict[str, int] = {}
         self.id_to_relation: Dict[int, str] = {}
+        self.openai_client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else None
+        self.embedding_model = embedding_model
 
     @abstractmethod
-    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
+    def fit(self, graph: KnowledgeGraph) -> bool:
         """
         训练图嵌入模型
 
         Args:
             graph: 知识图谱
-            **kwargs: 训练参数
 
         Returns:
-            bool: 训练是否成功
+            bool: 是否成功
         """
-        raise NotImplementedError("Subclasses must implement train method")
+        pass
 
     @abstractmethod
     def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
@@ -53,7 +253,19 @@ class GraphEmbedding(ABC):
         Returns:
             np.ndarray: 嵌入向量，如果不存在则返回None
         """
-        raise NotImplementedError("Subclasses must implement get_entity_embedding method")
+        pass
+
+    def get_relation_embedding(self, relation_id: str) -> Optional[np.ndarray]:
+        """
+        获取关系嵌入向量
+
+        Args:
+            relation_id: 关系ID
+
+        Returns:
+            np.ndarray: 嵌入向量，如果不存在则返回None
+        """
+        return self.vector_storage.get_vector(f"relation_{relation_id}")
 
     def compute_entity_similarity(self, entity1_id: str, entity2_id: str) -> float:
         """
@@ -73,107 +285,222 @@ class GraphEmbedding(ABC):
             if emb1 is None or emb2 is None:
                 return 0.0
 
-            # 计算余弦相似度
-            dot_product = np.dot(emb1, emb2)
-            norm1 = np.linalg.norm(emb1)
-            norm2 = np.linalg.norm(emb2)
-
-            if norm1 == 0 or norm2 == 0:
-                return 0.0
-
-            similarity = dot_product / (norm1 * norm2)
-            return float(max(0.0, min(1.0, (similarity + 1) / 2)))  # 将[-1,1]映射到[0,1]
+            return self.vector_storage.compute_cosine_similarity(emb1, emb2)
 
         except Exception as e:
             logger.error("Error computing entity similarity: %s", e)
             return 0.0
 
-    def recommend_entities(self, entity_id: str, top_k: int = 10) -> List[Tuple[str, float]]:
+    def recommend_entities(
+        self, entity_id: str, top_k: int = 10, similarity_threshold: float = 0.5
+    ) -> List[Tuple[str, float]]:
         """
         基于嵌入的实体推荐
 
         Args:
             entity_id: 输入实体ID
             top_k: 推荐数量
+            similarity_threshold: 相似度阈值
 
         Returns:
             List[Tuple[str, float]]: 推荐实体列表及相似度
         """
         try:
-            similarities = []
+            entity_embedding = self.get_entity_embedding(entity_id)
+            if entity_embedding is None:
+                return []
 
-            for other_entity_id in self.entity_embeddings:
-                if other_entity_id != entity_id:
-                    similarity = self.compute_entity_similarity(entity_id, other_entity_id)
-                    similarities.append((other_entity_id, similarity))
+            # 使用向量存储搜索相似向量
+            similar_vectors = self.vector_storage.search_similar_vectors(
+                entity_embedding, top_k + 1, similarity_threshold
+            )
 
-            # 按相似度排序并返回Top-K
-            similarities.sort(key=lambda x: x[1], reverse=True)
-            return similarities[:top_k]
+            # 过滤掉自己，并移除entity_前缀
+            results = []
+            for vector_id, similarity in similar_vectors:
+                if vector_id.startswith("entity_"):
+                    actual_entity_id = vector_id[7:]  # 移除"entity_"前缀
+                    if actual_entity_id != entity_id:
+                        results.append((actual_entity_id, similarity))
+
+            return results[:top_k]
 
         except Exception as e:
             logger.error("Error recommending entities: %s", e)
             return []
 
-    def save_embeddings(self, filepath: str) -> bool:
+    async def embed_text(self, text: str) -> Optional[np.ndarray]:
         """
-        保存嵌入向量
+        将文本转换为嵌入向量
 
         Args:
-            filepath: 保存路径
+            text: 输入文本
+
+        Returns:
+            np.ndarray: 嵌入向量，如果失败返回None
+        """
+        if not self.openai_client:
+            logger.warning("No OpenAI client configured for text embedding")
+            return None
+
+        try:
+            response = await self.openai_client.embeddings.create(input=text, model=self.embedding_model)
+            embedding = np.array(response.data[0].embedding, dtype=np.float32)
+            return embedding
+        except Exception as e:
+            logger.error("Error embedding text: %s", e)
+            return None
+
+    async def build_text_embeddings(self, graph: KnowledgeGraph) -> bool:
+        """
+        为图中的实体和关系构建文本嵌入
+
+        Args:
+            graph: 知识图谱
+
+        Returns:
+            bool: 是否成功
+        """
+        if not self.openai_client:
+            logger.warning("No OpenAI client configured for text embedding")
+            return False
+
+        try:
+            entity_vectors = {}
+            relation_vectors = {}
+
+            # 为实体构建文本嵌入
+            for entity_id, entity in graph.entities.items():
+                entity_text = self._entity_to_text(entity)
+                embedding = await self.embed_text(entity_text)
+                if embedding is not None:
+                    entity_vectors[f"entity_text_{entity_id}"] = embedding
+
+            # 为关系构建文本嵌入
+            for relation_id, relation in graph.relations.items():
+                relation_text = self._relation_to_text(relation)
+                embedding = await self.embed_text(relation_text)
+                if embedding is not None:
+                    relation_vectors[f"relation_text_{relation_id}"] = embedding
+
+            # 保存到向量存储
+            all_vectors = {**entity_vectors, **relation_vectors}
+            success = self.vector_storage.save_vectors(
+                all_vectors, {"embedding_model": self.embedding_model, "embedding_type": "text"}
+            )
+
+            if success:
+                logger.info(
+                    "Built text embeddings for %d entities and %d relations", len(entity_vectors), len(relation_vectors)
+                )
+            return success
+
+        except Exception as e:
+            logger.error("Error building text embeddings: %s", e)
+            return False
+
+    def save_embeddings(self, storage_path: Optional[str] = None) -> bool:
+        """
+        保存嵌入向量和映射信息
+
+        Args:
+            storage_path: 可选的存储路径，仅对JsonVectorStorage有效
 
         Returns:
             bool: 保存是否成功
         """
         try:
-            embedding_data = {
-                "entity_embeddings": self.entity_embeddings,
-                "relation_embeddings": self.relation_embeddings,
+            # 保存映射信息到向量存储的元数据
+            mapping_metadata = {
                 "entity_to_id": self.entity_to_id,
                 "id_to_entity": self.id_to_entity,
                 "relation_to_id": self.relation_to_id,
                 "id_to_relation": self.id_to_relation,
                 "embedding_dim": self.embedding_dim,
+                "embedding_model": self.embedding_model,
             }
 
-            with open(filepath, "wb") as f:
-                pickle.dump(embedding_data, f)
+            # 如果是JsonVectorStorage且提供了路径，更新路径
+            if storage_path and isinstance(self.vector_storage, JsonVectorStorage):
+                self.vector_storage.file_path = storage_path
 
-            logger.info("Embeddings saved to %s", filepath)
-            return True
+            success = self.vector_storage.save_vectors({}, mapping_metadata)
+
+            if success:
+                logger.info("Graph embeddings saved successfully")
+            return success
 
         except Exception as e:
-            logger.error("Error saving embeddings: %s", e)
+            logger.error("Error saving graph embeddings: %s", e)
             return False
 
-    def load_embeddings(self, filepath: str) -> bool:
+    def load_embeddings(self, storage_path: Optional[str] = None) -> bool:
         """
-        加载嵌入向量
+        加载嵌入向量和映射信息
 
         Args:
-            filepath: 文件路径
+            storage_path: 可选的存储路径，仅对JsonVectorStorage有效
 
         Returns:
             bool: 加载是否成功
         """
         try:
-            with open(filepath, "rb") as f:
-                embedding_data = pickle.load(f)
+            # 如果是JsonVectorStorage且提供了路径，更新路径
+            if storage_path and isinstance(self.vector_storage, JsonVectorStorage):
+                self.vector_storage.file_path = storage_path
 
-            self.entity_embeddings = embedding_data.get("entity_embeddings", {})
-            self.relation_embeddings = embedding_data.get("relation_embeddings", {})
-            self.entity_to_id = embedding_data.get("entity_to_id", {})
-            self.id_to_entity = embedding_data.get("id_to_entity", {})
-            self.relation_to_id = embedding_data.get("relation_to_id", {})
-            self.id_to_relation = embedding_data.get("id_to_relation", {})
-            self.embedding_dim = embedding_data.get("embedding_dim", self.embedding_dim)
+            vectors, metadata = self.vector_storage.load_vectors()
 
-            logger.info("Embeddings loaded from %s", filepath)
+            # 恢复映射信息
+            self.entity_to_id = metadata.get("entity_to_id", {})
+            self.id_to_entity = metadata.get("id_to_entity", {})
+            self.relation_to_id = metadata.get("relation_to_id", {})
+            self.id_to_relation = metadata.get("id_to_relation", {})
+            self.embedding_dim = metadata.get("embedding_dim", self.embedding_dim)
+            self.embedding_model = metadata.get("embedding_model", self.embedding_model)
+
+            logger.info("Graph embeddings loaded successfully")
             return True
 
         except Exception as e:
-            logger.error("Error loading embeddings: %s", e)
+            logger.error("Error loading graph embeddings: %s", e)
             return False
+
+    def _entity_to_text(self, entity: Entity) -> str:
+        """将实体转换为文本描述"""
+        text_parts = [f"Entity: {entity.name}"]
+
+        if entity.description:
+            text_parts.append(f"Description: {entity.description}")
+
+        if entity.aliases:
+            text_parts.append(f"Aliases: {', '.join(entity.aliases)}")
+
+        text_parts.append(f"Type: {entity.entity_type.value}")
+
+        if entity.properties:
+            properties_text = ", ".join([f"{k}: {v}" for k, v in entity.properties.items()])
+            text_parts.append(f"Properties: {properties_text}")
+
+        return " | ".join(text_parts)
+
+    def _relation_to_text(self, relation: Relation) -> str:
+        """将关系转换为文本描述"""
+        text_parts = []
+
+        if relation.head_entity and relation.tail_entity:
+            text_parts.append(
+                f"Relation: {relation.head_entity.name} {relation.relation_type.value} {relation.tail_entity.name}"
+            )
+
+        if relation.description:
+            text_parts.append(f"Description: {relation.description}")
+
+        if relation.properties:
+            properties_text = ", ".join([f"{k}: {v}" for k, v in relation.properties.items()])
+            text_parts.append(f"Properties: {properties_text}")
+
+        return " | ".join(text_parts)
 
     def _build_entity_mapping(self, graph: KnowledgeGraph) -> None:
         """构建实体映射"""
@@ -192,416 +519,242 @@ class GraphEmbedding(ABC):
         self.id_to_relation = {i: relation for relation, i in self.relation_to_id.items()}
 
 
-class Node2VecEmbedding(GraphEmbedding):
-    """Node2Vec图嵌入"""
+class OpenAIEmbedding(GraphEmbedding):
+    """基于OpenAI API的图嵌入实现 - 专注于嵌入向量生成"""
 
     def __init__(
         self,
-        embedding_dim: int = 128,
-        walk_length: int = 80,
-        num_walks: int = 10,
-        walk_params: Optional[Dict[str, float]] = None,
+        vector_storage: Optional[VectorStorage] = None,
+        openai_api_key: Optional[str] = None,
+        openai_api_base: Optional[str] = None,
+        embedding_model: str = "text-embedding-3-small",
+        batch_size: int = 100,
+        max_concurrent: int = 5,
     ):
-        super().__init__(embedding_dim)
-        self.walk_length = walk_length
-        self.num_walks = num_walks
-        walk_params = walk_params or {}
-        self.p = walk_params.get("p", 1.0)  # 返回参数
-        self.q = walk_params.get("q", 1.0)  # 进出参数
+        """
+        初始化OpenAI嵌入处理器
 
-    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
-        """训练Node2Vec嵌入"""
-        epochs: int = kwargs.get("epochs", 100)
-        learning_rate: float = kwargs.get("learning_rate", 0.025)
+        Args:
+            vector_storage: 向量存储后端
+            openai_api_key: OpenAI API密钥
+            openai_api_base: OpenAI API基础URL
+            embedding_model: 嵌入模型名称
+            batch_size: 批处理大小
+            max_concurrent: 最大并发数
+        """
+        # 从OpenAI获取实际的embedding维度
+        embedding_dim = self._get_embedding_dim_for_model(embedding_model)
 
+        super().__init__(
+            embedding_dim=embedding_dim,
+            vector_storage=vector_storage,
+            openai_api_key=openai_api_key,
+            embedding_model=embedding_model,
+        )
+
+        self.openai_client = AsyncOpenAI(api_key=openai_api_key, base_url=openai_api_base)
+        self.batch_size = batch_size
+        self.max_concurrent = max_concurrent
+        self._entity_embeddings_cache: Dict[str, np.ndarray] = {}
+        self._relation_embeddings_cache: Dict[str, np.ndarray] = {}
+
+    def _get_embedding_dim_for_model(self, model: str) -> int:
+        """根据模型名称获取embedding维度"""
+        model_dims = {
+            "text-embedding-3-small": 1536,
+            "text-embedding-3-large": 3072,
+            "text-embedding-ada-002": 1536,
+        }
+        return model_dims.get(model, 1536)  # 默认1536
+
+    def fit(self, graph: KnowledgeGraph) -> bool:
+        """
+        使用OpenAI API为图中的实体和关系构建嵌入
+
+        Args:
+            graph: 知识图谱
+
+        Returns:
+            bool: 是否成功
+        """
         try:
-            self._build_entity_mapping(graph)
-
-            # 构建邻接表
-            adjacency = self._build_adjacency_list(graph)
-
-            # 生成随机游走序列
-            walks = self._generate_walks(adjacency)
-
-            # 训练Skip-gram模型
-            self._train_skipgram(walks, epochs, learning_rate)
-
-            logger.info("Node2Vec training completed with %d entity embeddings", len(self.entity_embeddings))
-            return True
-
+            # 使用asyncio运行异步方法
+            return asyncio.run(self._fit_async(graph))
         except Exception as e:
-            logger.error("Error training Node2Vec: %s", e)
+            logger.error(f"Error in OpenAI embedding fit: {e}")
             return False
+
+    async def _fit_async(self, graph: KnowledgeGraph) -> bool:
+        """异步版本的fit方法"""
+        try:
+            # 构建文本嵌入
+            await self.build_text_embeddings(graph)
+            return True
+        except Exception as e:
+            logger.error(f"Error in async fit: {e}")
+            return False
+
+    async def build_text_embeddings(self, graph: KnowledgeGraph) -> bool:
+        """为图中的实体和关系构建文本嵌入"""
+        try:
+            logger.info("Building text embeddings using OpenAI API...")
+
+            # 收集所有需要嵌入的文本
+            texts_to_embed = []
+            text_to_id = {}
+
+            # 实体文本
+            for entity_id, entity in graph.entities.items():
+                text = self._entity_to_text(entity)
+                texts_to_embed.append(text)
+                text_to_id[text] = f"entity_{entity_id}"
+
+            # 关系文本
+            for relation_id, relation in graph.relations.items():
+                text = self._relation_to_text(relation)
+                texts_to_embed.append(text)
+                text_to_id[text] = f"relation_{relation_id}"
+
+            if not texts_to_embed:
+                logger.warning("No texts to embed")
+                return True
+
+            # 批量获取嵌入
+            embeddings = await self._get_embeddings_batch(texts_to_embed)
+
+            # 存储嵌入
+            for text, embedding in zip(texts_to_embed, embeddings):
+                item_id = text_to_id[text]
+                self.vector_storage.add_vector(item_id, embedding, metadata={"text": text})
+
+                # 更新缓存
+                if item_id.startswith("entity_"):
+                    entity_id = item_id[7:]  # 去掉"entity_"前缀
+                    self._entity_embeddings_cache[entity_id] = embedding
+                elif item_id.startswith("relation_"):
+                    relation_id = item_id[9:]  # 去掉"relation_"前缀
+                    self._relation_embeddings_cache[relation_id] = embedding
+
+            logger.info(f"Successfully built embeddings for {len(texts_to_embed)} items")
+            return True
+        except Exception as e:
+            logger.error(f"Error building text embeddings: {e}")
+            return False
+
+    def _entity_to_text(self, entity: Entity) -> str:
+        """将实体转换为文本"""
+        parts = [entity.name]
+        if entity.description:
+            parts.append(entity.description)
+        if entity.aliases:
+            parts.append(f"别名: {', '.join(entity.aliases)}")
+        return " ".join(parts)
+
+    def _relation_to_text(self, relation: Relation) -> str:
+        """将关系转换为文本"""
+        parts = []
+        if relation.head_entity and relation.tail_entity:
+            parts.append(f"{relation.head_entity.name} {relation.relation_type.value} {relation.tail_entity.name}")
+        if relation.description:
+            parts.append(relation.description)
+        return " ".join(parts) if parts else relation.relation_type.value
+
+    async def _get_embeddings_batch(self, texts: List[str]) -> List[np.ndarray]:
+        """批量获取文本嵌入"""
+        all_embeddings = []
+
+        # 使用信号量控制并发
+        semaphore = asyncio.Semaphore(self.max_concurrent)
+
+        async def get_batch_embedding(batch_texts: List[str]) -> List[np.ndarray]:
+            async with semaphore:
+                try:
+                    if self.openai_client is None:
+                        raise ValueError("OpenAI client is not initialized")
+                    response = await self.openai_client.embeddings.create(model=self.embedding_model, input=batch_texts)
+                    return [np.array(item.embedding) for item in response.data]
+                except Exception as e:
+                    logger.error(f"Error getting batch embedding: {e}")
+                    # 返回零向量作为备用
+                    return [np.zeros(self.embedding_dim) for _ in batch_texts]
+
+        # 分批处理
+        tasks = []
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i : i + self.batch_size]
+            tasks.append(get_batch_embedding(batch))
+
+        # 并发执行
+        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 合并结果
+        for i, result in enumerate(batch_results):
+            if isinstance(result, Exception):
+                logger.error(f"Batch embedding failed: {result}")
+                # 为失败的批次添加零向量
+                batch_start = i * self.batch_size
+                batch_end = min(batch_start + self.batch_size, len(texts))
+                batch_size = batch_end - batch_start
+                all_embeddings.extend([np.zeros(self.embedding_dim)] * batch_size)
+            else:
+                # 确保 result 是正确的类型
+                if isinstance(result, list):
+                    all_embeddings.extend(result)
+                else:
+                    logger.error(f"Unexpected result type: {type(result)}")
+                    # 添加零向量作为替代
+                    batch_start = i * self.batch_size
+                    batch_end = min(batch_start + self.batch_size, len(texts))
+                    batch_size = batch_end - batch_start
+                    all_embeddings.extend([np.zeros(self.embedding_dim)] * batch_size)
+
+        return all_embeddings[: len(texts)]  # 确保长度匹配
 
     def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
         """获取实体嵌入向量"""
-        return self.entity_embeddings.get(entity_id)
+        # 先检查缓存
+        if entity_id in self._entity_embeddings_cache:
+            return self._entity_embeddings_cache[entity_id]
 
-    def _build_adjacency_list(self, graph: KnowledgeGraph) -> Dict[str, List[str]]:
-        """构建邻接表"""
-        adjacency = defaultdict(list)
+        # 从存储中获取
+        embedding = self.vector_storage.get_vector(f"entity_{entity_id}")
+        if embedding is not None:
+            self._entity_embeddings_cache[entity_id] = embedding
 
-        for relation in graph.relations.values():
-            head_entity = relation.head_entity
-            tail_entity = relation.tail_entity
+        return embedding
 
-            if head_entity is None or tail_entity is None:
-                continue
-
-            head_id = head_entity.id
-            tail_id = tail_entity.id
-
-            # 构建无向图
-            adjacency[head_id].append(tail_id)
-            adjacency[tail_id].append(head_id)
-
-        return adjacency
-
-    def _generate_walks(self, adjacency: Dict[str, List[str]]) -> List[List[str]]:
-        """生成随机游走序列"""
-        walks = []
-        nodes = list(adjacency.keys())
-
-        for _ in range(self.num_walks):
-            random.shuffle(nodes)
-            for node in nodes:
-                walk = self._random_walk(adjacency, node)
-                if len(walk) > 1:
-                    walks.append(walk)
-
-        return walks
-
-    def _random_walk(self, adjacency: Dict[str, List[str]], start_node: str) -> List[str]:
-        """执行单次随机游走"""
-        walk = [start_node]
-
-        while len(walk) < self.walk_length:
-            current = walk[-1]
-            neighbors = adjacency.get(current, [])
-
-            if not neighbors:
-                break
-
-            if len(walk) == 1:
-                # 第一步，随机选择邻居
-                next_node = random.choice(neighbors)
-            else:
-                # 根据p, q参数选择下一个节点
-                prev = walk[-2]
-                next_node = self._choose_next_node(current, prev, neighbors, adjacency)
-
-            walk.append(next_node)
-
-        return walk
-
-    def _choose_next_node(self, current: str, prev: str, neighbors: List[str], adjacency: Dict[str, List[str]]) -> str:
-        """根据p, q参数选择下一个节点"""
-        probs = []
-
-        for neighbor in neighbors:
-            if neighbor == prev:
-                # 返回上一个节点的概率
-                prob = 1.0 / self.p
-            elif neighbor in adjacency.get(prev, []):
-                # 到达公共邻居的概率
-                prob = 1.0
-            else:
-                # 探索远离之前节点的概率
-                prob = 1.0 / self.q
-
-            probs.append(prob)
-
-        # 归一化概率
-        total_prob = sum(probs)
-        if total_prob == 0:
-            return random.choice(neighbors)
-
-        probs = [p / total_prob for p in probs]
-
-        # 根据概率选择
-        r = random.random()
-        cumsum = 0.0
-        for i, prob in enumerate(probs):
-            cumsum += prob
-            if r <= cumsum:
-                return neighbors[i]
-
-        return neighbors[-1]
-
-    def _train_skipgram(self, walks: List[List[str]], epochs: int, learning_rate: float) -> None:
-        """训练Skip-gram模型"""
-        # 简化的Skip-gram实现
-        vocabulary = set()
-        for walk in walks:
-            vocabulary.update(walk)
-
-        vocab_size = len(vocabulary)
-        vocab_to_idx = {word: i for i, word in enumerate(vocabulary)}
-
-        # 初始化嵌入矩阵
-        W1 = np.random.uniform(-0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (vocab_size, self.embedding_dim))
-        W2 = np.random.uniform(-0.5 / self.embedding_dim, 0.5 / self.embedding_dim, (self.embedding_dim, vocab_size))
-
-        window_size = 5
-
-        for epoch in range(epochs):
-            total_loss = 0.0
-
-            for walk in walks:
-                for i, center_word in enumerate(walk):
-                    center_idx = vocab_to_idx[center_word]
-
-                    # 获取上下文窗口
-                    context_indices = []
-                    for j in range(max(0, i - window_size), min(len(walk), i + window_size + 1)):
-                        if i != j:
-                            context_indices.append(vocab_to_idx[walk[j]])
-
-                    if not context_indices:
-                        continue
-
-                    # 前向传播
-                    h = W1[center_idx]
-
-                    for context_idx in context_indices:
-                        # 计算输出层
-                        u = np.dot(h, W2)
-                        y_pred = self._softmax(u)
-
-                        # 计算损失
-                        loss = -np.log(y_pred[context_idx] + 1e-10)
-                        total_loss += float(loss)
-
-                        # 反向传播
-                        e = y_pred.copy()
-                        e[context_idx] -= 1.0
-
-                        # 更新权重
-                        W2 -= learning_rate * np.outer(h, e)
-                        W1[center_idx] -= learning_rate * np.dot(W2, e)
-
-            if epoch % 10 == 0:
-                logger.info("Epoch %d, Loss: %.4f", epoch, total_loss)
-
-        # 保存最终嵌入
-        for entity_id in vocabulary:
-            if entity_id in vocab_to_idx:
-                idx = vocab_to_idx[entity_id]
-                self.entity_embeddings[entity_id] = W1[idx].copy()
-
-    def _softmax(self, x: np.ndarray) -> np.ndarray:
-        """Softmax函数"""
-        exp_x = np.exp(x - np.max(x))
-        result = exp_x / np.sum(exp_x)
-        return np.asarray(result, dtype=x.dtype)
-
-
-class TransEEmbedding(GraphEmbedding):
-    """TransE平移模型嵌入"""
-
-    def __init__(self, embedding_dim: int = 128, margin: float = 1.0):
-        super().__init__(embedding_dim)
-        self.margin = margin
-
-    def train(self, graph: KnowledgeGraph, **kwargs: Any) -> bool:
-        """训练TransE嵌入"""
-        epochs: int = kwargs.get("epochs", 100)
-        learning_rate: float = kwargs.get("learning_rate", 0.01)
-        batch_size: int = kwargs.get("batch_size", 100)
-
-        try:
-            self._build_entity_mapping(graph)
-            self._build_relation_mapping(graph)
-
-            # 构建训练三元组
-            triplets = self._build_triplets(graph)
-
-            # 初始化嵌入
-            self._initialize_embeddings()
-
-            # 训练模型
-            self._train_model(triplets, epochs, learning_rate, batch_size)
-
-            logger.info("TransE training completed with %d entity embeddings", len(self.entity_embeddings))
-            return True
-
-        except Exception as e:
-            logger.error("Error training TransE: %s", e)
-            return False
-
-    def get_entity_embedding(self, entity_id: str) -> Optional[np.ndarray]:
-        """获取实体嵌入向量"""
-        return self.entity_embeddings.get(entity_id)
-
-    def get_relation_embedding(self, relation_type: str) -> Optional[np.ndarray]:
+    def get_relation_embedding(self, relation_id: str) -> Optional[np.ndarray]:
         """获取关系嵌入向量"""
-        return self.relation_embeddings.get(relation_type)
+        # 先检查缓存
+        if relation_id in self._relation_embeddings_cache:
+            return self._relation_embeddings_cache[relation_id]
 
-    def _build_triplets(self, graph: KnowledgeGraph) -> List[Tuple[str, str, str]]:
-        """构建训练三元组 (head, relation, tail)"""
-        triplets = []
+        # 从存储中获取
+        embedding = self.vector_storage.get_vector(f"relation_{relation_id}")
+        if embedding is not None:
+            self._relation_embeddings_cache[relation_id] = embedding
 
-        for relation in graph.relations.values():
-            head_entity = relation.head_entity
-            tail_entity = relation.tail_entity
+        return embedding
 
-            if head_entity is None or tail_entity is None:
-                continue
+    async def _get_single_embedding(self, text: str) -> Optional[np.ndarray]:
+        """获取单个文本的嵌入"""
+        try:
+            if self.openai_client is None:
+                raise ValueError("OpenAI client is not initialized")
+            response = await self.openai_client.embeddings.create(model=self.embedding_model, input=[text])
+            return np.array(response.data[0].embedding)
+        except Exception as e:
+            logger.error(f"Error getting single embedding: {e}")
+            return None
 
-            triplet = (
-                head_entity.id,
-                relation.relation_type.value,
-                tail_entity.id,
-            )
-            triplets.append(triplet)
-
-        return triplets
-
-    def _initialize_embeddings(self) -> None:
-        """初始化嵌入向量"""
-        # 初始化实体嵌入
-        for entity_id in self.entity_to_id:
-            embedding = np.random.uniform(
-                -6 / np.sqrt(self.embedding_dim),
-                6 / np.sqrt(self.embedding_dim),
-                self.embedding_dim,
-            )
-            # L2归一化
-            embedding = embedding / np.linalg.norm(embedding)
-            self.entity_embeddings[entity_id] = embedding
-
-        # 初始化关系嵌入
-        for relation_type in self.relation_to_id:
-            embedding = np.random.uniform(
-                -6 / np.sqrt(self.embedding_dim),
-                6 / np.sqrt(self.embedding_dim),
-                self.embedding_dim,
-            )
-            # L2归一化
-            embedding = embedding / np.linalg.norm(embedding)
-            self.relation_embeddings[relation_type] = embedding
-
-    def _train_model(
-        self,
-        triplets: List[Tuple[str, str, str]],
-        epochs: int,
-        learning_rate: float,
-        batch_size: int,
-    ) -> None:
-        """训练TransE模型"""
-        for epoch in range(epochs):
-            total_loss = 0
-            random.shuffle(triplets)
-
-            for i in range(0, len(triplets), batch_size):
-                batch = triplets[i : i + batch_size]
-                batch_loss = 0
-
-                for head, relation, tail in batch:
-                    # 正样本
-                    h_pos = self.entity_embeddings[head]
-                    r = self.relation_embeddings[relation]
-                    t_pos = self.entity_embeddings[tail]
-
-                    # 生成负样本
-                    neg_head, neg_relation, neg_tail = self._generate_negative_sample(head, relation, tail, triplets)
-
-                    h_neg = self.entity_embeddings[neg_head]
-                    r_neg = self.relation_embeddings[neg_relation]
-                    t_neg = self.entity_embeddings[neg_tail]
-
-                    # 计算损失
-                    pos_score = np.linalg.norm(h_pos + r - t_pos)
-                    neg_score = np.linalg.norm(h_neg + r_neg - t_neg)
-
-                    loss = max(0.0, float(self.margin + pos_score - neg_score))
-                    batch_loss += int(loss)
-
-                    if loss > 0:
-                        # 计算梯度并更新
-                        self._update_embeddings(
-                            (head, relation, tail),
-                            (neg_head, neg_relation, neg_tail),
-                            learning_rate,
-                        )
-
-                total_loss += batch_loss
-
-            if epoch % 10 == 0:
-                logger.info("Epoch %d, Loss: %.4f", epoch, total_loss)
-
-    def _generate_negative_sample(
-        self, head: str, relation: str, tail: str, triplets: List[Tuple[str, str, str]]
-    ) -> Tuple[str, str, str]:
-        """生成负样本"""
-        # 随机替换头实体或尾实体
-        if random.random() < 0.5:
-            # 替换头实体
-            neg_head = random.choice(list(self.entity_to_id.keys()))
-            while (neg_head, relation, tail) in triplets:
-                neg_head = random.choice(list(self.entity_to_id.keys()))
-            return neg_head, relation, tail
-
-        # 替换尾实体
-        neg_tail = random.choice(list(self.entity_to_id.keys()))
-        while (head, relation, neg_tail) in triplets:
-            neg_tail = random.choice(list(self.entity_to_id.keys()))
-        return head, relation, neg_tail
-
-    def _update_embeddings(
-        self,
-        pos_triplet: Tuple[str, str, str],
-        neg_triplet: Tuple[str, str, str],
-        learning_rate: float,
-    ) -> None:
-        """更新嵌入向量"""
-        head, relation, tail = pos_triplet
-        neg_head, neg_relation, neg_tail = neg_triplet
-
-        h_pos = self.entity_embeddings[head]
-        r = self.relation_embeddings[relation]
-        t_pos = self.entity_embeddings[tail]
-
-        h_neg = self.entity_embeddings[neg_head]
-        r_neg = self.relation_embeddings[neg_relation]
-        t_neg = self.entity_embeddings[neg_tail]
-
-        # 计算梯度
-        pos_diff = h_pos + r - t_pos
-        neg_diff = h_neg + r_neg - t_neg
-
-        pos_norm = np.linalg.norm(pos_diff)
-        neg_norm = np.linalg.norm(neg_diff)
-
-        if pos_norm > 0:
-            pos_gradient = pos_diff / pos_norm
-        else:
-            pos_gradient = np.zeros_like(pos_diff)
-
-        if neg_norm > 0:
-            neg_gradient = neg_diff / neg_norm
-        else:
-            neg_gradient = np.zeros_like(neg_diff)
-
-        # 更新正样本嵌入
-        self.entity_embeddings[head] -= learning_rate * pos_gradient
-        self.relation_embeddings[relation] -= learning_rate * pos_gradient
-        self.entity_embeddings[tail] += learning_rate * pos_gradient
-
-        # 更新负样本嵌入
-        self.entity_embeddings[neg_head] += learning_rate * neg_gradient
-        self.relation_embeddings[neg_relation] += learning_rate * neg_gradient
-        self.entity_embeddings[neg_tail] -= learning_rate * neg_gradient
-
-        # L2归一化
-        for entity_id in [head, tail, neg_head, neg_tail]:
-            embedding = self.entity_embeddings[entity_id]
-            norm = np.linalg.norm(embedding)
-            if norm > 0:
-                self.entity_embeddings[entity_id] = embedding / norm
-
-        for rel_type in [relation, neg_relation]:
-            embedding = self.relation_embeddings[rel_type]
-            norm = np.linalg.norm(embedding)
-            if norm > 0:
-                self.relation_embeddings[rel_type] = embedding / norm
+    def save_embeddings(self, storage_path: Optional[str] = None) -> bool:
+        """保存嵌入到存储"""
+        try:
+            # 调用 vector_storage 的保存方法
+            if hasattr(self.vector_storage, "save"):
+                self.vector_storage.save()
+            logger.info("OpenAI embeddings saved to storage")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving embeddings: {e}")
+            return False
