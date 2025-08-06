@@ -18,9 +18,6 @@ help:
 	@echo "  format       - 格式化代码 (black + isort)"
 	@echo "  lint         - 运行 linting 工具"
 	@echo ""
-	@echo "测试相关:"
-	@echo "  test         - 运行测试"
-	@echo "  test-cov     - 运行测试并生成覆盖率报告"
 	@echo ""
 	@echo "文档和发布:"
 	@echo "  docs         - 构建文档"
@@ -55,16 +52,6 @@ lint:
 	flake8 agraph/ examples/ --max-line-length=100
 	pylint agraph/ --exit-zero
 	mypy agraph/ --ignore-missing-imports
-
-# 测试
-test:
-	@echo "🧪 运行测试..."
-	pytest
-
-test-cov:
-	@echo "🧪 运行测试并生成覆盖率报告..."
-	pytest --cov=agraph --cov-report=html --cov-report=term
-	@echo "📊 查看覆盖率报告: open htmlcov/index.html"
 
 # 文档
 docs:

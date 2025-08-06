@@ -55,7 +55,6 @@ pre-commit install
 python -c "from agraph import KnowledgeGraph; print('安装成功!')"
 
 # 运行测试确保环境正常
-pytest --version
 black --version
 pylint --version
 ```
@@ -190,49 +189,6 @@ black --line-length=120 agraph/ examples/
 isort --line-length=120 agraph/ examples/
 ```
 
-## 测试
-
-### 运行测试
-
-```bash
-# 运行所有测试
-pytest
-
-# 运行特定测试文件
-pytest tests/test_graph.py
-
-# 运行特定测试方法
-pytest tests/test_graph.py::TestKnowledgeGraph::test_add_entity
-
-# 详细输出
-pytest -v
-
-# 并行运行
-pytest -n auto
-```
-
-### 测试覆盖率
-
-```bash
-# 生成覆盖率报告
-pytest --cov=agraph --cov-report=html --cov-report=term
-
-# 查看 HTML 报告
-open htmlcov/index.html  # macOS
-start htmlcov/index.html # Windows
-```
-
-### 测试特定 Python 版本
-
-```bash
-# 使用 tox 测试多个 Python 版本
-pip install tox
-tox
-
-# 测试特定版本
-tox -e py311
-```
-
 ## 提交规范
 
 我们使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
@@ -244,7 +200,6 @@ tox -e py311
 - `docs`: 文档更新
 - `style`: 代码格式调整（不影响功能）
 - `refactor`: 重构代码
-- `test`: 添加或修改测试
 - `chore`: 维护任务（如依赖更新）
 
 ### 提交示例
@@ -377,20 +332,8 @@ pylint agraph/ --reports=y
 # pylint: disable=too-many-arguments
 ```
 
-### 4. 测试失败
 
-```bash
-# 重新安装依赖
-pip install -e .[dev] --force-reinstall
-
-# 清理缓存
-pytest --cache-clear
-
-# 检查测试环境
-pytest --collect-only
-```
-
-### 5. 导入问题
+### 4. 导入问题
 
 ```bash
 # 检查 Python 路径
@@ -418,12 +361,6 @@ make check
 # 自动修复格式
 make fix
 
-# 运行测试
-make test
-
-# 生成覆盖率报告
-make test-cov
-
 # 构建包
 make build
 ```
@@ -432,7 +369,6 @@ make build
 
 - [Python 编码规范 (PEP 8)](https://pep8.org/)
 - [Type Hints (PEP 484)](https://www.python.org/dev/peps/pep-0484/)
-- [Pytest 文档](https://docs.pytest.org/)
 - [Black 文档](https://black.readthedocs.io/)
 - [MyPy 文档](https://mypy.readthedocs.io/)
 - [Pylint 文档](https://pylint.pycqa.org/)

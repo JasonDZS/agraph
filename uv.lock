@@ -33,7 +33,6 @@ dev = [
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pylint" },
-    { name = "pytest" },
     { name = "pytest-cov" },
 ]
 docs = [
@@ -61,7 +60,6 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "pypdf", specifier = ">=5.9.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=5.0" },
