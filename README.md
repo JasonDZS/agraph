@@ -52,9 +52,6 @@ pip install pandas         # Excel/CSV processing
 
 # Image processing and OCR
 pip install pillow pytesseract
-
-# Graph database support
-pip install neo4j
 ```
 ## 🚀 Quick Start
 
