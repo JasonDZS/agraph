@@ -1,6 +1,10 @@
+# v0.1.1
+Change the base class for `Entity` and `Relation` to `ABC` to ensure they are abstract classes.
+
+
 # v0.1.0
 
-**Release Date:** 2025-01-XX
+**Release Date:** 2025-08-
 
 Initial release of AGraph - A comprehensive toolkit for building, storing and querying knowledge graphs.
 
