@@ -14,6 +14,7 @@ from openai import AsyncOpenAI
 from ..entities import Entity
 from ..relations import Relation
 from ..types import RelationType
+from ..utils import get_type_value
 from .relation_extractor import BaseRelationExtractor
 
 logger = logging.getLogger(__name__)
@@ -48,35 +49,35 @@ class LLMRelationExtractor(BaseRelationExtractor):
 
         # Relation extraction prompt
         self.relation_extraction_prompt = """
-你是一个专业的知识图谱构建专家。请从以下文本中提取实体间的关系。
+You are a professional knowledge graph construction expert. Please extract relationships between entities from the following text.
 
-文本内容：
+Text content:
 {text}
 
-已识别的实体：
+Identified entities:
 {entities}
 
-请按照以下JSON格式返回提取的关系：
+Please return the extracted relationships in the following JSON format:
 {{
     "relations": [
         {{
-            "head_entity": "头实体名称",
-            "tail_entity": "尾实体名称",
-            "relation_type": "关系类型(BELONGS_TO/LOCATED_IN/WORKS_FOR/RELATED_TO/CAUSES/PART_OF/IS_A/OTHER)",
-            "description": "关系描述",
-            "properties": {{"属性名": "属性值"}},
+            "head_entity": "Head entity name",
+            "tail_entity": "Tail entity name",
+            "relation_type": "Relation type (BELONGS_TO/LOCATED_IN/WORKS_FOR/RELATED_TO/CAUSES/PART_OF/IS_A/OTHER)",
+            "description": "Relation description",
+            "properties": {{"property_name": "property_value"}},
             "confidence": 0.9
         }}
     ]
 }}
 
-要求：
-1. 只提取文本中明确表述的关系
-2. 头实体和尾实体必须在已识别实体列表中
-3. 选择最适合的关系类型
-4. 提供关系的简洁描述
-5. 置信度范围0-1，表示关系的确定程度
-6. 只返回JSON格式，不要包含其他文本
+Requirements:
+1. Only extract relationships that are explicitly stated in the text
+2. Head and tail entities must be in the identified entity list
+3. Choose the most appropriate relation type
+4. Provide concise descriptions of the relationships
+5. Confidence range 0-1, indicating the certainty of the relationship
+6. Return only JSON format, do not include other text
 """
 
     def extract_from_text(self, text: str, entities: List[Entity]) -> List[Relation]:
@@ -139,7 +140,7 @@ class LLMRelationExtractor(BaseRelationExtractor):
     async def _extract_relations_llm(self, text: str, entities: List[Entity]) -> List[Dict[str, Any]]:
         """Use LLM to extract relations from text"""
         try:
-            entities_str = "\n".join([f"- {entity.name} ({entity.entity_type.value})" for entity in entities])
+            entities_str = "\n".join([f"- {entity.name} ({get_type_value(entity.entity_type)})" for entity in entities])
             prompt = self.relation_extraction_prompt.format(text=text, entities=entities_str)
 
             response = await self.openai_client.chat.completions.create(

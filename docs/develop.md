@@ -133,10 +133,10 @@ isort --line-length=120 agraph/ examples/
 
 ```bash
 # 基本语法检查
-flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503
+flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503,E501
 
 # 详细检查
-flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503 --count --statistics
+flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503,E501 --count --statistics
 ```
 
 #### 4. 类型检查 (MyPy)

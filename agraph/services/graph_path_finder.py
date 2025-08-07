@@ -1,19 +1,43 @@
 """
-Graph path finding service - Single responsibility: path algorithms
+Graph Path Finding Service
+
+This service provides comprehensive path finding and graph traversal algorithms
+for knowledge graphs. It implements various search strategies to discover
+relationships and connections between entities.
+
+Key Features:
+- Shortest path finding using BFS algorithm
+- Comprehensive path enumeration with DFS
+- Filtered path search by relation types
+- Cycle detection in directed graphs
+- Configurable search depth limits
 """
 
 import logging
 from collections import deque
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Union
 
 from ..graph import KnowledgeGraph
 from ..relations import Relation
+from ..types import RelationType
 
 logger = logging.getLogger(__name__)
 
 
 class GraphPathFinder:
-    """Service for graph path finding algorithms"""
+    """
+    Service for graph path finding and traversal algorithms.
+
+    This service implements various path finding algorithms to discover connections
+    between entities in knowledge graphs. It supports both breadth-first and
+    depth-first search strategies with configurable constraints.
+
+    The path finder can:
+    - Find shortest paths between entities
+    - Enumerate all possible paths with depth limits
+    - Filter paths by relation types
+    - Detect cycles in the graph structure
+    """
 
     def __init__(self) -> None:
         """Initialize path finder"""
@@ -23,16 +47,27 @@ class GraphPathFinder:
         self, graph: KnowledgeGraph, start_entity_id: str, end_entity_id: str, max_depth: int = 5
     ) -> Optional[List[str]]:
         """
-        Find shortest path between two entities using BFS
+        Find the shortest path between two entities using breadth-first search.
+
+        This method uses BFS to guarantee finding the shortest path (minimum number
+        of hops) between the start and end entities. The search respects the
+        maximum depth limit to prevent excessive computation.
 
         Args:
-            graph: Knowledge graph
-            start_entity_id: Start entity ID
-            end_entity_id: End entity ID
-            max_depth: Maximum search depth
+            graph: Knowledge graph to search within
+            start_entity_id: ID of the starting entity for path search
+            end_entity_id: ID of the target entity to reach
+            max_depth: Maximum number of hops to search (default: 5)
 
         Returns:
-            Optional[List[str]]: Path as list of entity IDs, None if no path found
+            Optional[List[str]]: List of entity IDs representing the shortest path
+                from start to end, including both endpoints. Returns None if no
+                path exists within the depth limit or if entities don't exist.
+
+        Note:
+            - Path includes both start and end entity IDs
+            - Empty list is never returned; None indicates no path found
+            - Search considers undirected connections between entities
         """
         if start_entity_id not in graph.entities or end_entity_id not in graph.entities:
             return None
@@ -126,9 +161,13 @@ class GraphPathFinder:
         graph: KnowledgeGraph,
         start_entity_id: str,
         end_entity_id: str,
-        relation_types: List[str],
+        relation_types: List[Union[RelationType, str]],
         max_depth: int = 3,
+        max_paths: int = 10,
     ) -> List[List[Relation]]:
+        """Find paths between entities with specific relation types."""
+        from ..utils import get_type_value
+
         """
         Find paths between entities using only specified relation types
 
@@ -166,7 +205,7 @@ class GraphPathFinder:
                 relations = graph.get_entity_relations(current_id, direction="out")
                 for relation in relations:
                     if (
-                        relation.relation_type.value in relation_types
+                        get_type_value(relation.relation_type) in [get_type_value(rt) for rt in relation_types]
                         and relation.tail_entity
                         and relation.tail_entity.id not in visited
                     ):

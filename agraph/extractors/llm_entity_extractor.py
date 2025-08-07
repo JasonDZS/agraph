@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from ..entities import Entity
 from ..types import EntityType
+from ..utils import get_type_value
 from .entity_extractor import BaseEntityExtractor
 
 logger = logging.getLogger(__name__)
@@ -47,68 +48,68 @@ class LLMEntityExtractor(BaseEntityExtractor):
 
         # Entity extraction prompt
         self.entity_extraction_prompt = """
-你是一个专业的知识图谱构建专家。请从以下文本中提取实体信息。
+You are a professional knowledge graph construction expert. Please extract entity information from the following text.
 
-文本内容：
+Text content:
 {text}
 
-请按照以下JSON格式返回提取的实体：
+Please return the extracted entities in the following JSON format:
 {{
     "entities": [
         {{
-            "name": "实体名称",
-            "type": "实体类型(PERSON/ORGANIZATION/LOCATION/CONCEPT/EVENT/OTHER)",
-            "description": "实体描述",
-            "aliases": ["别名1", "别名2"],
-            "properties": {{"属性名": "属性值"}}
+            "name": "Entity name",
+            "type": "Entity type (PERSON/ORGANIZATION/LOCATION/CONCEPT/EVENT/OTHER)",
+            "description": "Entity description",
+            "aliases": ["alias1", "alias2"],
+            "properties": {{"property_name": "property_value"}}
         }}
     ]
 }}
 
-要求：
-1. 提取所有重要的实体，包括人名、地名、机构名、概念等
-2. 为每个实体分配合适的类型
-3. 提供简洁准确的描述
-4. 如果有别名或其他称呼，请包含在aliases中
-5. 重要属性可以放在properties中
-6. 只返回JSON格式，不要包含其他文本
+Requirements:
+1. Extract all important entities, including person names, place names, organization names, concepts, etc.
+2. Assign appropriate types to each entity
+3. Provide concise and accurate descriptions
+4. Include aliases or other names in the aliases field if available
+5. Important properties can be placed in the properties field
+6. Return only JSON format, do not include other text
 """
 
         # Entity deduplication prompt
         self.entity_deduplication_prompt = """
-你是一个专业的实体去重专家。请判断以下两个实体是否指向同一个事物。
+You are a professional entity deduplication expert. Please determine whether the following two entities refer to the same thing.
 
-实体1：
-名称：{entity1_name}
-类型：{entity1_type}
-描述：{entity1_description}
-别名：{entity1_aliases}
+Entity 1:
+Name: {entity1_name}
+Type: {entity1_type}
+Description: {entity1_description}
+Aliases: {entity1_aliases}
 
-实体2：
-名称：{entity2_name}
-类型：{entity2_type}
-描述：{entity2_description}
-别名：{entity2_aliases}
+Entity 2:
+Name: {entity2_name}
+Type: {entity2_type}
+Description: {entity2_description}
+Aliases: {entity2_aliases}
 
-请按照以下JSON格式返回判断结果：
+Please return the judgment result in the following JSON format:
 {{
     "is_duplicate": true/false,
     "confidence": 0.95,
-    "reason": "判断理由",
+    "reason": "Reasoning for the judgment",
     "merged_entity": {{
-        "name": "合并后的实体名称",
-        "type": "实体类型",
-        "description": "合并后的描述",
-        "aliases": ["所有别名"],
-        "properties": {{"合并后的属性"}}
+        "name": "Name of merged entity",
+        "type": "Entity type",
+        "description": "Merged description",
+        "aliases": ["All aliases"],
+        "properties": {{"Merged properties"}}
     }}
 }}
 
-要求：
-1. 如果是同一实体，is_duplicate为true，并提供合并后的实体信息
-2. 如果不是同一实体，is_duplicate为false
-3. 提供判断的置信度和理由
-4. 只返回JSON格式，不要包含其他文本
+Requirements:
+1. If they are the same entity, set is_duplicate to true and provide merged entity information
+2. If they are not the same entity, set is_duplicate to false
+3. Provide confidence level and reasoning for the judgment
+4. Return only JSON format, do not include other text
 """
 
     def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
@@ -221,11 +222,11 @@ class LLMEntityExtractor(BaseEntityExtractor):
         try:
             prompt = self.entity_deduplication_prompt.format(
                 entity1_name=entity1.name,
-                entity1_type=entity1.entity_type.value,
+                entity1_type=get_type_value(entity1.entity_type),
                 entity1_description=entity1.description,
                 entity1_aliases=", ".join(entity1.aliases),
                 entity2_name=entity2.name,
-                entity2_type=entity2.entity_type.value,
+                entity2_type=get_type_value(entity2.entity_type),
                 entity2_description=entity2.description,
                 entity2_aliases=", ".join(entity2.aliases),
             )

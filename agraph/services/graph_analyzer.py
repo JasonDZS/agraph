@@ -1,5 +1,16 @@
 """
-Graph analysis service - Single responsibility: statistical analysis of graphs
+Graph Analysis Service
+
+This service provides comprehensive statistical analysis and metrics computation
+for knowledge graphs. It implements various graph analysis algorithms to provide
+insights into graph structure, connectivity, and quality.
+
+Key Features:
+- Comprehensive graph statistics (nodes, edges, types)
+- Connectivity analysis and component detection
+- Node degree distribution analysis
+- Graph density and centrality metrics
+- Entity importance scoring
 """
 
 import logging
@@ -12,7 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 class GraphAnalyzer:
-    """Service for graph statistical analysis and metrics"""
+    """
+    Service for comprehensive graph statistical analysis and metrics computation.
+
+    This service provides various analytical methods to understand graph structure,
+    connectivity patterns, and quality metrics. It supports both basic statistics
+    and advanced graph analysis algorithms.
+
+    The analyzer can compute:
+    - Basic counts and distributions
+    - Connectivity metrics and component analysis
+    - Node centrality and importance scores
+    - Graph quality indicators
+    """
 
     def __init__(self) -> None:
         """Initialize graph analyzer"""
@@ -20,13 +43,28 @@ class GraphAnalyzer:
 
     def get_statistics(self, graph: KnowledgeGraph) -> Dict[str, Any]:
         """
-        Get comprehensive graph statistics
+        Generate comprehensive statistical analysis of the knowledge graph.
+
+        Computes various metrics including entity/relation counts, type distributions,
+        connectivity analysis, and degree statistics to provide a complete overview
+        of the graph structure and characteristics.
 
         Args:
-            graph: Knowledge graph to analyze
+            graph: Knowledge graph instance to analyze
 
         Returns:
-            Dict[str, Any]: Statistical information
+            Dict[str, Any]: Comprehensive statistics including:
+                - total_entities: Total number of entities
+                - total_relations: Total number of relations
+                - entity_types: Count of entities by type
+                - relation_types: Count of relations by type
+                - connectivity: Component analysis and connectivity metrics
+                - degree_statistics: Node degree distribution statistics
+                - created_at: Graph creation timestamp
+                - updated_at: Graph last update timestamp
+
+        Note:
+            Returns empty dict if analysis fails due to errors.
         """
         try:
             entity_type_counts = self._count_entities_by_type(graph)
@@ -49,7 +87,16 @@ class GraphAnalyzer:
             return {}
 
     def _count_entities_by_type(self, graph: KnowledgeGraph) -> Dict[str, int]:
-        """Count entities by type"""
+        """
+        Count entities grouped by their entity type.
+
+        Args:
+            graph: Knowledge graph to analyze
+
+        Returns:
+            Dict[str, int]: Mapping of entity type names to their counts.
+                Only includes types that have at least one entity.
+        """
         counts = {}
         for entity_type in EntityType:
             count = len(graph.get_entities_by_type(entity_type))
@@ -58,7 +105,16 @@ class GraphAnalyzer:
         return counts
 
     def _count_relations_by_type(self, graph: KnowledgeGraph) -> Dict[str, int]:
-        """Count relations by type"""
+        """
+        Count relations grouped by their relation type.
+
+        Args:
+            graph: Knowledge graph to analyze
+
+        Returns:
+            Dict[str, int]: Mapping of relation type names to their counts.
+                Only includes types that have at least one relation.
+        """
         counts = {}
         for relation_type in RelationType:
             count = len(graph.get_relations_by_type(relation_type))

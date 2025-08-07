@@ -1,5 +1,7 @@
 """
-JSON文件存储实现
+JSON file storage implementation.
+
+Provides JSON file-based storage for knowledge graphs.
 """
 
 import json
@@ -8,6 +10,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
@@ -17,22 +20,31 @@ logger = logging.getLogger(__name__)
 
 
 class JsonStorage(GraphStorage):
-    """JSON文件存储"""
+    """JSON file-based graph storage implementation."""
 
-    def __init__(self, storage_dir: str = "graphs"):
+    def __init__(self, storage_dir: Optional[str] = None):
+        """
+        Initialize JSON storage.
+
+        Args:
+            storage_dir: Directory to store JSON files. If None, uses workdir from settings.
+        """
         super().__init__()
-        self.storage_dir = storage_dir
-        self.graphs_file = os.path.join(storage_dir, "graphs.json")
+        if storage_dir is not None:
+            self.storage_dir = storage_dir
+        else:
+            self.storage_dir = settings.workdir
+        self.graphs_file = os.path.join(self.storage_dir, "graphs.json")
         self.ensure_storage_dir()
 
     def ensure_storage_dir(self) -> None:
-        """确保存储目录存在"""
+        """Ensure storage directory exists."""
         if not os.path.exists(self.storage_dir):
             os.makedirs(self.storage_dir)
             logger.info("Created storage directory: %s", self.storage_dir)
 
     def connect(self) -> bool:
-        """连接到文件系统"""
+        """Connect to file system storage."""
         try:
             self.ensure_storage_dir()
             self._is_connected = True
@@ -43,12 +55,12 @@ class JsonStorage(GraphStorage):
             return False
 
     def disconnect(self) -> None:
-        """断开连接"""
+        """Disconnect from storage."""
         self._is_connected = False
         logger.info("Disconnected from JSON storage")
 
     def save_graph(self, graph: KnowledgeGraph) -> bool:
-        """保存知识图谱"""
+        """Save knowledge graph to JSON file."""
         if not self.is_connected():
             if not self.connect():
                 return False
@@ -72,7 +84,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def load_graph(self, graph_id: str) -> Optional[KnowledgeGraph]:
-        """加载知识图谱"""
+        """Load knowledge graph from JSON file."""
         if not self.is_connected():
             logger.error("Not connected to storage")
             return None
@@ -96,7 +108,7 @@ class JsonStorage(GraphStorage):
             return None
 
     def delete_graph(self, graph_id: str) -> bool:
-        """删除知识图谱"""
+        """Delete knowledge graph from storage."""
         if not self.is_connected():
             logger.error("Not connected to storage")
             return False
@@ -108,7 +120,7 @@ class JsonStorage(GraphStorage):
                 os.remove(graph_file)
                 logger.info("Graph file deleted: %s", graph_file)
 
-            # 从索引中移除
+            # Remove from index
             self._remove_from_graph_index(graph_id)
 
             return True
@@ -118,7 +130,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def list_graphs(self) -> List[Dict[str, Any]]:
-        """列出所有图谱"""
+        """List all available graphs."""
         if not self.is_connected():
             logger.error("Not connected to storage")
             return []
@@ -138,7 +150,7 @@ class JsonStorage(GraphStorage):
             return []
 
     def query_entities(self, conditions: Dict[str, Any]) -> List[Entity]:
-        """查询实体"""
+        """Query entities based on specified conditions."""
         if not self.is_connected():
             logger.error("Not connected to storage")
             return []
@@ -155,7 +167,7 @@ class JsonStorage(GraphStorage):
 
             entities = list(graph.entities.values())
 
-            # 应用过滤条件
+            # Apply filter conditions
             if "entity_type" in conditions:
                 entity_type = conditions["entity_type"]
                 entities = [e for e in entities if getattr(e.entity_type, "value", str(e.entity_type)) == entity_type]
@@ -168,7 +180,7 @@ class JsonStorage(GraphStorage):
                 min_confidence = conditions["min_confidence"]
                 entities = [e for e in entities if e.confidence >= min_confidence]
 
-            # 限制返回数量
+            # Limit results
             limit = conditions.get("limit", 100)
             return entities[:limit]
 
@@ -183,7 +195,7 @@ class JsonStorage(GraphStorage):
         relation_type: Optional[Any] = None,
         **kwargs: Any,
     ) -> List[Relation]:
-        """查询关系"""
+        """Query relations based on specified conditions."""
         if not self.is_connected():
             logger.error("Not connected to storage")
             return []
@@ -200,7 +212,7 @@ class JsonStorage(GraphStorage):
 
             relations = list(graph.relations.values())
 
-            # 应用过滤条件
+            # Apply filter conditions
             if head_entity:
                 relations = [r for r in relations if r.head_entity and r.head_entity.id == head_entity]
 
@@ -217,7 +229,7 @@ class JsonStorage(GraphStorage):
             return []
 
     def add_entity(self, graph_id: str, entity: Entity) -> bool:
-        """添加实体"""
+        """Add entity to specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -232,7 +244,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def add_relation(self, graph_id: str, relation: Relation) -> bool:
-        """添加关系"""
+        """Add relation to specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -247,7 +259,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def update_entity(self, graph_id: str, entity: Entity) -> bool:
-        """更新实体"""
+        """Update entity in specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -265,7 +277,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def update_relation(self, graph_id: str, relation: Relation) -> bool:
-        """更新关系"""
+        """Update relation in specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -283,7 +295,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def remove_entity(self, graph_id: str, entity_id: str) -> bool:
-        """删除实体"""
+        """Remove entity from specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -300,7 +312,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def remove_relation(self, graph_id: str, relation_id: str) -> bool:
-        """删除关系"""
+        """Remove relation from specified graph."""
         try:
             graph = self.load_graph(graph_id)
             if not graph:
@@ -317,7 +329,7 @@ class JsonStorage(GraphStorage):
             return False
 
     def _update_graph_index(self, graph: KnowledgeGraph) -> None:
-        """更新图谱索引"""
+        """Update graph index with new graph information."""
         try:
             graphs_index: Dict[str, Any] = {"graphs": []}
 
@@ -325,11 +337,11 @@ class JsonStorage(GraphStorage):
                 with open(self.graphs_file, "r", encoding="utf-8") as f:
                     graphs_index = json.load(f)
 
-            # 移除已存在的图谱记录
+            # Remove existing graph record
             graphs_list = graphs_index.get("graphs", [])
             graphs_list = [g for g in graphs_list if g.get("id") != graph.id]
 
-            # 添加新记录
+            # Add new record
             graph_info = {
                 "id": graph.id,
                 "name": graph.name,
@@ -340,7 +352,7 @@ class JsonStorage(GraphStorage):
             }
             graphs_list.append(graph_info)
 
-            # 按更新时间排序
+            # Sort by update time
             graphs_list.sort(key=lambda x: x["updated_at"], reverse=True)
 
             graphs_index["graphs"] = graphs_list
@@ -352,7 +364,7 @@ class JsonStorage(GraphStorage):
             logger.error("Error updating graph index: %s", e)
 
     def _remove_from_graph_index(self, graph_id: str) -> None:
-        """从索引中移除图谱"""
+        """Remove graph from index."""
         try:
             if not os.path.exists(self.graphs_file):
                 return
@@ -372,9 +384,9 @@ class JsonStorage(GraphStorage):
             logger.error("Error removing from graph index: %s", e)
 
     def compact_storage(self) -> None:
-        """压缩存储空间"""
+        """Compact storage by removing invalid index entries."""
         try:
-            # 清理不存在的图谱索引
+            # Clean up non-existent graph indexes
             graphs_list = self.list_graphs()
             valid_graphs = []
 
@@ -387,7 +399,7 @@ class JsonStorage(GraphStorage):
                 else:
                     logger.info("Removing invalid graph index entry: %s", graph_id)
 
-            # 更新索引
+            # Update index
             graphs_index = {"graphs": valid_graphs}
             with open(self.graphs_file, "w", encoding="utf-8") as f:
                 json.dump(graphs_index, f, ensure_ascii=False, indent=2)
@@ -398,7 +410,7 @@ class JsonStorage(GraphStorage):
             logger.error("Error compacting storage: %s", e)
 
     def get_storage_info(self) -> Dict[str, Any]:
-        """获取存储信息"""
+        """Get storage information and statistics."""
         try:
             total_size = 0
             file_count = 0

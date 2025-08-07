@@ -1,9 +1,8 @@
+"""Knowledge retrieval module.
+
+Provides various knowledge graph retrieval functionalities.
 """
-知识检索模块
 
-提供各种知识图谱检索功能
-"""
+from .knowledge_retriever import ChatKnowledgeRetriever, KnowledgeRetriever
 
-from .knowledge_retriever import KnowledgeRetriever
-
-__all__ = ["KnowledgeRetriever"]
+__all__ = ["KnowledgeRetriever", "ChatKnowledgeRetriever"]

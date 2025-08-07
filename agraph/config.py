@@ -10,27 +10,11 @@ load_dotenv(".env")
 class Settings(BaseModel):
     _instance: ClassVar[Optional["Settings"]] = None
 
-    # API settings
-    APP_TITLE: str = Field(default="Data Visualization Agent")
-    APP_VERSION: str = Field(default="0.1.0")
-    HOST: str = Field(default="0.0.0.0")
-    PORT: int = Field(default=8000)
-    LOG_LEVEL: str = Field(default="debug")  # Options: "debug", "info", "warning", "error", "critical"
-
-    # CORS settings
-    CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
-    CORS_METHODS: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-    CORS_HEADERS: List[str] = Field(default_factory=lambda: ["*"])
-    CORS_CREDENTIALS: bool = Field(default=False)
+    workdir: str = Field(default="workdir")
 
     # OpenAI settings
     OPENAI_API_KEY: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     OPENAI_API_BASE: str = Field(default_factory=lambda: os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"))
-
-    # Database settings
-    DATABASES_DIR: str = Field(default="databases")
-    LOGS_DIR: str = Field(default="logs")
-    TEMPLATES_DIR: str = Field(default="templates")
 
     # Model settings
     LLM_MODEL: str = Field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-3.5-turbo"))
@@ -96,6 +80,43 @@ class Settings(BaseModel):
             "founded_by",
             "other",
         ]
+    )
+    # pylint: disable=line-too-long
+    RAG_SYS_PROMPT: str = Field(
+        default="""---Role---
+
+You are a helpful assistant responding to user query about Data Sources provided below.
+
+
+---Goal---
+
+Generate a concise response based on Data Sources and follow Response Rules, considering both the conversation history and the current query. Data sources contain two parts: Knowledge Graph(KG) and Document Chunks(DC). Summarize all information in the provided Data Sources, and incorporating general knowledge relevant to the Data Sources. Do not include information not provided by Data Sources.
+
+When handling information with timestamps:
+1. Each piece of information (both relationships and content) has a "created_at" timestamp indicating when we acquired this knowledge
+2. When encountering conflicting information, consider both the content/relationship and the timestamp
+3. Don't automatically prefer the most recent information - use judgment based on the context
+4. For time-specific queries, prioritize temporal information in the content before considering creation timestamps
+
+---Conversation History---
+{history}
+
+---Data Sources---
+
+1. From Knowledge Graph(KG):
+{kg_context}
+
+---Response Rules---
+
+- Target format and length: {response_type}
+- Use markdown formatting with appropriate section headings
+- Please respond in the same language as the user's question.
+- Ensure the response maintains continuity with the conversation history.
+- Organize answer in sesctions focusing on one main point or aspect of the answer
+- Use clear and descriptive section titles that reflect the content
+- List up to 5 most important reference sources at the end under "References" sesction. Clearly indicating whether each source is from Knowledge Graph (KG) or Vector Data (DC), in the following format: [KG/DC] Source content
+- If you don't know the answer, just say so. Do not make anything up.
+- Do not include information not provided by the Data Sources."""
     )
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Any:

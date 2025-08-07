@@ -1,5 +1,7 @@
 """
-图存储基类
+Graph storage base class.
+
+Provides abstract base class for graph storage implementations.
 """
 
 import json
@@ -10,99 +12,104 @@ from typing import Any, Dict, List, Optional
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
-from ..types import RelationType
 
 logger = logging.getLogger(__name__)
 
 
 class GraphStorage(ABC):
-    """图存储基类"""
+    """Abstract base class for graph storage implementations."""
 
     def __init__(self) -> None:
+        """Initialize the graph storage."""
         self.connection = None
         self._is_connected = False
 
     def is_connected(self) -> bool:
         """
-        检查是否已连接到存储后端
+        Check if connected to storage backend.
 
         Returns:
-            bool: 如果已连接返回True
+            bool: True if connected
         """
         return self._is_connected
 
     def set_connected(self, value: bool) -> None:
-        """设置连接状态"""
+        """
+        Set connection status.
+
+        Args:
+            value: Connection status to set
+        """
         self._is_connected = value
 
     @abstractmethod
     def connect(self) -> bool:
         """
-        连接到存储后端
+        Connect to storage backend.
 
         Returns:
-            bool: 连接是否成功
+            bool: True if connection successful
         """
 
     @abstractmethod
     def disconnect(self) -> None:
-        """断开连接"""
+        """Disconnect from storage backend."""
 
     @abstractmethod
     def save_graph(self, graph: KnowledgeGraph) -> bool:
         """
-        保存知识图谱
+        Save knowledge graph to storage.
 
         Args:
-            graph: 知识图谱
+            graph: Knowledge graph to save
 
         Returns:
-            bool: 保存是否成功
+            bool: True if save successful
         """
 
     @abstractmethod
     def load_graph(self, graph_id: str) -> Optional[KnowledgeGraph]:
         """
-        加载知识图谱
+        Load knowledge graph from storage.
 
         Args:
-            graph_id: 图谱ID
+            graph_id: Graph identifier
 
         Returns:
-            KnowledgeGraph: 加载的知识图谱，如果不存在则返回None
+            KnowledgeGraph: Loaded knowledge graph, None if not found
         """
 
     @abstractmethod
     def delete_graph(self, graph_id: str) -> bool:
         """
-        删除知识图谱
+        Delete knowledge graph from storage.
 
         Args:
-            graph_id: 图谱ID
+            graph_id: Graph identifier
 
         Returns:
-            bool: 删除是否成功
+            bool: True if delete successful
         """
 
     @abstractmethod
     def list_graphs(self) -> List[Dict[str, Any]]:
         """
-        列出所有图谱
+        List all available graphs.
 
         Returns:
-            List[Dict[str, Any]]: 图谱信息列表
+            List[Dict[str, Any]]: Graph metadata list
         """
 
     @abstractmethod
     def query_entities(self, conditions: Dict[str, Any]) -> List[Entity]:
         """
-        查询实体
+        Query entities based on conditions.
 
         Args:
-            conditions: 查询条件
+            conditions: Query conditions
 
         Returns:
-            List[Entity]: 查询结果
+            List[Entity]: Matching entities
         """
 
     @abstractmethod
@@ -110,107 +117,107 @@ class GraphStorage(ABC):
         self,
         head_entity: Optional[str] = None,
         tail_entity: Optional[str] = None,
-        relation_type: Optional[RelationType] = None,
+        relation_type: Optional[Any] = None,
     ) -> List[Relation]:
         """
-        查询关系
+        Query relations based on conditions.
 
         Args:
-            head_entity: 头实体ID
-            tail_entity: 尾实体ID
-            relation_type: 关系类型
+            head_entity: Head entity ID
+            tail_entity: Tail entity ID
+            relation_type: Relation type
 
         Returns:
-            List[Relation]: 查询结果
+            List[Relation]: Matching relations
         """
 
     @abstractmethod
     def add_entity(self, graph_id: str, entity: Entity) -> bool:
         """
-        添加实体
+        Add entity to graph.
 
         Args:
-            graph_id: 图谱ID
-            entity: 实体对象
+            graph_id: Graph identifier
+            entity: Entity object to add
 
         Returns:
-            bool: 添加是否成功
+            bool: True if add successful
         """
 
     @abstractmethod
     def add_relation(self, graph_id: str, relation: Relation) -> bool:
         """
-        添加关系
+        Add relation to graph.
 
         Args:
-            graph_id: 图谱ID
-            relation: 关系对象
+            graph_id: Graph identifier
+            relation: Relation object to add
 
         Returns:
-            bool: 添加是否成功
+            bool: True if add successful
         """
 
     @abstractmethod
     def update_entity(self, graph_id: str, entity: Entity) -> bool:
         """
-        更新实体
+        Update entity in graph.
 
         Args:
-            graph_id: 图谱ID
-            entity: 实体对象
+            graph_id: Graph identifier
+            entity: Entity object to update
 
         Returns:
-            bool: 更新是否成功
+            bool: True if update successful
         """
 
     @abstractmethod
     def update_relation(self, graph_id: str, relation: Relation) -> bool:
         """
-        更新关系
+        Update relation in graph.
 
         Args:
-            graph_id: 图谱ID
-            relation: 关系对象
+            graph_id: Graph identifier
+            relation: Relation object to update
 
         Returns:
-            bool: 更新是否成功
+            bool: True if update successful
         """
 
     @abstractmethod
     def remove_entity(self, graph_id: str, entity_id: str) -> bool:
         """
-        删除实体
+        Remove entity from graph.
 
         Args:
-            graph_id: 图谱ID
-            entity_id: 实体ID
+            graph_id: Graph identifier
+            entity_id: Entity ID to remove
 
         Returns:
-            bool: 删除是否成功
+            bool: True if remove successful
         """
 
     @abstractmethod
     def remove_relation(self, graph_id: str, relation_id: str) -> bool:
         """
-        删除关系
+        Remove relation from graph.
 
         Args:
-            graph_id: 图谱ID
-            relation_id: 关系ID
+            graph_id: Graph identifier
+            relation_id: Relation ID to remove
 
         Returns:
-            bool: 删除是否成功
+            bool: True if remove successful
         """
 
     def get_graph_statistics(self, graph_id: str) -> Dict[str, Any]:
         """
-        获取图谱统计信息
+        Get graph statistics.
 
         Args:
-            graph_id: 图谱ID
+            graph_id: Graph identifier
 
         Returns:
-            Dict[str, Any]: 统计信息
+            Dict[str, Any]: Statistics information
         """
         try:
             graph = self.load_graph(graph_id)
@@ -223,21 +230,21 @@ class GraphStorage(ABC):
 
     def backup_graph(self, graph_id: str, backup_path: str) -> bool:
         """
-        备份图谱
+        Backup graph to file.
 
         Args:
-            graph_id: 图谱ID
-            backup_path: 备份路径
+            graph_id: Graph identifier
+            backup_path: Backup file path
 
         Returns:
-            bool: 备份是否成功
+            bool: True if backup successful
         """
         try:
             graph = self.load_graph(graph_id)
             if not graph:
                 return False
 
-            # 子类可以重写此方法实现具体的备份逻辑
+            # Subclasses can override this method for specific backup logic
             graph_data = graph.to_dict()
 
             with open(backup_path, "w", encoding="utf-8") as f:
@@ -252,13 +259,13 @@ class GraphStorage(ABC):
 
     def restore_graph(self, backup_path: str) -> Optional[str]:
         """
-        从备份恢复图谱
+        Restore graph from backup file.
 
         Args:
-            backup_path: 备份文件路径
+            backup_path: Backup file path
 
         Returns:
-            str: 恢复的图谱ID，失败返回None
+            str: Restored graph ID, None if failed
         """
         try:
 
@@ -279,14 +286,14 @@ class GraphStorage(ABC):
 
     def export_graph(self, graph_id: str, outformat: str = "json") -> Optional[Dict[str, Any]]:
         """
-        导出图谱数据
+        Export graph data in specified format.
 
         Args:
-            graph_id: 图谱ID
-            outformat: 导出格式 ('json', 'csv', 'graphml', etc.)
+            graph_id: Graph identifier
+            outformat: Export format ('json', 'csv', 'graphml', etc.)
 
         Returns:
-            Dict[str, Any]: 导出的数据
+            Dict[str, Any]: Exported data, None if failed
         """
         try:
             graph = self.load_graph(graph_id)
@@ -307,14 +314,16 @@ class GraphStorage(ABC):
             return None
 
     def _export_to_csv_format(self, graph: KnowledgeGraph) -> Dict[str, Any]:
-        """导出为CSV格式"""
+        """Export graph data to CSV format."""
+        from ..utils import get_type_value
+
         entities_data = []
         for entity in graph.entities.values():
             entities_data.append(
                 {
                     "id": entity.id,
                     "name": entity.name,
-                    "type": entity.entity_type.value,
+                    "type": get_type_value(entity.entity_type),
                     "description": entity.description,
                     "confidence": entity.confidence,
                     "source": entity.source,
@@ -330,7 +339,7 @@ class GraphStorage(ABC):
                     "id": relation.id,
                     "head_entity": relation.head_entity.name,
                     "tail_entity": relation.tail_entity.name,
-                    "relation_type": relation.relation_type.value,
+                    "relation_type": get_type_value(relation.relation_type),
                     "confidence": relation.confidence,
                     "source": relation.source,
                 }
@@ -339,8 +348,10 @@ class GraphStorage(ABC):
         return {"entities": entities_data, "relations": relations_data}
 
     def _export_to_graphml_format(self, graph: KnowledgeGraph) -> Dict[str, Any]:
-        """导出为GraphML格式"""
-        # 简化的GraphML格式
+        """Export graph data to GraphML format."""
+        from ..utils import get_type_value
+
+        # Simplified GraphML format
         nodes = []
         edges = []
 
@@ -349,7 +360,7 @@ class GraphStorage(ABC):
                 {
                     "id": entity.id,
                     "label": entity.name,
-                    "type": entity.entity_type.value,
+                    "type": get_type_value(entity.entity_type),
                     "description": entity.description,
                 }
             )
@@ -362,7 +373,7 @@ class GraphStorage(ABC):
                     "id": relation.id,
                     "source": relation.head_entity.id,
                     "target": relation.tail_entity.id,
-                    "label": relation.relation_type.value,
+                    "label": get_type_value(relation.relation_type),
                     "confidence": relation.confidence,
                 }
             )

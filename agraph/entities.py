@@ -1,5 +1,5 @@
 """
-实体相关的数据结构和操作
+Entity-related data structures and operations.
 """
 
 import uuid
@@ -7,16 +7,30 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List
 
-from .types import EntityType
+from .types import EntityType, EntityTypeType
 
 
 @dataclass
 class Entity:
-    """实体类"""
+    """
+    Entity class representing a knowledge graph entity.
+
+    Attributes:
+        id: Unique identifier for the entity
+        name: Name of the entity
+        entity_type: Type classification of the entity
+        description: Detailed description of the entity
+        properties: Additional properties as key-value pairs
+        aliases: Alternative names for the entity
+        confidence: Confidence score of entity extraction (0.0 to 1.0)
+        source: Source document or origin of the entity
+        created_at: Timestamp when the entity was created
+        updated_at: Timestamp when the entity was last updated
+    """
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    entity_type: Any = field(default_factory=lambda: EntityType.UNKNOWN)
+    entity_type: EntityTypeType = EntityType.UNKNOWN
     description: str = ""
     properties: Dict[str, Any] = field(default_factory=dict)
     aliases: List[str] = field(default_factory=list)
@@ -26,49 +40,86 @@ class Entity:
     updated_at: datetime = field(default_factory=datetime.now)
 
     def __hash__(self) -> int:
-        """返回实体的哈希值"""
+        """Return hash value of the entity based on its ID."""
         return hash(self.id)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality between entities based on their IDs."""
         if not isinstance(other, Entity):
             return NotImplemented
         return self.id == other.id
 
     def add_alias(self, alias: str) -> None:
-        """添加别名"""
+        """
+        Add an alias to the entity.
+
+        Args:
+            alias: The alias name to add
+        """
         if alias and alias not in self.aliases:
             self.aliases.append(alias)
 
     def add_property(self, key: str, value: Any) -> None:
-        """添加属性"""
+        """
+        Add a property to the entity.
+
+        Args:
+            key: Property key
+            value: Property value
+        """
         self.properties[key] = value
 
     def get_property(self, key: str, default: Any = None) -> Any:
-        """获取属性"""
+        """
+        Get a property value from the entity.
+
+        Args:
+            key: Property key to retrieve
+            default: Default value if key is not found
+
+        Returns:
+            Property value or default if not found
+        """
         return self.properties.get(key, default)
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """
+        Convert entity to dictionary representation.
+
+        Returns:
+            Dictionary containing all entity data with serializable values
+        """
+        from .utils import get_type_value
+
         return {
             "id": self.id,
             "name": self.name,
-            "entity_type": getattr(self.entity_type, "value", str(self.entity_type)),
+            "entity_type": get_type_value(self.entity_type),
             "description": self.description,
             "properties": self.properties,
             "aliases": self.aliases,
             "confidence": self.confidence,
             "source": self.source,
             "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Entity":
-        """从字典创建实体"""
+        """
+        Create entity from dictionary data.
+
+        Args:
+            data: Dictionary containing entity data
+
+        Returns:
+            Entity instance created from the dictionary data
+        """
         entity_type_value = data.get("entity_type", "UNKNOWN")
         try:
             entity_type = EntityType(entity_type_value)
         except (ValueError, AttributeError):
-            entity_type = getattr(EntityType, "UNKNOWN", None) or EntityType._member_map_.get("UNKNOWN")
+            entity_type = EntityType.UNKNOWN
 
         entity = cls(
             id=data.get("id", str(uuid.uuid4())),

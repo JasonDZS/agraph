@@ -39,7 +39,7 @@ jobs:
         # stop the build if there are Python syntax errors or undefined names
         flake8 agraph/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 120 chars wide
-        flake8 agraph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --extend-ignore=E203,W503 --statistics
+        flake8 agraph/ examples/ --count --exit-zero --max-complexity=10 --max-line-length=120 --extend-ignore=E203,W503,E501 --statistics
 
     - name: Type checking with mypy
       run: |

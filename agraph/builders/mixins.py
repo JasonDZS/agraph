@@ -3,6 +3,24 @@ Builder mixins following Interface Segregation Principle
 
 These mixins provide optional functionality that can be composed as needed,
 following the principle that clients should not depend on interfaces they don't use.
+
+    def _export_to_graphml(self, graph: KnowledgeGraph) -> Dict[str, Any]:
+        Export graph to GraphML format.
+        from ..utils import get_type_value
+
+        nodes = []
+        edges = []
+
+        for entity in graph.entities.values():
+            nodes.append(
+                {
+                    "id": entity.id,
+                    "label": entity.name,
+                    "type": get_type_value(entity.entity_type),
+                    "description": entity.description,
+                    "confidence": entity.confidence,
+                }
+            )'t use.
 """
 
 import asyncio
@@ -200,6 +218,8 @@ class GraphExporterMixin:
 
     def _export_to_graphml(self, graph: KnowledgeGraph) -> Dict[str, Any]:
         """Export to GraphML format"""
+        from ..utils import get_type_value
+
         nodes = []
         edges = []
 
@@ -208,7 +228,7 @@ class GraphExporterMixin:
                 {
                     "id": entity.id,
                     "label": entity.name,
-                    "type": entity.entity_type.value,
+                    "type": get_type_value(entity.entity_type),
                     "description": entity.description,
                     "confidence": entity.confidence,
                 }
@@ -221,7 +241,7 @@ class GraphExporterMixin:
                         "id": relation.id,
                         "source": relation.head_entity.id,
                         "target": relation.tail_entity.id,
-                        "label": relation.relation_type.value,
+                        "label": get_type_value(relation.relation_type),
                         "confidence": relation.confidence,
                     }
                 )
@@ -230,6 +250,8 @@ class GraphExporterMixin:
 
     def _export_to_cytoscape(self, graph: KnowledgeGraph) -> Dict[str, Any]:
         """Export to Cytoscape format"""
+        from ..utils import get_type_value
+
         elements = []
 
         # Add nodes
@@ -239,7 +261,7 @@ class GraphExporterMixin:
                     "data": {
                         "id": entity.id,
                         "label": entity.name,
-                        "type": entity.entity_type.value,
+                        "type": get_type_value(entity.entity_type),
                         "confidence": entity.confidence,
                     }
                 }
@@ -254,7 +276,7 @@ class GraphExporterMixin:
                             "id": relation.id,
                             "source": relation.head_entity.id,
                             "target": relation.tail_entity.id,
-                            "label": relation.relation_type.value,
+                            "label": get_type_value(relation.relation_type),
                             "confidence": relation.confidence,
                         }
                     }

@@ -1,111 +1,175 @@
-# 知识图谱模块
-## 🚀 快速开始
+# Knowledge Graph Module (AGraph)
 
-### 1. 基本知识图谱构建
+> 🤖 Intelligent Knowledge Graph Construction and Q&A Tool Based on LLM
+
+AGraph is a powerful Python toolkit specifically designed for automatically building knowledge graphs from various documents and providing intelligent Q&A functionality. It supports multiple document formats, integrates the LightRAG framework, and provides advanced features such as semantic search and vector storage.
+
+## ✨ Feature Overview
+
+- 🧠 **Intelligent Construction**: Automatic entity and relation extraction based on LLM
+- 📚 **Multi-format Support**: PDF, Word, HTML, JSON, images, etc.
+- 🔍 **Semantic Search**: Intelligent retrieval based on vector similarity
+- 💾 **Flexible Storage**: Support for JSON, Neo4j, and other storage solutions
+- 🚀 **High Performance**: Support for incremental updates and batch processing
+- 🔌 **LightRAG Integration**: Deep integration with advanced knowledge graph framework
+
+## 📋 System Requirements
+
+- **Python**: 3.10+
+- **Operating System**: Windows, macOS, Linux
+
+## 🛠️ Quick Installation
+
+### Basic Installation
+
+```bash
+# Install from source (recommended for development)
+git clone <repository-url>
+cd agraph
+uv sync --python 3.12
+
+# Or install directly
+pip install -e .
+```
+
+### Environment Variable Setup
+
+```bash
+cp .env.example .env
+```
+Edit the `.env` file to set your model address and API key
+
+### Optional Dependencies Installation
+
+Install corresponding dependencies based on the document types you need to process:
+
+```bash
+# Document processing
+pip install beautifulsoup4  # HTML processing
+pip install pypdf          # PDF processing
+pip install python-docx    # Word documents
+pip install pandas         # Excel/CSV processing
+
+# Image processing and OCR
+pip install pillow pytesseract
+
+# Graph database support
+pip install neo4j
+```
+## 🚀 Quick Start
+
+### 1. Basic Knowledge Graph Construction
 
 ```python
+import os
 import asyncio
-from agraph.builders import MinimalLLMGraphBuilder
-from agraph.embeddings import JsonVectorStorage
+import logging
+from agraph.builders import LLMGraphBuilder
+from agraph.storage import JsonVectorStorage
+from agraph.config import settings
+from agraph import ChatKnowledgeRetriever
+
+# Configure logging system to show detailed information
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+settings.workdir = "./workdir/llm_builder_example"  # Set working directory
+os.makedirs(settings.workdir, exist_ok=True)  # Ensure working directory exists
 
 async def build_knowledge_graph():
-    # 创建图构建器
-    builder = MinimalLLMGraphBuilder(
-        openai_api_key="your-openai-api-key",
-        llm_model="gpt-4o-mini",  # 指定LLM模型
+    # Create graph builder
+    builder = LLMGraphBuilder(
+        openai_api_key=settings.OPENAI_API_KEY,
+        openai_api_base=settings.OPENAI_API_BASE,
+        llm_model=settings.LLM_MODEL,  # Specify LLM model
+        embedding_model=settings.EMBEDDING_MODEL,  # Specify embedding model
+        vector_storage=JsonVectorStorage(),  # Use JSON vector storage
         temperature=0.1
     )
 
-    # 从文本构建知识图谱
+    # Build knowledge graph from text
     texts = [
-        "苹果公司是由史蒂夫·乔布斯创立的科技公司。",
-        "iPhone是苹果公司的旗舰智能手机产品。",
-        "史蒂夫·乔布斯在2011年之前担任苹果公司CEO。"
+        "Apple Inc. is a technology company founded by Steve Jobs.",
+        "iPhone is Apple's flagship smartphone product.",
+        "Steve Jobs served as CEO of Apple until 2011."
     ]
 
-    graph = await builder.build_graph(texts=texts, graph_name="科技公司")
+    graph = await builder.build_graph(texts=texts, graph_name="Technology Company")
 
-    print(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
+    print(f"Built knowledge graph with {len(graph.entities)} entities and {len(graph.relations)} relations")
+
+    # Print entity information for debugging
+    print("\n=== Built Entities ===")
+    for entity_id, entity in graph.entities.items():
+        print(f"- {entity.name} ({entity.entity_type.value}): {entity.description}")
+
+    # Print relation information for debugging
+    print(f"\n=== Built Relations ({len(graph.relations)}) ===")
+    for relation_id, relation in graph.relations.items():
+        if relation.head_entity and relation.tail_entity:
+            print(f"- {relation.head_entity.name} --{relation.relation_type.value}--> {relation.tail_entity.name}: {relation.description}")
     return graph, builder
 
-# 运行示例
+# Run example
 if __name__ == "__main__":
     graph, builder = asyncio.run(build_knowledge_graph())
+    # Use the built knowledge graph and builder
+    retriever = ChatKnowledgeRetriever()
+    result = retriever.chat("Who founded Apple Inc.?")
+
+    print("\n=== Retrieval Results Debug ===")
+    print(f"Retrieved entities count: {len(result.get('entities', []))}")
+    print(f"Retrieved relations count: {len(result.get('relations', []))}")
+    if result.get('entities'):
+        print("Retrieved entities:")
+        for entity in result['entities']:
+            if hasattr(entity, 'entity'):
+                print(f"  - {entity.entity.name}: score={entity.score}")
+
+    print(f"\n=== Final Result ===")
+    print(result)
 ```
 
-### 2. 知识问答功能
+### 2. Document Processing Example
 
 ```python
+import os
 import asyncio
-from agraph import KnowledgeRetriever
-from agraph.builders import FlexibleLLMGraphBuilder
-from agraph.embeddings import JsonVectorStorage
-
-async def question_answering():
-    # 首先创建带搜索功能的构建器
-    builder = FlexibleLLMGraphBuilder(
-        openai_api_key="your-openai-api-key",
-        llm_model="gpt-4o-mini",
-        embedding_model="text-embedding-3-small",
-        vector_storage=JsonVectorStorage("./vectors.json")
-    )
-
-    # 构建知识图谱
-    texts = [
-        "苹果公司是由史蒂夫·乔布斯创立的科技公司。",
-        "iPhone是苹果公司的旗舰智能手机产品。",
-        "史蒂夫·乔布斯在2011年之前担任苹果公司CEO。"
-    ]
-
-    graph = await builder.build_graph(texts=texts, graph_name="科技公司")
-
-    # 创建知识检索器（与构建器分离）
-    retriever = KnowledgeRetriever(
-        graph=graph,
-        graph_embedding=builder.graph_embedding
-    )
-
-    # 对知识图谱进行问答
-    questions = [
-        "谁创立了苹果公司？",
-        "苹果公司生产什么产品？",
-        "史蒂夫·乔布斯什么时候离开苹果？"
-    ]
-
-    for question in questions:
-        # 搜索相关实体
-        entities = await retriever.search_entities(question, top_k=3)
-        print(f"问题: {question}")
-        print(f"相关实体: {[entity['entity_name'] for entity in entities]}")
-        print()
-
-# 运行问答示例
-if __name__ == "__main__":
-    asyncio.run(question_answering())
-```
-
-### 3. 文档处理示例
-
-```python
-import asyncio
-from agraph.builders import FlexibleLLMGraphBuilder
+import logging
+from agraph.builders import LLMGraphBuilder
+from agraph.storage import JsonVectorStorage
+from agraph.config import settings
 from agraph.processer.factory import DocumentProcessorFactory
-from agraph.embeddings import JsonVectorStorage
+from agraph.retrieval import ChatKnowledgeRetriever
 
-async def process_documents():
-    # 创建文档处理构建器
-    builder = FlexibleLLMGraphBuilder(
-        openai_api_key="your-openai-api-key",
-        llm_model="gpt-4o-mini",
-        embedding_model="text-embedding-3-small",
-        vector_storage=JsonVectorStorage("./doc_vectors.json")
+# Configure logging system to show detailed information
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+settings.workdir = "./workdir/llm_builder_folder"  # Set working directory
+os.makedirs(settings.workdir, exist_ok=True)  # Ensure working directory exists
+
+async def build_knowledge_graph():
+    # Create graph builder
+    builder = LLMGraphBuilder(
+        openai_api_key=settings.OPENAI_API_KEY,
+        openai_api_base=settings.OPENAI_API_BASE,
+        llm_model=settings.LLM_MODEL,  # Specify LLM model
+        embedding_model=settings.EMBEDDING_MODEL,  # Specify embedding model
+        vector_storage=JsonVectorStorage(),  # Use JSON vector storage
+        temperature=0.1
     )
 
-    # 处理不同类型的文档
     document_paths = [
         "./examples/documents/company_info.txt",
         "./examples/documents/products.json",
-        "./examples/documents/team.html"
+        "./examples/documents/team.html",
+        "./examples/documents/research_papers.csv",
+        "./examples/documents/technology_stack.md"
     ]
 
     texts = []
@@ -114,105 +178,109 @@ async def process_documents():
     for doc_path in document_paths:
         processor = processor_factory.get_processor(doc_path)
         content = processor.process(doc_path)
-        texts.append(f"文档: {doc_path}\n{content}")
+        texts.append(f"Document: {doc_path}\n{content}")
 
-    # 从处理后的文档构建图谱
-    graph = await builder.build_graph(texts=texts, graph_name="文档知识库")
+    graph = await builder.build_graph(texts=texts, graph_name="Technology Company")
 
-    print(f"处理了 {len(document_paths)} 个文档")
-    print(f"构建了包含 {len(graph.entities)} 个实体的图谱")
+    print(f"Built knowledge graph with {len(graph.entities)} entities and {len(graph.relations)} relations")
+    return graph, builder
 
+# Run example
 if __name__ == "__main__":
-    asyncio.run(process_documents())
+    graph, builder = asyncio.run(build_knowledge_graph())
+    # Use the built knowledge graph and builder
+    retriever = ChatKnowledgeRetriever()
+    result = retriever.chat("Company headquarters location")
+    print(result)
 ```
 
-## 📚 主要功能特性
+## 📚 Main Features
 
-### 🏗️ 知识图谱构建
-- **智能实体识别**: 基于LLM自动抽取实体和关系
-- **多格式支持**: PDF、Word、HTML、JSON、CSV等文档类型
-- **增量更新**: 支持动态添加新文档到现有图谱
-- **向量化存储**: 支持语义相似度搜索
-- **多种构建器**: 提供MinimalLLMGraphBuilder、FlexibleLLMGraphBuilder等不同功能的构建器
+### 🏗️ Knowledge Graph Construction
+- **Intelligent Entity Recognition**: Automatic entity and relation extraction based on LLM
+- **Multi-format Support**: PDF, Word, HTML, JSON, CSV and other document types
+- **Incremental Updates**: Support for dynamically adding new documents to existing graphs
+- **Vector Storage**: Support for semantic similarity search
+- **Multiple Builders**: Provides different functional builders like MinimalLLMGraphBuilder, FlexibleLLMGraphBuilder
 
-### 🔍 知识问答检索
-- **语义搜索**: 基于向量相似度的智能搜索
-- **实体查询**: 查找相关实体和它们的属性
-- **关系探索**: 发现实体间的复杂关系
-- **智能问答**: 专门的KnowledgeRetriever提供问答功能
-- **多种搜索模式**: 支持实体搜索、关系搜索和综合搜索
+### 🔍 Knowledge Q&A Retrieval
+- **Semantic Search**: Intelligent search based on vector similarity
+- **Entity Queries**: Find related entities and their properties
+- **Relation Exploration**: Discover complex relationships between entities
+- **Intelligent Q&A**: Dedicated KnowledgeRetriever provides Q&A functionality
+- **Multiple Search Modes**: Support for entity search, relation search, and comprehensive search
 
-### 💾 灵活存储方案
-- **JSON存储**: 轻量级文件存储，适合小规模应用
-- **Neo4j存储**: 企业级图数据库，支持复杂查询
-- **向量存储**: JsonVectorStorage支持高效的相似度搜索
-- **LightRAG集成**: 支持GraphML格式和LightRAG工作目录结构
+### 💾 Flexible Storage Solutions
+- **JSON Storage**: Lightweight file storage, suitable for small-scale applications
+- **Neo4j Storage**: Enterprise-level graph database, supports complex queries
+- **Vector Storage**: JsonVectorStorage supports efficient similarity search
+- **LightRAG Integration**: Support for GraphML format and LightRAG working directory structure
 
-## 🔧 环境配置
+## 🔧 Environment Configuration
 
-### 安装依赖
+### Install Dependencies
 
 ```bash
-# 开发安装（推荐）
+# Development installation (recommended)
 make install-dev
 
-# 或者直接安装
+# Or install directly
 pip install -e .
 
-# 可选依赖（根据需要安装）
-pip install beautifulsoup4  # HTML处理
-pip install pypdf          # PDF处理
-pip install python-docx    # Word文档处理
-pip install pandas         # Excel/CSV处理
-pip install pillow          # 图像处理
-pip install pytesseract     # OCR功能
+# Optional dependencies (install as needed)
+pip install beautifulsoup4  # HTML processing
+pip install pypdf          # PDF processing
+pip install python-docx    # Word document processing
+pip install pandas         # Excel/CSV processing
+pip install pillow          # Image processing
+pip install pytesseract     # OCR functionality
 ```
 
-### API密钥设置
+### API Key Setup
 
 ```bash
-# 设置OpenAI API密钥（必需）
+# Set OpenAI API key (required)
 export OPENAI_API_KEY="your-openai-api-key"
 
-# 可选：自定义API地址
+# Optional: Custom API address
 export OPENAI_API_BASE="https://api.openai.com/v1"
 ```
 
-## 📖 更多示例
+## 📖 More Examples
 
-查看 `examples/` 目录获取更多完整示例：
+Check the `examples/` directory for more complete examples:
 
-- **基础功能**: `llm_builder_example.py` - 展示多种LLM构建器的使用
-- **LightRAG集成**: `lightrag_example.py` - LightRAG构建器使用示例
-- **文档处理**: `llm_builder_folder.py` - 批量文档处理示例
-- **示例文档**: `documents/` - 包含各种格式的示例文档
+- **Basic Functionality**: `llm_builder_example.py` - Demonstrates usage of various LLM builders
+- **LightRAG Integration**: `lightrag_example.py` - LightRAG builder usage example
+- **Document Processing**: `llm_builder_folder.py` - Batch document processing example
+- **Sample Documents**: `documents/` - Contains sample documents in various formats
 
-## ⚡ 核心优势
+## ⚡ Core Advantages
 
-- **🤖 智能化**: 基于LLM的自动实体关系抽取，无需手工规则
-- **🔍 语义化**: 支持向量相似度搜索，理解语义而非仅匹配关键词
-- **📄 多格式**: 自动处理PDF、Word、HTML等多种文档格式
-- **⚡ 高性能**: 支持增量更新和批量处理，适合大规模应用
-- **🔧 易扩展**: 模块化设计，支持自定义构建器和存储后端
-- **🏗️ SOLID设计**: 严格遵循SOLID原则，提供专门的构建器和检索器
-- **🔌 LightRAG集成**: 深度集成LightRAG框架，支持高级知识图谱功能
+- **🤖 Intelligence**: LLM-based automatic entity-relation extraction, no manual rules needed
+- **🔍 Semantics**: Support for vector similarity search, understanding semantics beyond keyword matching
+- **📄 Multi-format**: Automatic processing of PDF, Word, HTML and other document formats
+- **⚡ High Performance**: Support for incremental updates and batch processing, suitable for large-scale applications
+- **🔧 Extensible**: Modular design, support for custom builders and storage backends
+- **🏗️ SOLID Design**: Strictly follows SOLID principles, provides dedicated builders and retrievers
+- **🔌 LightRAG Integration**: Deep integration with LightRAG framework, supports advanced knowledge graph features
 
-## 📝 注意事项
+## 📝 Important Notes
 
-1. **API费用**: 使用OpenAI API会产生费用，建议先用小数据集测试
-2. **网络连接**: 构建图谱时需要稳定的网络连接访问LLM服务
-3. **内存使用**: 大规模文档可能需要较多内存，建议分批处理
-4. **异步编程**: 所有构建和搜索操作都是异步的，需要使用`asyncio.run()`
+1. **API Costs**: Using OpenAI API will incur costs, recommend testing with small datasets first
+2. **Network Connection**: Building graphs requires stable network connection to access LLM services
+3. **Memory Usage**: Large-scale documents may require significant memory, recommend batch processing
+4. **Asynchronous Programming**: All building and search operations are asynchronous, need to use `asyncio.run()`
 
-## 🆘 快速问题解决
+## 🆘 Quick Troubleshooting
 
-- **安装问题**: 运行 `make install-dev` 或 `pip install -e .`
-- **API密钥**: 确保设置了有效的`OPENAI_API_KEY`
-- **文档处理失败**: 安装相应的可选依赖包
-- **内存不足**: 减少单次处理的文档数量或文档大小
-- **测试运行**: 使用 `make test` 运行所有测试
-- **代码检查**: 使用 `make check` 进行代码质量检查
+- **Installation Issues**: Run `make install-dev` or `pip install -e .`
+- **API Key**: Ensure you have set a valid `OPENAI_API_KEY`
+- **Document Processing Failure**: Install corresponding optional dependency packages
+- **Memory Insufficient**: Reduce the number or size of documents processed at once
+- **Run Tests**: Use `make test` to run all tests
+- **Code Check**: Use `make check` for code quality checking
 
 ---
 
-🚀 **开始构建你的知识图谱吧！** 从简单的文本开始，逐步探索更多高级功能。
+🚀 **Start building your knowledge graph!** Begin with simple text and gradually explore more advanced features.

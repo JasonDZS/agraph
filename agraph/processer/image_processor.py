@@ -1,3 +1,10 @@
+"""Image document processor implementation using multimodal AI models.
+
+This module provides functionality for extracting text and descriptions from images
+using state-of-the-art multimodal AI models. It supports multiple AI providers
+and various image analysis tasks including OCR, description, and content analysis.
+"""
+
 import base64
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -8,19 +15,30 @@ from .base import DocumentProcessor, ProcessingError
 
 
 class MultimodalModel(ABC):
-    """Abstract base class for multimodal models."""
+    """Abstract base class for multimodal AI models.
+
+    This class defines the interface that all multimodal model implementations
+    must follow. It provides methods for analyzing images using either file paths
+    or base64 encoded data.
+    """
 
     @abstractmethod
     def analyze_image(self, image_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
-        """Analyze an image and return text description.
+        """Analyze an image file and return text description.
 
         Args:
-            image_path: Path to the image file
-            prompt: Text prompt for the analysis
-            **kwargs: Additional model-specific parameters
+            image_path: Path to the image file to analyze.
+            prompt: Text prompt describing the analysis task.
+            **kwargs: Additional model-specific parameters such as:
+                - max_tokens: Maximum response length
+                - temperature: Creativity/randomness level
+                - detail_level: Level of detail in analysis
 
         Returns:
-            Text description of the image
+            Text description or analysis of the image content.
+
+        Raises:
+            ProcessingError: If image analysis fails or model is unavailable.
         """
         pass
 
@@ -29,25 +47,43 @@ class MultimodalModel(ABC):
         """Analyze an image from base64 data and return text description.
 
         Args:
-            image_base64: Base64 encoded image data
-            prompt: Text prompt for the analysis
-            **kwargs: Additional model-specific parameters
+            image_base64: Base64 encoded image data.
+            prompt: Text prompt describing the analysis task.
+            **kwargs: Additional model-specific parameters.
 
         Returns:
-            Text description of the image
+            Text description or analysis of the image content.
+
+        Raises:
+            ProcessingError: If image analysis fails or model is unavailable.
         """
         pass
 
 
 class OpenAIVisionModel(MultimodalModel):
-    """OpenAI GPT-4V integration for image analysis."""
+    """OpenAI GPT-4V integration for advanced image analysis.
+
+    This model uses OpenAI's GPT-4 with vision capabilities to perform
+    sophisticated image analysis including object detection, scene understanding,
+    text recognition, and detailed content description.
+
+    Features:
+    - Advanced scene understanding
+    - Text recognition and OCR
+    - Object and person detection
+    - Artistic and stylistic analysis
+    - Configurable detail levels
+    """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o"):
         """Initialize OpenAI vision model.
 
         Args:
-            api_key: OpenAI API key (if None, will use environment variable)
-            model: Model name to use
+            api_key: OpenAI API key. If None, uses settings.OPENAI_API_KEY.
+            model: Model name to use (default: 'gpt-4o' for optimal performance).
+
+        Raises:
+            ProcessingError: If OpenAI package is not installed.
         """
         try:
             import openai
@@ -58,12 +94,33 @@ class OpenAIVisionModel(MultimodalModel):
         self.model = model
 
     def analyze_image(self, image_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
-        """Analyze image using OpenAI GPT-4V."""
-        image_base64 = self._encode_image(image_path)
+        """Analyze image using OpenAI GPT-4V.
+
+        Args:
+            image_path: Path to the image file.
+            prompt: Analysis prompt.
+            **kwargs: Additional parameters.
+
+        Returns:
+            Analysis result from GPT-4V.
+        """
+        image_base64 = self._encode_image_to_base64(image_path)
         return self.analyze_image_base64(image_base64, prompt, **kwargs)
 
     def analyze_image_base64(self, image_base64: str, prompt: str, **kwargs: Any) -> str:
-        """Analyze image from base64 using OpenAI GPT-4V."""
+        """Analyze image from base64 using OpenAI GPT-4V.
+
+        Args:
+            image_base64: Base64 encoded image.
+            prompt: Analysis prompt.
+            **kwargs: Additional parameters.
+
+        Returns:
+            Analysis result from GPT-4V.
+
+        Raises:
+            ProcessingError: If API call fails.
+        """
         max_tokens = kwargs.get("max_tokens", 1000)
         temperature = kwargs.get("temperature", 0.1)
 
@@ -87,21 +144,43 @@ class OpenAIVisionModel(MultimodalModel):
         except Exception as e:
             raise ProcessingError(f"OpenAI vision analysis failed: {str(e)}")
 
-    def _encode_image(self, image_path: Union[str, Path]) -> str:
-        """Encode image to base64."""
+    def _encode_image_to_base64(self, image_path: Union[str, Path]) -> str:
+        """Encode image file to base64 string.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            Base64 encoded image data.
+        """
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
 
 class ClaudeVisionModel(MultimodalModel):
-    """Anthropic Claude Vision integration for image analysis."""
+    """Anthropic Claude Vision integration for image analysis.
+
+    This model uses Anthropic's Claude with vision capabilities for detailed
+    image analysis. Claude excels at nuanced understanding and provides
+    thoughtful, detailed descriptions.
+
+    Features:
+    - Detailed scene analysis
+    - Contextual understanding
+    - Safety-aware content analysis
+    - High-quality text extraction
+    - Nuanced artistic interpretation
+    """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20241022"):
         """Initialize Claude vision model.
 
         Args:
-            api_key: Anthropic API key (if None, will use environment variable)
-            model: Model name to use
+            api_key: Anthropic API key. If None, uses environment variable.
+            model: Model name to use (default: latest Claude 3.5 Sonnet).
+
+        Raises:
+            ProcessingError: If Anthropic package is not installed.
         """
         try:
             import anthropic
@@ -114,17 +193,38 @@ class ClaudeVisionModel(MultimodalModel):
         self.model = model
 
     def analyze_image(self, image_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
-        """Analyze image using Claude Vision."""
-        image_base64 = self._encode_image(image_path)
+        """Analyze image using Claude Vision.
+
+        Args:
+            image_path: Path to the image file.
+            prompt: Analysis prompt.
+            **kwargs: Additional parameters.
+
+        Returns:
+            Analysis result from Claude.
+        """
+        image_base64 = self._encode_image_to_base64(image_path)
         return self.analyze_image_base64(image_base64, prompt, **kwargs)
 
     def analyze_image_base64(self, image_base64: str, prompt: str, **kwargs: Any) -> str:
-        """Analyze image from base64 using Claude Vision."""
+        """Analyze image from base64 using Claude Vision.
+
+        Args:
+            image_base64: Base64 encoded image.
+            prompt: Analysis prompt.
+            **kwargs: Additional parameters.
+
+        Returns:
+            Analysis result from Claude.
+
+        Raises:
+            ProcessingError: If API call fails.
+        """
         max_tokens = kwargs.get("max_tokens", 1000)
         temperature = kwargs.get("temperature", 0.1)
 
-        # Detect image format
-        image_format = self._detect_image_format(image_base64)
+        # Detect image format for Claude API
+        image_format = self._detect_image_format_from_base64(image_base64)
 
         try:
             response = self.client.messages.create(
@@ -153,16 +253,30 @@ class ClaudeVisionModel(MultimodalModel):
         except Exception as e:
             raise ProcessingError(f"Claude vision analysis failed: {str(e)}")
 
-    def _encode_image(self, image_path: Union[str, Path]) -> str:
-        """Encode image to base64."""
+    def _encode_image_to_base64(self, image_path: Union[str, Path]) -> str:
+        """Encode image file to base64 string.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            Base64 encoded image data.
+        """
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
-    def _detect_image_format(self, image_base64: str) -> str:
-        """Detect image format from base64 data."""
+    def _detect_image_format_from_base64(self, image_base64: str) -> str:
+        """Detect image format from base64 data using magic numbers.
+
+        Args:
+            image_base64: Base64 encoded image data.
+
+        Returns:
+            Image format string (png, jpeg, gif, webp).
+        """
         image_data = base64.b64decode(image_base64)
 
-        # Check magic numbers
+        # Check magic numbers for different image formats
         if image_data.startswith(b"\x89PNG"):
             return "png"
         elif image_data.startswith(b"\xff\xd8\xff"):
@@ -176,34 +290,67 @@ class ClaudeVisionModel(MultimodalModel):
 
 
 class ImageProcessor(DocumentProcessor):
-    """Processor for image files using multimodal models."""
+    """Document processor for image files using multimodal AI models.
+
+    This processor extracts text content and descriptions from images using
+    advanced multimodal AI models. It supports various image analysis tasks
+    and provides flexible processing options.
+
+    Features:
+    - Multiple AI model support (OpenAI GPT-4V, Claude Vision)
+    - Automatic model selection based on available API keys
+    - Specialized prompts for different analysis tasks
+    - Comprehensive image metadata extraction
+    - Support for various image formats
+    - OCR-like text extraction capabilities
+
+    Supported formats:
+    - JPEG (.jpg, .jpeg)
+    - PNG (.png)
+    - GIF (.gif)
+    - BMP (.bmp)
+    - TIFF (.tiff, .tif)
+    - WebP (.webp)
+    """
 
     def __init__(self, model: Optional[MultimodalModel] = None, default_prompt: Optional[str] = None):
-        """Initialize image processor.
+        """Initialize image processor with multimodal model.
 
         Args:
-            model: Multimodal model to use (if None, will try to auto-detect)
-            default_prompt: Default prompt for image analysis
+            model: Multimodal model to use. If None, auto-detects available model.
+            default_prompt: Default analysis prompt. If None, uses comprehensive prompt.
         """
         self.model = model or self._get_default_model()
         self.default_prompt = default_prompt or (
-            "Please describe this image in detail. Include information about objects, people, "
-            "text, colors, composition, and any other relevant visual elements. "
-            "If there is text in the image, please transcribe it."
+            "Please provide a detailed description of this image. Include information about:\n"
+            "1. Objects, people, and animals present\n"
+            "2. Setting, location, and environment\n"
+            "3. Actions and activities taking place\n"
+            "4. Colors, lighting, and visual composition\n"
+            "5. Any text or writing visible in the image\n"
+            "6. Mood, atmosphere, and artistic style\n"
+            "Please be thorough and specific in your description."
         )
 
     def _get_default_model(self) -> MultimodalModel:
-        """Get default multimodal model based on available API keys."""
+        """Automatically select and configure a multimodal model.
+
+        Returns:
+            Configured multimodal model instance.
+
+        Raises:
+            ProcessingError: If no suitable model is available.
+        """
         import os
 
-        # Try OpenAI first
+        # Try OpenAI first (often more widely available)
         if os.getenv("OPENAI_API_KEY"):
             try:
                 return OpenAIVisionModel()
             except ProcessingError:
                 pass
 
-        # Try Claude
+        # Try Claude as fallback
         if os.getenv("ANTHROPIC_API_KEY"):
             try:
                 return ClaudeVisionModel()
@@ -212,22 +359,34 @@ class ImageProcessor(DocumentProcessor):
 
         raise ProcessingError(
             "No multimodal model available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY "
-            "environment variable and install the required packages."
+            "environment variable and install the required packages (openai or anthropic)."
         )
 
     @property
     def supported_extensions(self) -> List[str]:
+        """Return list of supported image file extensions.
+
+        Returns:
+            List of supported image extensions.
+        """
         return [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp"]
 
     def process(self, file_path: Union[str, Path], **kwargs: Any) -> str:
-        """Extract text from image using multimodal model.
+        """Extract text description from image using multimodal AI model.
 
         Args:
-            file_path: Path to the image file
-            **kwargs: Additional parameters (prompt, max_tokens, temperature, etc.)
+            file_path: Path to the image file to process.
+            **kwargs: Additional processing parameters:
+                - prompt (str): Custom analysis prompt
+                - max_tokens (int): Maximum response length
+                - temperature (float): Model creativity level
+                - detail_level (str): 'brief', 'detailed', or 'comprehensive'
 
         Returns:
-            Text description of the image
+            Text description or analysis of the image content.
+
+        Raises:
+            ProcessingError: If image format is unsupported or analysis fails.
         """
         self.validate_file(file_path)
 
@@ -243,58 +402,66 @@ class ImageProcessor(DocumentProcessor):
             raise ProcessingError(f"Failed to process image {file_path}: {str(e)}")
 
     def process_with_custom_prompt(self, file_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
-        """Process image with custom prompt.
+        """Process image with a custom analysis prompt.
 
         Args:
-            file_path: Path to the image file
-            prompt: Custom prompt for analysis
-            **kwargs: Additional parameters
+            file_path: Path to the image file.
+            prompt: Custom prompt for specific analysis needs.
+            **kwargs: Additional parameters.
 
         Returns:
-            Text description based on the prompt
+            Analysis result based on the custom prompt.
         """
         return self.process(file_path, prompt=prompt, **kwargs)
 
     def extract_text_from_image(self, file_path: Union[str, Path], **kwargs: Any) -> str:
-        """Extract text from image (OCR-like functionality).
+        """Extract and transcribe text from images (OCR functionality).
+
+        This method uses the multimodal model to identify and transcribe
+        any text visible in the image, similar to OCR but with AI understanding.
 
         Args:
-            file_path: Path to the image file
-            **kwargs: Additional parameters
+            file_path: Path to the image file.
+            **kwargs: Additional parameters.
 
         Returns:
-            Extracted text from the image
+            Extracted text from the image, or indication if no text found.
         """
         ocr_prompt = (
-            "Extract and transcribe all text visible in this image. "
+            "Please extract and transcribe all text visible in this image. "
             "Maintain the original formatting and structure as much as possible. "
+            "Include all readable text such as signs, documents, labels, captions, etc. "
             "If no text is visible, respond with 'No text found in image'."
         )
         return self.process(file_path, prompt=ocr_prompt, **kwargs)
 
     def describe_image(self, file_path: Union[str, Path], detail_level: str = "detailed", **kwargs: Any) -> str:
-        """Get image description with specified detail level.
+        """Get image description with specified level of detail.
 
         Args:
-            file_path: Path to the image file
-            detail_level: "brief", "detailed", or "comprehensive"
-            **kwargs: Additional parameters
+            file_path: Path to the image file.
+            detail_level: Level of detail - 'brief', 'detailed', or 'comprehensive'.
+            **kwargs: Additional parameters.
 
         Returns:
-            Image description
+            Image description with requested level of detail.
         """
         prompts = {
-            "brief": "Provide a brief, one-sentence description of this image.",
+            "brief": "Provide a brief, one-sentence description of this image focusing on the main subject.",
             "detailed": self.default_prompt,
             "comprehensive": (
-                "Provide a comprehensive analysis of this image including: "
-                "1. Overall scene and setting, "
-                "2. All objects and their positions, "
-                "3. People and their activities, "
-                "4. Colors, lighting, and mood, "
-                "5. Any text or writing visible, "
-                "6. Artistic style or photographic qualities, "
-                "7. Potential context or story."
+                "Provide an extremely comprehensive analysis of this image including:\n"
+                "1. Overall scene, setting, and context\n"
+                "2. Detailed inventory of all objects and their positions\n"
+                "3. All people present, their appearance and activities\n"
+                "4. Environmental details (lighting, weather, time of day)\n"
+                "5. Colors, textures, and visual composition\n"
+                "6. Any text, symbols, or signage visible\n"
+                "7. Artistic style, photographic technique, or medium\n"
+                "8. Emotional tone, mood, and atmosphere\n"
+                "9. Potential cultural, historical, or contextual significance\n"
+                "10. Technical aspects (camera angle, composition, quality)\n"
+                "Be extremely thorough and include all observable details."
             ),
         }
 
@@ -302,13 +469,25 @@ class ImageProcessor(DocumentProcessor):
         return self.process(file_path, prompt=prompt, **kwargs)
 
     def extract_metadata(self, file_path: Union[str, Path]) -> Dict[str, Any]:
-        """Extract metadata from image file.
+        """Extract comprehensive metadata from image files.
+
+        This method extracts both technical image metadata and file information.
+        It uses PIL/Pillow for technical details when available.
 
         Args:
-            file_path: Path to the image file
+            file_path: Path to the image file.
 
         Returns:
-            Dictionary containing metadata
+            Dictionary containing metadata with keys:
+            - file_path: Original file path
+            - file_size: File size in bytes
+            - file_type: File extension
+            - created/modified: File timestamps
+            - width/height: Image dimensions
+            - mode/format: Image color mode and format
+            - has_transparency: Whether image has transparency
+            - exif: EXIF data if available
+            - pillow_error: Error message if PIL processing fails
         """
         self.validate_file(file_path)
         file_path = Path(file_path)
@@ -322,6 +501,7 @@ class ImageProcessor(DocumentProcessor):
             "modified": str(stat.st_mtime),
         }
 
+        # Extract technical image metadata using PIL
         try:
             from PIL import Image
 
@@ -333,13 +513,23 @@ class ImageProcessor(DocumentProcessor):
                         "mode": img.mode,
                         "format": img.format,
                         "has_transparency": img.mode in ("RGBA", "LA") or "transparency" in img.info,
+                        "aspect_ratio": round(img.width / img.height, 3) if img.height > 0 else 0,
                     }
                 )
 
                 # Extract EXIF data if available
                 if hasattr(img, "_getexif") and img._getexif():
-                    exif = img._getexif()
-                    metadata["exif"] = {k: v for k, v in exif.items() if isinstance(v, (str, int, float))}
+                    exif_data = img._getexif()
+                    # Filter EXIF data to include only basic types
+                    filtered_exif = {
+                        k: v for k, v in exif_data.items() if isinstance(v, (str, int, float)) and len(str(v)) < 100
+                    }
+                    if filtered_exif:
+                        metadata["exif"] = filtered_exif
+
+                # Additional image analysis
+                metadata["total_pixels"] = img.width * img.height
+                metadata["estimated_quality"] = self._estimate_image_quality(img)
 
         except ImportError:
             metadata["pillow_error"] = "PIL/Pillow not available for detailed image metadata"
@@ -348,13 +538,48 @@ class ImageProcessor(DocumentProcessor):
 
         return metadata
 
+    def _estimate_image_quality(self, img: Any) -> str:
+        """Estimate image quality based on dimensions and file size.
+
+        Args:
+            img: PIL Image object.
+
+        Returns:
+            Quality estimation string.
+        """
+        total_pixels = img.width * img.height
+
+        if total_pixels > 8000000:  # 8MP+
+            return "very_high"
+        elif total_pixels > 2000000:  # 2MP+
+            return "high"
+        elif total_pixels > 500000:  # 0.5MP+
+            return "medium"
+        elif total_pixels > 100000:  # 0.1MP+
+            return "low"
+        else:
+            return "very_low"
+
 
 class ImageProcessorFactory:
-    """Factory for creating image processors with different models."""
+    """Factory class for creating image processors with specific multimodal models.
+
+    This factory provides convenient methods to create image processors
+    configured with specific AI models and settings.
+    """
 
     @staticmethod
     def create_openai_processor(api_key: Optional[str] = None, model: str = "gpt-4o", **kwargs: Any) -> ImageProcessor:
-        """Create image processor with OpenAI model."""
+        """Create image processor with OpenAI GPT-4V model.
+
+        Args:
+            api_key: OpenAI API key.
+            model: OpenAI model name.
+            **kwargs: Additional processor parameters.
+
+        Returns:
+            ImageProcessor configured with OpenAI model.
+        """
         openai_model = OpenAIVisionModel(api_key=api_key, model=model)
         return ImageProcessor(model=openai_model, **kwargs)
 
@@ -362,11 +587,27 @@ class ImageProcessorFactory:
     def create_claude_processor(
         api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20241022", **kwargs: Any
     ) -> ImageProcessor:
-        """Create image processor with Claude model."""
+        """Create image processor with Claude Vision model.
+
+        Args:
+            api_key: Anthropic API key.
+            model: Claude model name.
+            **kwargs: Additional processor parameters.
+
+        Returns:
+            ImageProcessor configured with Claude model.
+        """
         claude_model = ClaudeVisionModel(api_key=api_key, model=model)
         return ImageProcessor(model=claude_model, **kwargs)
 
     @staticmethod
     def create_auto_processor(**kwargs: Any) -> ImageProcessor:
-        """Create image processor with auto-detected model."""
+        """Create image processor with automatically detected model.
+
+        Args:
+            **kwargs: Additional processor parameters.
+
+        Returns:
+            ImageProcessor with auto-detected model.
+        """
         return ImageProcessor(**kwargs)

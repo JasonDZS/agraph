@@ -1,5 +1,8 @@
 """
-实体抽取器模块
+Entity Extractor Module
+
+This module provides entity extraction capabilities from various data sources.
+Includes base classes and concrete implementations for text and database entity extraction.
 """
 
 import logging
@@ -14,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaseEntityExtractor(ABC):
-    """实体抽取器基类"""
+    """
+    Base class for entity extractors.
+
+    This abstract class defines the common interface for all entity extractors.
+    It provides entity normalization, deduplication utilities and confidence calculation methods.
+    """
 
     def __init__(self) -> None:
         self.entity_patterns: Dict[str, List[str]] = {}
@@ -39,42 +47,42 @@ class BaseEntityExtractor(ABC):
     @abstractmethod
     def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
         """
-        从文本中抽取实体
+        Extract entities from text.
 
         Args:
-            text: 输入文本
-            context: 上下文信息
+            text: Input text to extract entities from
+            context: Optional context information to assist extraction
 
         Returns:
-            List[Entity]: 抽取的实体列表
+            List[Entity]: List of extracted entities
         """
 
     @abstractmethod
     def extract_from_database(self, schema: Dict[str, Any]) -> List[Entity]:
         """
-        从数据库模式中抽取实体
+        Extract entities from database schema.
 
         Args:
-            schema: 数据库模式信息
+            schema: Database schema information containing tables, columns, etc.
 
         Returns:
-            List[Entity]: 抽取的实体列表
+            List[Entity]: List of extracted entities
         """
 
     def normalize_entity(self, entity: Entity) -> Entity:
         """
-        实体标准化
+        Normalize entity by standardizing name and aliases.
 
         Args:
-            entity: 原始实体
+            entity: Original entity to normalize
 
         Returns:
-            Entity: 标准化后的实体
+            Entity: Normalized entity
         """
-        # 名称标准化
+        # Normalize entity name
         entity.name = entity.name.strip().lower()
 
-        # 别名去重和标准化
+        # Normalize and deduplicate aliases
         normalized_aliases = []
         for alias in entity.aliases:
             normalized_alias = alias.strip().lower()
@@ -86,29 +94,29 @@ class BaseEntityExtractor(ABC):
 
     def deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
         """
-        实体去重
+        Remove duplicate entities based on name matching and merge their information.
 
         Args:
-            entities: 实体列表
+            entities: List of entities to deduplicate
 
         Returns:
-            List[Entity]: 去重后的实体列表
+            List[Entity]: Deduplicated entity list
         """
         unique_entities = {}
         name_to_entity: Dict[str, Entity] = {}
 
         for entity in entities:
-            # 基于名称的精确匹配
+            # Exact name matching
             normalized_name = entity.name.lower().strip()
 
             if normalized_name in name_to_entity:
-                # 合并实体信息
+                # Merge entity information
                 existing_entity = name_to_entity[normalized_name]
                 existing_entity.aliases.extend(entity.aliases)
                 existing_entity.aliases = list(set(existing_entity.aliases))
                 existing_entity.properties.update(entity.properties)
 
-                # 保留更高置信度的实体
+                # Keep entity with higher confidence
                 if entity.confidence > existing_entity.confidence:
                     existing_entity.confidence = entity.confidence
                     existing_entity.description = entity.description or existing_entity.description
@@ -119,20 +127,29 @@ class BaseEntityExtractor(ABC):
         return list(unique_entities.values())
 
     def _calculate_entity_confidence(self, entity_name: str, context: Optional[Dict[str, Any]] = None) -> float:
-        """计算实体置信度"""
-        confidence = 0.5  # 基础置信度
+        """
+        Calculate entity confidence score based on various factors.
 
-        # 基于长度的置信度调整
+        Args:
+            entity_name: Name of the entity
+            context: Optional context information
+
+        Returns:
+            float: Confidence score between 0.0 and 1.0
+        """
+        confidence = 0.5  # Base confidence
+
+        # Length-based confidence adjustment
         if len(entity_name) > 1:
             confidence += 0.1
         if len(entity_name) > 3:
             confidence += 0.1
 
-        # 基于大小写的置信度调整
+        # Capitalization-based confidence adjustment
         if entity_name[0].isupper():
             confidence += 0.1
 
-        # 基于停用词的置信度调整
+        # Stopword-based confidence adjustment
         if entity_name.lower() in self.stopwords:
             confidence -= 0.3
 
@@ -140,51 +157,65 @@ class BaseEntityExtractor(ABC):
 
 
 class TextEntityExtractor(BaseEntityExtractor):
-    """文本实体抽取器"""
+    """
+    Text-based entity extractor.
+
+    Extracts entities from text using regular expression patterns and keyword extraction.
+    Supports multiple entity types including persons, organizations, locations, concepts, and products.
+    """
 
     def __init__(self) -> None:
         super().__init__()
         self._init_patterns()
 
     def _init_patterns(self) -> None:
-        """初始化实体识别模式"""
+        """Initialize entity recognition patterns for different entity types."""
         self.entity_patterns = {
             EntityType.PERSON.value: [
-                r"\b[A-Z][a-z]+ [A-Z][a-z]+\b",  # 英文人名模式
-                r"\b(?:Mr|Mrs|Ms|Dr|Prof)\.? [A-Z][a-z]+\b",  # 称谓+名字
-                r"[\u4e00-\u9fff]{2,4}·[\u4e00-\u9fff]{2,4}",  # 中文人名·模式
-                r"史蒂夫·[\u4e00-\u9fff]+",  # 史蒂夫·开头的人名
-                r"[\u4e00-\u9fff]{2}[\u4e00-\u9fff]{1,2}(?:先生|女士|博士|教授)",  # 中文称谓
+                r"\b[A-Z][a-z]+ [A-Z][a-z]+\b",  # English name pattern
+                r"\b(?:Mr|Mrs|Ms|Dr|Prof)\.? [A-Z][a-z]+\b",  # Title + name
+                r"[\u4e00-\u9fff]{2,4}·[\u4e00-\u9fff]{2,4}",  # Chinese name with · pattern
+                r"史蒂夫·[\u4e00-\u9fff]+",  # Steve· prefix Chinese names
+                r"[\u4e00-\u9fff]{2}[\u4e00-\u9fff]{1,2}(?:先生|女士|博士|教授)",  # Chinese titles
             ],
             EntityType.ORGANIZATION.value: [
                 r"\b[A-Z][a-zA-Z\s&]+ (?:Inc|Corp|Ltd|LLC|Company|Organization)\b",
-                r"\b[A-Z][A-Z\s]+\b",  # 全大写可能是组织
-                r"[\u4e00-\u9fff]+(?:公司|企业|集团|组织|机构|大学|学院|研究所)",  # 中文组织
-                r"苹果公司|清华大学|Facebook|Google|TensorFlow|PyTorch",  # 具体组织名
+                r"\b[A-Z][A-Z\s]+\b",  # All caps might be organization
+                r"[\u4e00-\u9fff]+(?:公司|企业|集团|组织|机构|大学|学院|研究所)",  # Chinese organizations
+                r"苹果公司|清华大学|Facebook|Google|TensorFlow|PyTorch",  # Specific organization names
             ],
             EntityType.LOCATION.value: [
                 r"\b[A-Z][a-z]+ (?:City|State|Country|Province|District)\b",
-                r"\bin [A-Z][a-z]+\b",  # 地点介词短语
-                r"[\u4e00-\u9fff]+(?:市|省|区|县|国|州|地区)",  # 中文地名
-                r"北京|上海|加利福尼亚州|库比蒂诺|海淀区",  # 具体地名
+                r"\bin [A-Z][a-z]+\b",  # Location prepositional phrases
+                r"[\u4e00-\u9fff]+(?:市|省|区|县|国|州|地区)",  # Chinese location names
+                r"北京|上海|加利福尼亚州|库比蒂诺|海淀区",  # Specific location names
             ],
             EntityType.CONCEPT.value: [
                 r"\b[a-z]+ (?:concept|theory|principle|method|approach)\b",
-                r"[\u4e00-\u9fff]+(?:技术|概念|理论|方法|系统|平台|框架)",  # 中文概念
-                r"人工智能|机器学习|深度学习|自然语言处理|计算机视觉|iOS|iPhone",  # 具体概念
+                r"[\u4e00-\u9fff]+(?:技术|概念|理论|方法|系统|平台|框架)",  # Chinese concepts
+                r"人工智能|机器学习|深度学习|自然语言处理|计算机视觉|iOS|iPhone",  # Specific concepts
             ],
             EntityType.PRODUCT.value: [
-                r"iPhone|iPad|macOS|iOS|Django|Flask|Python|TensorFlow|PyTorch",  # 产品名
-                r"[\u4e00-\u9fff]+(?:产品|系统|平台|应用|软件)",  # 中文产品
+                r"iPhone|iPad|macOS|iOS|Django|Flask|Python|TensorFlow|PyTorch",  # Product names
+                r"[\u4e00-\u9fff]+(?:产品|系统|平台|应用|软件)",  # Chinese products
             ],
         }
 
     def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
-        """从文本中抽取实体"""
+        """
+        Extract entities from text using pattern matching and keyword extraction.
+
+        Args:
+            text: Input text to extract entities from
+            context: Optional context information
+
+        Returns:
+            List[Entity]: List of extracted entities
+        """
         entities = []
 
         try:
-            # 基于正则表达式的实体抽取
+            # Pattern-based entity extraction
             for entity_type, patterns in self.entity_patterns.items():
                 for pattern in patterns:
                     matches = re.finditer(pattern, text, re.IGNORECASE)
@@ -210,7 +241,7 @@ class TextEntityExtractor(BaseEntityExtractor):
 
                         entities.append(entity)
 
-            # 基于关键词的概念实体抽取
+            # Keyword-based concept entity extraction
             concept_keywords = self._extract_concept_keywords(text)
             for keyword in concept_keywords:
                 entity = Entity(
@@ -228,11 +259,19 @@ class TextEntityExtractor(BaseEntityExtractor):
             return []
 
     def extract_from_database(self, schema: Dict[str, Any]) -> List[Entity]:
-        """从数据库模式中抽取实体"""
+        """
+        Extract entities from database schema including databases, tables, and columns.
+
+        Args:
+            schema: Database schema information
+
+        Returns:
+            List[Entity]: List of extracted database entities
+        """
         entities = []
 
         try:
-            # 数据库实体
+            # Database entity
             if "database_name" in schema:
                 db_entity = Entity(
                     name=schema["database_name"],
@@ -243,7 +282,7 @@ class TextEntityExtractor(BaseEntityExtractor):
                 )
                 entities.append(db_entity)
 
-            # 表实体
+            # Table entities
             tables = schema.get("tables", [])
             for table in tables:
                 table_name = table.get("name", "")
@@ -261,7 +300,7 @@ class TextEntityExtractor(BaseEntityExtractor):
                     )
                     entities.append(table_entity)
 
-                    # 列实体
+                    # Column entities
                     columns = table.get("columns", [])
                     for column in columns:
                         column_name = column.get("name", "")
@@ -289,25 +328,38 @@ class TextEntityExtractor(BaseEntityExtractor):
             return []
 
     def _extract_concept_keywords(self, text: str) -> List[str]:
-        """抽取概念关键词"""
-        # 简单的关键词抽取，基于词频和位置
+        """
+        Extract concept keywords from text based on frequency and position.
+
+        Args:
+            text: Input text to extract keywords from
+
+        Returns:
+            List[str]: List of concept keywords
+        """
+        # Simple keyword extraction based on word frequency and position
         words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
 
-        # 过滤停用词
+        # Filter stopwords
         keywords = [word for word in words if word not in self.stopwords]
 
-        # 统计词频
+        # Count word frequency
         word_freq: Dict[str, int] = {}
         for word in keywords:
             word_freq[word] = word_freq.get(word, 0) + 1
 
-        # 返回高频词作为概念
+        # Return high-frequency words as concepts
         concept_keywords = [word for word, freq in word_freq.items() if freq >= 2]
-        return concept_keywords[:10]  # 限制数量
+        return concept_keywords[:10]  # Limit number of keywords
 
 
 class DatabaseEntityExtractor(BaseEntityExtractor):
-    """数据库实体抽取器"""
+    """
+    Database-focused entity extractor.
+
+    Specializes in extracting entities from database schemas with enhanced business concept inference.
+    Provides detailed table and column analysis with business semantics.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -315,15 +367,23 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
         self.common_columns = {"id", "created_at", "updated_at", "deleted_at"}
 
     def extract_from_text(self, text: str, context: Optional[Dict[str, Any]] = None) -> List[Entity]:
-        """数据库抽取器不处理文本"""
+        """Database extractor does not process text data."""
         return []
 
     def extract_from_database(self, schema: Dict[str, Any]) -> List[Entity]:
-        """从数据库模式中抽取实体"""
+        """
+        Extract entities from database schema with business concept inference.
+
+        Args:
+            schema: Database schema information
+
+        Returns:
+            List[Entity]: List of extracted entities including business concepts
+        """
         entities = []
 
         try:
-            # 抽取数据库实体
+            # Extract database entity
             if "database_name" in schema:
                 db_entity = Entity(
                     name=schema["database_name"],
@@ -334,13 +394,13 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
                 )
                 entities.append(db_entity)
 
-            # 抽取表和列实体
+            # Extract table and column entities
             tables = schema.get("tables", [])
             for table in tables:
                 table_entities = self._extract_table_entities(table)
                 entities.extend(table_entities)
 
-            # 抽取业务概念实体
+            # Extract business concept entities
             business_entities = self._extract_business_concepts(schema)
             entities.extend(business_entities)
 
@@ -351,20 +411,28 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             return []
 
     def _extract_table_entities(self, table: Dict[str, Any]) -> List[Entity]:
-        """抽取表相关实体"""
+        """
+        Extract table-related entities including the table itself and its columns.
+
+        Args:
+            table: Table information dictionary
+
+        Returns:
+            List[Entity]: List of table and column entities
+        """
         entities: List[Entity] = []
         table_name = table.get("name", "")
 
         if not table_name:
             return entities
 
-        # 表实体
+        # Table entity
         table_entity = Entity(
             name=table_name,
             entity_type=EntityType.TABLE,
             confidence=1.0,
             source="database_extraction",
-            description=table.get("comment", f"数据表: {table_name}"),
+            description=table.get("comment", f"Data table: {table_name}"),
             properties={
                 "schema": table.get("schema", ""),
                 "row_count": table.get("row_count", 0),
@@ -375,14 +443,14 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             },
         )
 
-        # 添加表名别名（去掉前缀）
+        # Add table name aliases (remove prefixes)
         clean_name = self._clean_table_name(table_name)
         if clean_name != table_name:
             table_entity.add_alias(clean_name)
 
         entities.append(table_entity)
 
-        # 列实体
+        # Column entities
         columns = table.get("columns", [])
         for column in columns:
             column_entities = self._extract_column_entities(table_name, column)
@@ -391,14 +459,23 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
         return entities
 
     def _extract_column_entities(self, table_name: str, column: Dict[str, Any]) -> List[Entity]:
-        """抽取列实体"""
+        """
+        Extract column entities with detailed metadata.
+
+        Args:
+            table_name: Name of the parent table
+            column: Column information dictionary
+
+        Returns:
+            List[Entity]: List of column entities
+        """
         entities: List[Entity] = []
         column_name = column.get("name", "")
 
         if not column_name:
             return entities
 
-        # 跳过通用列
+        # Skip common columns
         if column_name.lower() in self.common_columns:
             return entities
 
@@ -409,7 +486,7 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             entity_type=EntityType.COLUMN,
             confidence=1.0,
             source="database_extraction",
-            description=column.get("comment", f"数据列: {column_name}"),
+            description=column.get("comment", f"Data column: {column_name}"),
             properties={
                 "table": table_name,
                 "column": column_name,
@@ -424,17 +501,25 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             },
         )
 
-        # 添加列名别名
+        # Add column name alias
         column_entity.add_alias(column_name)
 
         entities.append(column_entity)
         return entities
 
     def _extract_business_concepts(self, schema: Dict[str, Any]) -> List[Entity]:
-        """抽取业务概念实体"""
+        """
+        Extract business concept entities by inferring from table names.
+
+        Args:
+            schema: Database schema information
+
+        Returns:
+            List[Entity]: List of business concept entities
+        """
         entities = []
 
-        # 基于表名推断业务概念
+        # Infer business concepts from table names
         tables = schema.get("tables", [])
         business_concepts = set()
 
@@ -442,28 +527,36 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
             table_name = table.get("name", "")
             clean_name = self._clean_table_name(table_name)
 
-            # 从表名推断业务概念
+            # Infer business concepts from table name
             concepts = self._infer_business_concepts(clean_name)
             business_concepts.update(concepts)
 
-        # 创建业务概念实体
+        # Create business concept entities
         for concept in business_concepts:
             concept_entity = Entity(
                 name=concept,
                 entity_type=EntityType.CONCEPT,
                 confidence=0.7,
                 source="business_inference",
-                description=f"业务概念: {concept}",
+                description=f"Business concept: {concept}",
             )
             entities.append(concept_entity)
 
         return entities
 
     def _clean_table_name(self, table_name: str) -> str:
-        """清理表名"""
+        """
+        Clean table name by removing common prefixes.
+
+        Args:
+            table_name: Original table name
+
+        Returns:
+            str: Cleaned table name
+        """
         clean_name = table_name.lower()
 
-        # 移除常见前缀
+        # Remove common prefixes
         for prefix in self.table_prefixes:
             if clean_name.startswith(prefix):
                 clean_name = clean_name[len(prefix) :]
@@ -472,10 +565,18 @@ class DatabaseEntityExtractor(BaseEntityExtractor):
         return clean_name
 
     def _infer_business_concepts(self, table_name: str) -> Set[str]:
-        """从表名推断业务概念"""
+        """
+        Infer business concepts from table name using keyword mapping.
+
+        Args:
+            table_name: Cleaned table name
+
+        Returns:
+            Set[str]: Set of inferred business concepts
+        """
         concepts = set()
 
-        # 简单的业务概念映射
+        # Simple business concept mapping
         concept_mapping = {
             "user": "User Management",
             "customer": "Customer Management",

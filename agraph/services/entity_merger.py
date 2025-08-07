@@ -1,9 +1,19 @@
 """
-Entity merger service - Single responsibility: entity merging operations
+Entity Merger Service
+
+This service provides comprehensive entity merging and deduplication capabilities
+for knowledge graphs. It implements similarity-based entity matching and automated
+merging strategies to maintain graph quality and reduce redundancy.
+
+Key Features:
+- Similarity-based entity matching using multiple criteria
+- Safe entity merging with attribute preservation
+- Automated bulk merging operations
+- Configurable similarity thresholds
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
@@ -12,28 +22,55 @@ logger = logging.getLogger(__name__)
 
 
 class EntityMerger:
-    """Service for entity merging operations"""
+    """
+    Service for entity merging and deduplication operations.
 
-    def __init__(self, similarity_threshold: float = 0.8):
+    This service provides methods to identify similar entities and merge them
+    while preserving important attributes and maintaining graph integrity.
+    The merging process combines entity attributes, updates relation references,
+    and removes duplicate entities from the graph.
+
+    Attributes:
+        similarity_threshold (float): Default threshold for entity similarity matching.
+            Values range from 0.0 (no similarity) to 1.0 (identical).
+    """
+
+    def __init__(self, similarity_threshold: float = 0.8) -> None:
         """
-        Initialize entity merger
+        Initialize the EntityMerger service.
 
         Args:
-            similarity_threshold: Threshold for considering entities similar
+            similarity_threshold: Default threshold for considering entities similar enough
+                to merge. Must be between 0.0 and 1.0. Higher values require more similarity.
+
+        Raises:
+            ValueError: If similarity_threshold is not between 0.0 and 1.0.
         """
+        if not 0.0 <= similarity_threshold <= 1.0:
+            raise ValueError("similarity_threshold must be between 0.0 and 1.0")
         self.similarity_threshold = similarity_threshold
 
     def merge_entity(self, graph: KnowledgeGraph, target_entity: Entity, source_entity: Entity) -> bool:
         """
-        Merge source entity into target entity
+        Merge a source entity into a target entity.
+
+        This operation combines the attributes of both entities, updates all relations
+        that reference the source entity to point to the target entity, and removes
+        the source entity from the graph.
 
         Args:
-            graph: Knowledge graph
-            target_entity: Target entity to merge into
-            source_entity: Source entity to merge from
+            graph: The knowledge graph containing both entities
+            target_entity: The entity that will receive merged attributes and relations
+            source_entity: The entity to be merged and removed from the graph
 
         Returns:
-            bool: True if merge successful
+            bool: True if the merge operation completed successfully, False otherwise
+
+        Note:
+            - Target entity retains its ID and core attributes
+            - Source entity attributes are merged into target
+            - All relations are updated to reference the target entity
+            - Source entity is removed from the graph after successful merge
         """
         if target_entity.id not in graph.entities or source_entity.id not in graph.entities:
             logger.error("One or both entities not found in graph")
@@ -57,7 +94,21 @@ class EntityMerger:
             return False
 
     def _merge_entity_attributes(self, target_entity: Entity, source_entity: Entity) -> None:
-        """Merge attributes from source entity into target entity"""
+        """
+        Merge attributes from source entity into target entity.
+
+        This method combines aliases, properties, and other attributes while preserving
+        the target entity's identity. Higher confidence values and better descriptions
+        are prioritized during the merge process.
+
+        Args:
+            target_entity: Entity to receive the merged attributes
+            source_entity: Entity providing attributes to merge
+
+        Side Effects:
+            - Modifies target_entity in place
+            - Adds source entity ID to merge history
+        """
         # Merge aliases
         target_entity.aliases.extend(source_entity.aliases)
         target_entity.aliases = list(set(target_entity.aliases))  # Remove duplicates
@@ -77,7 +128,20 @@ class EntityMerger:
         target_entity.properties["merged_from"].append(source_entity.id)
 
     def _update_entity_references(self, graph: KnowledgeGraph, old_entity_id: str, new_entity: Entity) -> None:
-        """Update all relations that reference the old entity"""
+        """
+        Update all relation references from old entity ID to new entity.
+
+        Scans all relations in the graph and updates both head and tail entity
+        references that point to the old entity to point to the new entity instead.
+
+        Args:
+            graph: Knowledge graph containing the relations to update
+            old_entity_id: ID of the entity being replaced
+            new_entity: Entity object to replace references with
+
+        Side Effects:
+            - Modifies relation objects in the graph
+        """
         for relation in graph.relations.values():
             if relation.head_entity and relation.head_entity.id == old_entity_id:
                 relation.head_entity = new_entity
@@ -120,7 +184,7 @@ class EntityMerger:
                         )
 
             # Sort by similarity descending
-            similar_pairs.sort(key=lambda x: x["similarity"], reverse=True)
+            similar_pairs.sort(key=lambda x: cast(float, x["similarity"]), reverse=True)
 
             return similar_pairs
 

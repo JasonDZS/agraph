@@ -1,5 +1,17 @@
 """
-Graph validation service - Single responsibility: graph validation and integrity checking
+Graph Validation Service
+
+This service provides comprehensive validation and integrity checking for
+knowledge graphs. It implements various validation rules and quality checks
+to ensure graph correctness and identify potential issues.
+
+Key Features:
+- Comprehensive graph integrity validation
+- Reference consistency checking
+- Connectivity and structural analysis
+- Data quality assessment
+- Automated recommendation generation
+- Configurable validation severity levels
 """
 
 import logging
@@ -11,7 +23,20 @@ logger = logging.getLogger(__name__)
 
 
 class GraphValidator:
-    """Service for graph validation and integrity checking"""
+    """
+    Service for comprehensive graph validation and integrity checking.
+
+    This service performs thorough validation of knowledge graphs to ensure
+    data integrity, structural consistency, and quality standards. It identifies
+    various types of issues and provides actionable recommendations for improvement.
+
+    The validator checks for:
+    - Reference integrity (entity-relation consistency)
+    - Structural issues (connectivity, cycles, isolated nodes)
+    - Data quality problems (empty names, low confidence)
+    - Duplicate entities and inconsistencies
+    - Graph statistics and health metrics
+    """
 
     def __init__(self) -> None:
         """Initialize graph validator"""
@@ -19,13 +44,26 @@ class GraphValidator:
 
     def validate_graph(self, graph: KnowledgeGraph) -> Dict[str, Any]:
         """
-        Perform comprehensive graph validation
+        Perform comprehensive validation of the knowledge graph.
+
+        Executes a complete validation workflow including integrity checks,
+        connectivity analysis, data quality assessment, and recommendation generation.
+        Issues are categorized by severity and type for prioritized resolution.
 
         Args:
-            graph: Knowledge graph to validate
+            graph: Knowledge graph instance to validate
 
         Returns:
-            Dict[str, Any]: Validation results with issues and recommendations
+            Dict[str, Any]: Comprehensive validation results containing:
+                - valid: Boolean indicating overall graph validity
+                - issues: List of high-severity problems requiring immediate attention
+                - warnings: List of medium/low-severity issues for consideration
+                - recommendations: List of actionable improvement suggestions
+                - statistics: Validation-related graph statistics
+
+        Note:
+            Graph is considered invalid if any high-severity issues are found.
+            The validation process is non-destructive and doesn't modify the graph.
         """
         try:
             validation_result: Dict[str, Any] = {
@@ -100,7 +138,19 @@ class GraphValidator:
             }
 
     def _check_integrity(self, graph: KnowledgeGraph) -> List[Dict[str, Any]]:
-        """Check graph integrity constraints"""
+        """
+        Check fundamental graph integrity constraints.
+
+        Validates that all relations have valid entity references and checks
+        for duplicate entities that might indicate data quality issues.
+
+        Args:
+            graph: Knowledge graph to check
+
+        Returns:
+            List[Dict[str, Any]]: List of integrity issues found, each containing
+                type, severity, message, and relevant IDs for debugging.
+        """
         issues = []
 
         # Check relation entity references
@@ -146,9 +196,11 @@ class GraphValidator:
                 )
 
         # Check for duplicate entities with same name and type
+        from ..utils import get_type_value
+
         entity_signatures: Dict[tuple, str] = {}
         for entity_id, entity in graph.entities.items():
-            signature = (entity.name.lower().strip(), entity.entity_type.value)
+            signature = (entity.name.lower().strip(), get_type_value(entity.entity_type))
             if signature in entity_signatures:
                 issues.append(
                     {

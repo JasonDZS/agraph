@@ -5,209 +5,21 @@
 """
 
 import asyncio
-import json
 import logging
-import os
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from openai import AsyncOpenAI
 
+from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
+from ..storage import JsonVectorStorage, VectorStorage
+from ..utils import get_type_value
 
 logger = logging.getLogger(__name__)
-
-
-class VectorStorage(ABC):
-    """向量存储基类"""
-
-    @abstractmethod
-    def add_vector(self, vector_id: str, vector: np.ndarray, metadata: Optional[Dict] = None) -> bool:
-        """添加向量"""
-        pass
-
-    @abstractmethod
-    def get_vector(self, vector_id: str) -> Optional[np.ndarray]:
-        """获取向量"""
-        pass
-
-    @abstractmethod
-    def delete_vector(self, vector_id: str) -> bool:
-        """删除向量"""
-        pass
-
-    @abstractmethod
-    def search_similar_vectors(
-        self, query_vector: np.ndarray, top_k: int = 10, threshold: float = 0.0
-    ) -> List[Tuple[str, float]]:
-        """搜索相似向量"""
-        pass
-
-    @abstractmethod
-    def save_vectors(self, vectors: Dict[str, np.ndarray], metadata: Optional[Dict] = None) -> bool:
-        """批量保存向量"""
-        pass
-
-    @abstractmethod
-    def load_vectors(self) -> Tuple[Dict[str, np.ndarray], Dict]:
-        """加载所有向量"""
-        pass
-
-    @abstractmethod
-    def clear(self) -> bool:
-        """清空所有向量"""
-        pass
-
-    def compute_cosine_similarity(self, vector1: np.ndarray, vector2: np.ndarray) -> float:
-        """计算余弦相似度"""
-        try:
-            dot_product = np.dot(vector1, vector2)
-            norm_a = np.linalg.norm(vector1)
-            norm_b = np.linalg.norm(vector2)
-
-            if norm_a == 0 or norm_b == 0:
-                return 0.0
-
-            return float(dot_product / (norm_a * norm_b))
-        except Exception as e:
-            logger.error("Error computing cosine similarity: %s", e)
-            return 0.0
-
-
-class JsonVectorStorage(VectorStorage):
-    """基于JSON的向量存储实现"""
-
-    def __init__(self, file_path: str = "vectors.json"):
-        self.file_path = file_path
-        self.vectors: Dict[str, np.ndarray] = {}
-        self.metadata: Dict = {}
-        self._ensure_file_exists()
-
-    def _ensure_file_exists(self) -> None:
-        """确保存储文件存在"""
-        if not os.path.exists(self.file_path):
-            dir_path = os.path.dirname(self.file_path)
-            if dir_path:  # Only create directory if there is a directory part
-                os.makedirs(dir_path, exist_ok=True)
-            self._save_to_file({}, {})
-
-    def _save_to_file(self, vectors: Dict[str, np.ndarray], metadata: Dict) -> None:
-        """保存到文件"""
-        try:
-            data = {"vectors": {k: v.tolist() for k, v in vectors.items()}, "metadata": metadata}
-            with open(self.file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error("Error saving vectors to file: %s", e)
-
-    def _load_from_file(self) -> Tuple[Dict[str, np.ndarray], Dict]:
-        """从文件加载"""
-        try:
-            if not os.path.exists(self.file_path):
-                return {}, {}
-
-            with open(self.file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            vectors = {k: np.array(v, dtype=np.float32) for k, v in data.get("vectors", {}).items()}
-            metadata = data.get("metadata", {})
-            return vectors, metadata
-        except Exception as e:
-            logger.error("Error loading vectors from file: %s", e)
-            return {}, {}
-
-    def add_vector(self, vector_id: str, vector: np.ndarray, metadata: Optional[Dict] = None) -> bool:
-        """添加向量"""
-        try:
-            self.vectors[vector_id] = vector.astype(np.float32)
-            if metadata:
-                if "vector_metadata" not in self.metadata:
-                    self.metadata["vector_metadata"] = {}
-                self.metadata["vector_metadata"][vector_id] = metadata
-            return True
-        except Exception as e:
-            logger.error("Error adding vector %s: %s", vector_id, e)
-            return False
-
-    def get_vector(self, vector_id: str) -> Optional[np.ndarray]:
-        """获取向量"""
-        return self.vectors.get(vector_id)
-
-    def delete_vector(self, vector_id: str) -> bool:
-        """删除向量"""
-        try:
-            if vector_id in self.vectors:
-                del self.vectors[vector_id]
-                if "vector_metadata" in self.metadata and vector_id in self.metadata["vector_metadata"]:
-                    del self.metadata["vector_metadata"][vector_id]
-                return True
-            return False
-        except Exception as e:
-            logger.error("Error deleting vector %s: %s", vector_id, e)
-            return False
-
-    def search_similar_vectors(
-        self, query_vector: np.ndarray, top_k: int = 10, threshold: float = 0.0
-    ) -> List[Tuple[str, float]]:
-        """搜索相似向量"""
-        try:
-            similarities = []
-            for vector_id, vector in self.vectors.items():
-                similarity = self.compute_cosine_similarity(query_vector, vector)
-                if similarity >= threshold:
-                    similarities.append((vector_id, similarity))
-
-            # 按相似度降序排序
-            similarities.sort(key=lambda x: x[1], reverse=True)
-            return similarities[:top_k]
-        except Exception as e:
-            logger.error("Error searching similar vectors: %s", e)
-            return []
-
-    def save_vectors(self, vectors: Dict[str, np.ndarray], metadata: Optional[Dict] = None) -> bool:
-        """批量保存向量"""
-        try:
-            # 更新内存中的向量
-            for vector_id, vector in vectors.items():
-                self.vectors[vector_id] = vector.astype(np.float32)
-
-            # 更新元数据
-            if metadata:
-                self.metadata.update(metadata)
-
-            # 保存到文件
-            self._save_to_file(self.vectors, self.metadata)
-            return True
-        except Exception as e:
-            logger.error("Error saving vectors: %s", e)
-            return False
-
-    def load_vectors(self) -> Tuple[Dict[str, np.ndarray], Dict]:
-        """加载所有向量"""
-        try:
-            self.vectors, self.metadata = self._load_from_file()
-            return self.vectors, self.metadata
-        except Exception as e:
-            logger.error("Error loading vectors: %s", e)
-            return {}, {}
-
-    def clear(self) -> bool:
-        """清空所有向量"""
-        try:
-            self.vectors.clear()
-            self.metadata.clear()
-            self._save_to_file(self.vectors, self.metadata)
-            return True
-        except Exception as e:
-            logger.error("Error clearing vectors: %s", e)
-            return False
-
-    def save(self) -> None:
-        """保存当前状态到文件"""
-        self._save_to_file(self.vectors, self.metadata)
 
 
 class GraphEmbedding(ABC):
@@ -476,7 +288,7 @@ class GraphEmbedding(ABC):
         if entity.aliases:
             text_parts.append(f"Aliases: {', '.join(entity.aliases)}")
 
-        text_parts.append(f"Type: {entity.entity_type.value}")
+        text_parts.append(f"Type: {get_type_value(entity.entity_type)}")
 
         if entity.properties:
             properties_text = ", ".join([f"{k}: {v}" for k, v in entity.properties.items()])
@@ -490,7 +302,7 @@ class GraphEmbedding(ABC):
 
         if relation.head_entity and relation.tail_entity:
             text_parts.append(
-                f"Relation: {relation.head_entity.name} {relation.relation_type.value} {relation.tail_entity.name}"
+                f"Relation: {relation.head_entity.name} {get_type_value(relation.relation_type)} {relation.tail_entity.name}"
             )
 
         if relation.description:
@@ -512,7 +324,7 @@ class GraphEmbedding(ABC):
         """构建关系映射"""
         relation_types = set()
         for relation in graph.relations.values():
-            relation_types.add(relation.relation_type.value)
+            relation_types.add(get_type_value(relation.relation_type))
 
         relation_list = list(relation_types)
         self.relation_to_id = {relation: i for i, relation in enumerate(relation_list)}
@@ -560,6 +372,8 @@ class OpenAIEmbedding(GraphEmbedding):
 
     def _get_embedding_dim_for_model(self, model: str) -> int:
         """根据模型名称获取embedding维度"""
+        if settings.EMBEDDING_DIM:
+            return settings.EMBEDDING_DIM
         model_dims = {
             "text-embedding-3-small": 1536,
             "text-embedding-3-large": 3072,
@@ -654,10 +468,12 @@ class OpenAIEmbedding(GraphEmbedding):
         """将关系转换为文本"""
         parts = []
         if relation.head_entity and relation.tail_entity:
-            parts.append(f"{relation.head_entity.name} {relation.relation_type.value} {relation.tail_entity.name}")
+            parts.append(
+                f"{relation.head_entity.name} {get_type_value(relation.relation_type)} {relation.tail_entity.name}"
+            )
         if relation.description:
             parts.append(relation.description)
-        return " ".join(parts) if parts else relation.relation_type.value
+        return " ".join(parts) if parts else get_type_value(relation.relation_type)
 
     async def _get_embeddings_batch(self, texts: List[str]) -> List[np.ndarray]:
         """批量获取文本嵌入"""

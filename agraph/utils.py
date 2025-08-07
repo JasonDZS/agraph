@@ -1,46 +1,64 @@
 """
-知识图谱工具函数
+Knowledge graph utility functions.
+
+This module provides utility functions for knowledge graph operations including
+export to visualization formats, graph analysis, path finding, and validation.
 """
 
 import logging
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .graph import KnowledgeGraph
 from .relations import Relation
+from .types import EntityType, RelationType
 
 logger = logging.getLogger(__name__)
 
 
-def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
+def get_type_value(type_obj: Union[EntityType, RelationType, str]) -> str:
     """
-    将知识图谱导出为Cytoscape.js格式
+    Safely get the value from a type object that could be an enum or string.
 
     Args:
-        graph: 知识图谱
+        type_obj: The type object (EntityType, RelationType, or string)
 
     Returns:
-        Dict[str, Any]: Cytoscape.js格式的数据
+        str: The string value of the type
+    """
+    if hasattr(type_obj, "value"):
+        return str(type_obj.value)
+    return str(type_obj)
+
+
+def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
+    """Export knowledge graph to Cytoscape.js format.
+
+    Args:
+        graph: The knowledge graph to export.
+
+    Returns:
+        Dict[str, Any]: Data in Cytoscape.js format with nodes and edges.
     """
     nodes = []
     edges: List[Dict[str, Any]] = []
 
-    # 转换实体为节点
+    # Convert entities to nodes
     for entity in graph.entities.values():
         node = {
             "data": {
                 "id": entity.id,
                 "label": entity.name,
-                "type": getattr(entity.entity_type, "value", str(entity.entity_type)),
+                "type": get_type_value(entity.entity_type),
                 "description": entity.description,
                 "confidence": entity.confidence,
                 "source": entity.source,
             },
-            "classes": getattr(entity.entity_type, "value", str(entity.entity_type)),
+            "classes": get_type_value(entity.entity_type),
         }
         nodes.append(node)
 
-    # 处理关系（边）
+    # Process relations as edges
     edges = []
     for relation in graph.relations.values():
         if relation.head_entity is None or relation.tail_entity is None:
@@ -50,12 +68,12 @@ def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
                 "id": relation.id,
                 "source": relation.head_entity.id,
                 "target": relation.tail_entity.id,
-                "label": getattr(relation.relation_type, "value", str(relation.relation_type)),
-                "type": getattr(relation.relation_type, "value", str(relation.relation_type)),
+                "label": get_type_value(relation.relation_type),
+                "type": get_type_value(relation.relation_type),
                 "confidence": relation.confidence,
                 "source_info": relation.source,
             },
-            "classes": getattr(relation.relation_type, "value", str(relation.relation_type)),
+            "classes": get_type_value(relation.relation_type),
         }
         edges.append(edge)
 
@@ -72,36 +90,35 @@ def export_graph_to_cytoscape(graph: KnowledgeGraph) -> Dict[str, Any]:
 
 
 def export_graph_to_d3(graph: KnowledgeGraph) -> Dict[str, Any]:
-    """
-    将知识图谱导出为D3.js格式
+    """Export knowledge graph to D3.js format.
 
     Args:
-        graph: 知识图谱
+        graph: The knowledge graph to export.
 
     Returns:
-        Dict[str, Any]: D3.js格式的数据
+        Dict[str, Any]: Data in D3.js format with nodes and links.
     """
     nodes = []
     links = []
 
-    # 创建节点ID映射
+    # Create node ID mapping
     node_id_map = {entity_id: i for i, entity_id in enumerate(graph.entities.keys())}
 
-    # 转换实体为节点
+    # Convert entities to nodes
     for i, entity in enumerate(graph.entities.values()):
         node = {
             "id": i,
             "entity_id": entity.id,
             "name": entity.name,
-            "type": getattr(entity.entity_type, "value", str(entity.entity_type)),
+            "type": get_type_value(entity.entity_type),
             "description": entity.description,
             "confidence": entity.confidence,
-            "group": getattr(entity.entity_type, "value", str(entity.entity_type)),
-            "size": max(5, min(20, entity.confidence * 15)),  # 根据置信度设置大小
+            "group": get_type_value(entity.entity_type),
+            "size": max(5, min(20, entity.confidence * 15)),  # Set size based on confidence
         }
         nodes.append(node)
 
-    # 转换关系为链接
+    # Convert relations to links
     for relation in graph.relations.values():
         if (
             relation.head_entity is not None
@@ -114,9 +131,9 @@ def export_graph_to_d3(graph: KnowledgeGraph) -> Dict[str, Any]:
                 "source": node_id_map[relation.head_entity.id],
                 "target": node_id_map[relation.tail_entity.id],
                 "relation_id": relation.id,
-                "type": getattr(relation.relation_type, "value", str(relation.relation_type)),
+                "type": get_type_value(relation.relation_type),
                 "confidence": relation.confidence,
-                "value": relation.confidence,  # D3中的链接权重
+                "value": relation.confidence,  # Link weight in D3
             }
             links.append(link)
 
@@ -133,16 +150,16 @@ def export_graph_to_d3(graph: KnowledgeGraph) -> Dict[str, Any]:
 
 
 def find_shortest_path(graph: KnowledgeGraph, start_entity_id: str, end_entity_id: str) -> Optional[List[Relation]]:
-    """
-    查找两个实体间的最短路径
+    """Find the shortest path between two entities.
 
     Args:
-        graph: 知识图谱
-        start_entity_id: 起始实体ID
-        end_entity_id: 目标实体ID
+        graph: The knowledge graph to search.
+        start_entity_id: The ID of the starting entity.
+        end_entity_id: The ID of the target entity.
 
     Returns:
-        List[Relation]: 最短路径上的关系列表，如果不存在路径则返回None
+        Optional[List[Relation]]: List of relations on the shortest path,
+                                 or None if no path exists.
     """
     if start_entity_id not in graph.entities or end_entity_id not in graph.entities:
         return None
@@ -150,7 +167,7 @@ def find_shortest_path(graph: KnowledgeGraph, start_entity_id: str, end_entity_i
     if start_entity_id == end_entity_id:
         return []
 
-    # BFS查找最短路径
+    # BFS to find shortest path
 
     queue: deque = deque([(start_entity_id, [])])
     visited = {start_entity_id}
@@ -158,7 +175,7 @@ def find_shortest_path(graph: KnowledgeGraph, start_entity_id: str, end_entity_i
     while queue:
         current_entity_id, path = queue.popleft()
 
-        # 获取当前实体的所有邻居
+        # Get all neighbors of current entity
         # neighbors = graph.get_neighbors(current_entity_id)
         relations = graph.get_entity_relations(current_entity_id, direction="out")
 
@@ -179,23 +196,22 @@ def find_shortest_path(graph: KnowledgeGraph, start_entity_id: str, end_entity_i
 
 
 def calculate_graph_metrics(graph: KnowledgeGraph) -> Dict[str, Any]:
-    """
-    计算图谱的网络指标
+    """Calculate network metrics for the knowledge graph.
 
     Args:
-        graph: 知识图谱
+        graph: The knowledge graph to analyze.
 
     Returns:
-        Dict[str, Any]: 图谱指标
+        Dict[str, Any]: Dictionary containing various graph metrics and statistics.
     """
     if not graph.entities:
         return {}
 
-    # 基本统计
+    # Basic statistics
     node_count = len(graph.entities)
     edge_count = len(graph.relations)
 
-    # 计算度分布
+    # Calculate degree distribution
     degree_map = {}
     in_degree_map = {}
     out_degree_map = {}
@@ -209,20 +225,20 @@ def calculate_graph_metrics(graph: KnowledgeGraph) -> Dict[str, Any]:
         in_degree_map[entity_id] = in_degree
         out_degree_map[entity_id] = out_degree
 
-    # 统计指标
+    # Statistical metrics
     degrees = list(degree_map.values())
     avg_degree = sum(degrees) / len(degrees) if degrees else 0
     max_degree = max(degrees) if degrees else 0
     min_degree = min(degrees) if degrees else 0
 
-    # 密度计算
+    # Density calculation
     max_possible_edges = node_count * (node_count - 1)
     density = (2 * edge_count) / max_possible_edges if max_possible_edges > 0 else 0
 
-    # 找出度最高的节点（中心节点）
+    # Find nodes with highest degree (central nodes)
     central_nodes = sorted(degree_map.items(), key=lambda x: x[1], reverse=True)[:5]
 
-    # 连通性分析
+    # Connectivity analysis
     components = _find_connected_components(graph)
 
     return {
@@ -254,7 +270,14 @@ def calculate_graph_metrics(graph: KnowledgeGraph) -> Dict[str, Any]:
 
 
 def _find_connected_components(graph: KnowledgeGraph) -> List[List[str]]:
-    """查找连通分量"""
+    """Find connected components in the graph.
+
+    Args:
+        graph: The knowledge graph to analyze.
+
+    Returns:
+        List[List[str]]: List of connected components, each containing entity IDs.
+    """
     visited: set[str] = set()
     components = []
 
@@ -267,7 +290,16 @@ def _find_connected_components(graph: KnowledgeGraph) -> List[List[str]]:
 
 
 def _dfs_component(graph: KnowledgeGraph, start_id: str, visited: set) -> List[str]:
-    """使用DFS找到一个连通分量"""
+    """Use DFS to find a connected component.
+
+    Args:
+        graph: The knowledge graph to search.
+        start_id: The starting entity ID for DFS.
+        visited: Set of already visited entity IDs.
+
+    Returns:
+        List[str]: List of entity IDs in the connected component.
+    """
     component = []
     stack = [start_id]
 
@@ -277,7 +309,7 @@ def _dfs_component(graph: KnowledgeGraph, start_id: str, visited: set) -> List[s
             visited.add(current)
             component.append(current)
 
-            # 添加邻居节点
+            # Add neighbor nodes
             neighbors = graph.get_neighbors(current)
             for neighbor in neighbors:
                 if neighbor.id not in visited:
@@ -287,31 +319,37 @@ def _dfs_component(graph: KnowledgeGraph, start_id: str, visited: set) -> List[s
 
 
 def _calculate_type_distribution(graph: KnowledgeGraph) -> Dict[str, Any]:
-    """计算类型分布"""
+    """Calculate type distribution for entities and relations.
+
+    Args:
+        graph: The knowledge graph to analyze.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing entity and relation type distributions.
+    """
     entity_types: Dict[str, int] = {}
     relation_types: Dict[str, int] = {}
 
     for entity in graph.entities.values():
-        entity_type = getattr(entity.entity_type, "value", str(entity.entity_type))
+        entity_type = get_type_value(entity.entity_type)
         entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
 
     for relation in graph.relations.values():
-        relation_type = getattr(relation.relation_type, "value", str(relation.relation_type))
+        relation_type = get_type_value(relation.relation_type)
         relation_types[relation_type] = relation_types.get(relation_type, 0) + 1
 
     return {"entity_types": entity_types, "relation_types": relation_types}
 
 
 def merge_similar_entities(graph: KnowledgeGraph, similarity_threshold: float = 0.8) -> int:
-    """
-    合并相似的实体
+    """Merge similar entities in the knowledge graph.
 
     Args:
-        graph: 知识图谱
-        similarity_threshold: 相似度阈值
+        graph: The knowledge graph to process.
+        similarity_threshold: Similarity threshold for merging (0.0 to 1.0).
 
     Returns:
-        int: 合并的实体数量
+        int: Number of entities merged.
     """
     merged_count = 0
     entities_to_remove: set[str] = set()
@@ -326,11 +364,11 @@ def merge_similar_entities(graph: KnowledgeGraph, similarity_threshold: float = 
             if entity2.id in entities_to_remove:
                 continue
 
-            # 计算名称相似度
+            # Calculate name similarity
             similarity = _calculate_name_similarity(entity1.name, entity2.name)
 
             if similarity >= similarity_threshold:
-                # 合并实体（注意：merge_entity 方法需要实现）
+                # Merge entities (Note: merge_entity method needs to be implemented)
                 # if graph.merge_entity(entity1, entity2):
                 #     entities_to_remove.add(entity2.id)
                 #     merged_count += 1
@@ -343,7 +381,15 @@ def merge_similar_entities(graph: KnowledgeGraph, similarity_threshold: float = 
 
 
 def _calculate_name_similarity(name1: str, name2: str) -> float:
-    """计算名称相似度（简单的Jaccard相似度）"""
+    """Calculate name similarity using simple Jaccard similarity.
+
+    Args:
+        name1: First name to compare.
+        name2: Second name to compare.
+
+    Returns:
+        float: Similarity score between 0.0 and 1.0.
+    """
     set1 = set(name1.lower().split())
     set2 = set(name2.lower().split())
 
@@ -354,25 +400,24 @@ def _calculate_name_similarity(name1: str, name2: str) -> float:
 
 
 def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
-    """
-    验证图谱一致性
+    """Validate graph consistency and find issues.
 
     Args:
-        graph: 知识图谱
+        graph: The knowledge graph to validate.
 
     Returns:
-        List[Dict[str, Any]]: 一致性问题列表
+        List[Dict[str, Any]]: List of consistency issues found.
     """
     issues = []
 
-    # 检查关系的实体引用
+    # Check entity references in relations
     for relation in graph.relations.values():
         if not relation.head_entity or relation.head_entity.id not in graph.entities:
             issues.append(
                 {
                     "type": "missing_head_entity",
                     "relation_id": relation.id,
-                    "description": f"关系 {relation.id} 的头实体不存在",
+                    "description": f"Relation {relation.id} has missing head entity",
                 }
             )
 
@@ -381,18 +426,18 @@ def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
                 {
                     "type": "missing_tail_entity",
                     "relation_id": relation.id,
-                    "description": f"关系 {relation.id} 的尾实体不存在",
+                    "description": f"Relation {relation.id} has missing tail entity",
                 }
             )
 
-    # 检查重复的关系
+    # Check for duplicate relations
     relation_signatures: Dict[str, List[str]] = {}
     for relation in graph.relations.values():
         if relation.head_entity and relation.tail_entity:
             signature_tuple = (
                 relation.head_entity.id,
                 relation.tail_entity.id,
-                getattr(relation.relation_type, "value", str(relation.relation_type)),
+                get_type_value(relation.relation_type),
             )
             signature = str(signature_tuple)
 
@@ -402,13 +447,13 @@ def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
                     {
                         "type": "duplicate_relation",
                         "relation_id": relation.id,
-                        "description": f"发现重复关系: {signature}",
+                        "description": f"Found duplicate relation: {signature}",
                     }
                 )
             else:
                 relation_signatures[signature] = [relation.id]
 
-    # 检查自环关系
+    # Check for self-loop relations
     for relation in graph.relations.values():
         if relation.head_entity and relation.tail_entity and relation.head_entity.id == relation.tail_entity.id:
             issues.append(
@@ -416,7 +461,7 @@ def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
                     "type": "self_loop",
                     "relation_id": relation.id,
                     "entity_id": relation.head_entity.id,
-                    "description": f"实体 {relation.head_entity.name} 存在自环关系",
+                    "description": f"Entity {relation.head_entity.name} has self-loop relation",
                 }
             )
 
@@ -424,56 +469,55 @@ def validate_graph_consistency(graph: KnowledgeGraph) -> List[Dict[str, Any]]:
 
 
 def create_graph_summary(graph: KnowledgeGraph) -> str:
-    """
-    创建图谱摘要报告
+    """Create a summary report of the knowledge graph.
 
     Args:
-        graph: 知识图谱
+        graph: The knowledge graph to summarize.
 
     Returns:
-        str: 图谱摘要
+        str: A formatted summary report of the graph.
     """
     stats = graph.get_basic_statistics()
     metrics = calculate_graph_metrics(graph)
 
     summary = f"""
-知识图谱摘要报告
-==================
+Knowledge Graph Summary Report
+==============================
 
-基本信息:
-- 图谱名称: {graph.name}
-- 图谱ID: {graph.id}
-- 创建时间: {graph.created_at.strftime('%Y-%m-%d %H:%M:%S')}
-- 更新时间: {graph.updated_at.strftime('%Y-%m-%d %H:%M:%S')}
+Basic Information:
+- Graph Name: {graph.name}
+- Graph ID: {graph.id}
+- Created: {graph.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+- Updated: {graph.updated_at.strftime('%Y-%m-%d %H:%M:%S')}
 
-统计信息:
-- 实体数量: {stats['total_entities']}
-- 关系数量: {stats['total_relations']}
-- 图密度: {metrics.get('basic_stats', {}).get('density', 0):.4f}
-- 平均度数: {metrics.get('basic_stats', {}).get('avg_degree', 0):.2f}
+Statistics:
+- Total Entities: {stats['total_entities']}
+- Total Relations: {stats['total_relations']}
+- Graph Density: {metrics.get('basic_stats', {}).get('density', 0):.4f}
+- Average Degree: {metrics.get('basic_stats', {}).get('avg_degree', 0):.2f}
 
-实体类型分布:
+Entity Type Distribution:
 """
 
     for entity_type, count in stats.get("entity_types", {}).items():
-        summary += f"- {entity_type}: {count}个\n"
+        summary += f"- {entity_type}: {count} entities\n"
 
-    summary += "\n关系类型分布:\n"
+    summary += "\nRelation Type Distribution:\n"
     for relation_type, count in stats.get("relation_types", {}).items():
-        summary += f"- {relation_type}: {count}个\n"
+        summary += f"- {relation_type}: {count} relations\n"
 
-    # 添加中心节点
+    # Add central nodes
     central_nodes = metrics.get("centrality", {}).get("top_central_nodes", [])
     if central_nodes:
-        summary += "\n中心节点 (度数最高):\n"
+        summary += "\nCentral Nodes (Highest Degree):\n"
         for node in central_nodes[:3]:
-            summary += f"- {node['entity_name']} (度数: {node['degree']})\n"
+            summary += f"- {node['entity_name']} (degree: {node['degree']})\n"
 
-    # 连通性信息
+    # Connectivity information
     connectivity = metrics.get("connectivity", {})
-    summary += "\n连通性:\n"
-    summary += f"- 连通分量数: {connectivity.get('connected_components', 0)}\n"
-    summary += f"- 最大连通分量大小: {connectivity.get('largest_component_size', 0)}\n"
-    summary += f"- 是否连通: {'是' if connectivity.get('is_connected', False) else '否'}\n"
+    summary += "\nConnectivity:\n"
+    summary += f"- Connected Components: {connectivity.get('connected_components', 0)}\n"
+    summary += f"- Largest Component Size: {connectivity.get('largest_component_size', 0)}\n"
+    summary += f"- Is Connected: {'Yes' if connectivity.get('is_connected', False) else 'No'}\n"
 
     return summary

@@ -34,14 +34,16 @@ from .graph import KnowledgeGraph
 from .relations import Relation
 
 # 检索
-from .retrieval import KnowledgeRetriever
+from .retrieval import ChatKnowledgeRetriever, KnowledgeRetriever
 
 # 服务
 from .services import EntityMerger, GraphAnalyzer, GraphPathFinder, GraphValidator
 
 # 存储
-from .storage import GraphStorage, JsonStorage, Neo4jStorage
-from .storage.interfaces import BasicGraphStorage, FullGraphStorage, QueryableGraphStorage
+from .storage import GraphStorage, JsonStorage
+from .storage import JsonVectorStorage as StorageJsonVectorStorage  # 区别于embeddings的版本
+from .storage import Neo4jStorage
+from .storage.interfaces import BasicGraphStorage, FullGraphStorage, QueryableGraphStorage, VectorStorage
 
 # 核心数据结构
 from .types import EntityType, RelationType
@@ -72,10 +74,12 @@ __all__ = [
     "GraphStorage",
     "Neo4jStorage",
     "JsonStorage",
+    "StorageJsonVectorStorage",
     # 嵌入
     "GraphEmbedding",
     # 检索
     "KnowledgeRetriever",
+    "ChatKnowledgeRetriever",
     # 服务
     "GraphAnalyzer",
     "GraphPathFinder",
@@ -85,4 +89,5 @@ __all__ = [
     "BasicGraphStorage",
     "QueryableGraphStorage",
     "FullGraphStorage",
+    "VectorStorage",
 ]

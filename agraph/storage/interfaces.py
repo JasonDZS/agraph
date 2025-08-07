@@ -9,13 +9,17 @@ Each interface has a single, well-defined responsibility:
 - GraphExport: Export functionality
 """
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
-from ..types import RelationType
+
+logger = logging.getLogger(__name__)
 
 
 class GraphConnection(ABC):
@@ -213,7 +217,7 @@ class GraphQuery(ABC):
         self,
         head_entity: Optional[str] = None,
         tail_entity: Optional[str] = None,
-        relation_type: Optional[RelationType] = None,
+        relation_type: Optional[Any] = None,
         **kwargs: Any,
     ) -> List[Relation]:
         """
@@ -324,3 +328,108 @@ class ReadOnlyGraphStorage(GraphConnection, GraphQuery, GraphStatistics):
     """Read-only graph storage interface"""
 
     pass
+
+
+# Vector Storage Interfaces
+
+
+class VectorStorageConnection(ABC):
+    """Interface for vector storage connection management"""
+
+    @abstractmethod
+    def connect(self) -> bool:
+        """Connect to vector storage backend"""
+        pass
+
+    @abstractmethod
+    def disconnect(self) -> None:
+        """Disconnect from vector storage backend"""
+        pass
+
+    @abstractmethod
+    def is_connected(self) -> bool:
+        """Check if connected to vector storage backend"""
+        pass
+
+
+class VectorStorageCRUD(ABC):
+    """Interface for vector CRUD operations"""
+
+    @abstractmethod
+    def add_vector(self, vector_id: str, vector: Any, metadata: Optional[Dict] = None) -> bool:
+        """Add vector to storage"""
+        pass
+
+    @abstractmethod
+    def get_vector(self, vector_id: str) -> Optional[Any]:
+        """Get vector from storage"""
+        pass
+
+    @abstractmethod
+    def delete_vector(self, vector_id: str) -> bool:
+        """Delete vector from storage"""
+        pass
+
+    @abstractmethod
+    def save_vectors(self, vectors: Dict[str, Any], metadata: Optional[Dict] = None) -> bool:
+        """Batch save vectors"""
+        pass
+
+    @abstractmethod
+    def load_vectors(self) -> tuple[Dict[str, Any], Dict]:
+        """Load all vectors"""
+        pass
+
+    @abstractmethod
+    def clear(self) -> bool:
+        """Clear all vectors"""
+        pass
+
+
+class VectorStorageQuery(ABC):
+    """Interface for vector query operations"""
+
+    @abstractmethod
+    def search_similar_vectors(
+        self, query_vector: Any, top_k: int = 10, threshold: float = 0.0
+    ) -> List[tuple[str, float]]:
+        """Search for similar vectors"""
+        pass
+
+    @staticmethod
+    def compute_cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+        """
+        Compute cosine similarity between two vectors.
+
+        Args:
+            vec1: First vector
+            vec2: Second vector
+
+        Returns:
+            float: Similarity score (0-1)
+        """
+        try:
+            dot_product = np.dot(vec1, vec2)
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
+
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+
+            similarity = dot_product / (norm1 * norm2)
+            return float(max(0.0, min(1.0, similarity)))
+        except Exception as e:
+            logger.error("Error computing cosine similarity: %s", e)
+            return 0.0
+
+
+class VectorStorage(VectorStorageConnection, VectorStorageCRUD, VectorStorageQuery):
+    """Complete vector storage interface"""
+
+    def save(self) -> None:
+        """
+        Save the current state of the vector storage.
+
+        This method should be implemented to persist the current state
+        to a file or database.
+        """

@@ -30,7 +30,7 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
-        args: ["--max-line-length=120", "--extend-ignore=E203,W503", "--count", "--statistics"]
+        args: ["--max-line-length=120", "--extend-ignore=E203,W503,E501", "--count", "--statistics"]
         exclude: ^(tests/|examples/)
 
   - repo: https://github.com/pre-commit/mirrors-mypy

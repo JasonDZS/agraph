@@ -19,6 +19,7 @@ from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..relations import Relation
 from ..types import EntityType, RelationType
+from ..utils import get_type_value
 from .interfaces import (
     BasicGraphBuilder,
     BatchGraphBuilder,
@@ -42,15 +43,31 @@ T = TypeVar("T")
 
 
 class LightRAGCore:
-    """LightRAG核心功能类 - 单一职责：管理LightRAG实例和GraphML解析"""
+    """Core LightRAG functionality class with single responsibility for managing LightRAG instances and GraphML parsing.
+
+    This class encapsulates all LightRAG-specific operations including initialization,
+    document processing, graph building, and GraphML file handling. It follows the
+    single responsibility principle by focusing solely on LightRAG operations.
+
+    Attributes:
+        working_dir: Directory path for LightRAG storage and generated files.
+        rag_instance: The initialized LightRAG instance.
+        _initialized: Flag indicating whether the LightRAG instance is properly initialized.
+    """
 
     def __init__(self, working_dir: str = "lightrag_storage"):
+        """Initialize the LightRAG core functionality.
+
+        Args:
+            working_dir: Directory path for storing LightRAG data and generated files.
+                Defaults to "lightrag_storage".
+        """
         self.working_dir = Path(working_dir)
         self.rag_instance: Optional[Any] = None
         self._initialized: bool = False
 
     def __del__(self) -> None:
-        """确保资源被正确清理"""
+        """Ensure resources are properly cleaned up during garbage collection."""
         if self._initialized and self.rag_instance:
             try:
                 self.cleanup()
@@ -58,22 +75,34 @@ class LightRAGCore:
                 pass
 
     async def initialize_lightrag(self) -> Any:
-        """初始化LightRAG实例"""
+        """Initialize the LightRAG instance with custom configuration.
+
+        This method sets up the LightRAG instance with custom LLM and embedding functions
+        based on the application settings. It ensures that the instance is only initialized
+        once and handles all necessary storage and pipeline initialization.
+
+        Returns:
+            Any: The initialized LightRAG instance.
+
+        Raises:
+            ImportError: If LightRAG is not installed.
+            RuntimeError: If initialization fails for any reason.
+        """
         if self._initialized and self.rag_instance is not None:
             return self.rag_instance
 
         try:
             # pylint: disable=import-outside-toplevel
-            # 延迟导入LightRAG以避免依赖问题
+            # Lazy import of LightRAG to avoid dependency issues
             from lightrag import LightRAG
             from lightrag.kg.shared_storage import initialize_pipeline_status
             from lightrag.llm.openai import openai_complete_if_cache, openai_embed
             from lightrag.utils import EmbeddingFunc
 
-            # 确保工作目录存在
+            # Ensure working directory exists
             self.working_dir.mkdir(parents=True, exist_ok=True)
 
-            # 创建自定义LLM函数
+            # Create custom LLM function
             async def custom_llm_complete(
                 prompt: str,
                 system_prompt: Optional[str] = None,
@@ -91,7 +120,7 @@ class LightRAGCore:
                 )
                 return str(result)
 
-            # 创建自定义嵌入函数
+            # Create custom embedding function
             async def custom_embed(texts: List[str]) -> List[List[float]]:
                 result = await openai_embed(
                     texts,
@@ -101,7 +130,7 @@ class LightRAGCore:
                 )
                 return list(result)
 
-            # 初始化LightRAG实例
+            # Initialize LightRAG instance
             self.rag_instance = LightRAG(
                 working_dir=str(self.working_dir),
                 llm_model_func=custom_llm_complete,
@@ -112,10 +141,10 @@ class LightRAGCore:
                 ),
             )
 
-            # 重要：两个初始化调用都是必需的！
+            # Critical: Both initialization calls are required!
             if self.rag_instance:
-                await self.rag_instance.initialize_storages()  # 初始化存储后端
-            await initialize_pipeline_status()  # 初始化处理管道
+                await self.rag_instance.initialize_storages()  # Initialize storage backends
+            await initialize_pipeline_status()  # Initialize processing pipeline
 
             self._initialized = True
             logger.info("LightRAG initialized with working directory: %s", self.working_dir)
@@ -137,7 +166,21 @@ class LightRAGCore:
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "lightrag_graph",
     ) -> KnowledgeGraph:
-        """异步构建知识图谱的核心实现"""
+        """Asynchronously build a knowledge graph from input data.
+
+        This is the main entry point for graph building operations. It delegates
+        to the internal implementation while providing a clean public interface.
+
+        Args:
+            texts: List of text documents to process for entity and relation extraction.
+            database_schema: Database schema information (currently not used but kept
+                for interface compatibility).
+            graph_name: Name identifier for the generated knowledge graph.
+
+        Returns:
+            KnowledgeGraph: Constructed knowledge graph containing extracted entities
+                and relations from the input texts.
+        """
         return await self.abuild_graph(texts, database_schema, graph_name)
 
     async def abuild_graph(
@@ -146,31 +189,45 @@ class LightRAGCore:
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "lightrag_graph",
     ) -> KnowledgeGraph:
+        """Internal implementation for asynchronously building knowledge graphs.
+
+        This method handles the core logic of graph construction using LightRAG,
+        including text processing, GraphML file generation, and graph loading.
+
+        Args:
+            texts: List of text documents to process.
+            database_schema: Database schema information (currently unused).
+            graph_name: Name for the generated graph.
+
+        Returns:
+            KnowledgeGraph: The constructed knowledge graph.
+
+        Raises:
+            RuntimeError: If LightRAG instance initialization fails.
+            Exception: For any other errors during graph building.
         """
-        异步构建知识图谱的内部实现
-        """
-        # 初始化RAG实例
+        # Initialize RAG instance
         await self.initialize_lightrag()
 
-        # 确保实例已初始化
+        # Ensure instance is initialized
         if self.rag_instance is None:
             raise RuntimeError("Failed to initialize LightRAG instance")
 
         try:
             logger.info("Building knowledge graph with LightRAG: %s", graph_name)
 
-            # 处理文本输入
+            # Process text inputs
             if texts:
                 for i, text in enumerate(texts):
                     logger.info("Inserting text document %d/%d", i + 1, len(texts))
-                    # 使用异步版本插入文档
+                    # Use asynchronous version to insert documents
                     await self.rag_instance.ainsert(text)
 
-            # 等待LightRAG处理完成并生成GraphML文件
+            # Wait for LightRAG to complete processing and generate GraphML file
             graphml_file = self.working_dir / "graph_chunk_entity_relation.graphml"
 
             if graphml_file.exists():
-                # 从GraphML文件加载知识图谱
+                # Load knowledge graph from GraphML file
                 graph = self._load_graph_from_graphml(str(graphml_file), graph_name)
                 logger.info(
                     "Successfully built graph: %d entities, %d relations",
@@ -191,17 +248,43 @@ class LightRAGCore:
         texts: List[str],
         graph_name: Optional[str] = None,
     ) -> KnowledgeGraph:
-        """使用新文本更新图谱的核心实现"""
+        """Update the knowledge graph with new texts asynchronously.
+
+        This method provides the main entry point for updating an existing
+        knowledge graph with additional text documents.
+
+        Args:
+            texts: List of new text documents to add to the graph.
+            graph_name: Optional name for the updated graph.
+
+        Returns:
+            KnowledgeGraph: Updated knowledge graph containing both existing
+                and new entities and relations.
+        """
         return await self.aadd_documents(texts, graph_name)
 
     async def aadd_documents(self, documents: List[str], graph_name: Optional[str] = None) -> KnowledgeGraph:
+        """Internal implementation for asynchronously adding documents to the graph.
+
+        This method handles the core logic of document addition, including
+        processing new documents through LightRAG and reloading the updated graph.
+
+        Args:
+            documents: List of documents to add to the knowledge graph.
+            graph_name: Optional name for the updated graph. If None,
+                defaults to "lightrag_graph".
+
+        Returns:
+            KnowledgeGraph: Updated knowledge graph with new documents processed.
+
+        Raises:
+            RuntimeError: If LightRAG instance initialization fails.
+            Exception: For any other errors during document addition.
         """
-        异步添加文档的内部实现
-        """
-        # 初始化RAG实例
+        # Initialize RAG instance
         await self.initialize_lightrag()
 
-        # 确保实例已初始化
+        # Ensure instance is initialized
         if self.rag_instance is None:
             raise RuntimeError("Failed to initialize LightRAG instance")
 
@@ -212,7 +295,7 @@ class LightRAGCore:
                 logger.info("Adding document %d/%d", i + 1, len(documents))
                 await self.rag_instance.ainsert(doc)
 
-            # 重新加载图谱
+            # Reload the graph
             graphml_file = self.working_dir / "graph_chunk_entity_relation.graphml"
             if graphml_file.exists():
                 graph = self._load_graph_from_graphml(str(graphml_file), graph_name or "lightrag_graph")
@@ -232,20 +315,38 @@ class LightRAGCore:
     async def asearch_graph(
         self, query: str, search_type: Literal["naive", "local", "global", "hybrid"] = "hybrid"
     ) -> Dict[str, Any]:
+        """Internal implementation for asynchronously searching the knowledge graph.
+
+        This method provides semantic search capabilities over the knowledge graph
+        using different search strategies supported by LightRAG.
+
+        Args:
+            query: Search query string to find relevant information.
+            search_type: Type of search strategy to use. Options are:
+                - "naive": Simple keyword-based search
+                - "local": Local neighborhood search
+                - "global": Global graph search
+                - "hybrid": Combination of local and global search (default)
+
+        Returns:
+            Dict[str, Any]: Search results containing query, search type,
+                result data, and timestamp.
+
+        Raises:
+            RuntimeError: If LightRAG instance initialization fails.
+            Exception: For any other errors during search operation.
         """
-        异步搜索图谱的内部实现
-        """
-        # 初始化RAG实例
+        # Initialize RAG instance
         await self.initialize_lightrag()
 
-        # 确保实例已初始化
+        # Ensure instance is initialized
         if self.rag_instance is None:
             raise RuntimeError("Failed to initialize LightRAG instance")
 
         try:
             logger.info("Searching graph with query: %s, type: %s", query, search_type)
 
-            # 根据搜索类型调用相应的查询方法
+            # Call appropriate query method based on search type
             from lightrag import QueryParam  # pylint: disable=import-outside-toplevel
 
             param = QueryParam(mode=search_type)
@@ -263,13 +364,16 @@ class LightRAGCore:
             raise
 
     def cleanup(self) -> None:
-        """
-        清理LightRAG资源 - 使用同步方式避免事件循环问题
+        """Clean up LightRAG resources using synchronous approach to avoid event loop issues.
+
+        This method performs resource cleanup in a synchronous manner to prevent
+        issues with event loop creation during cleanup operations. It safely
+        disposes of the LightRAG instance and resets the initialization state.
         """
         if self.rag_instance:
             try:
-                # 尝试同步清理，避免创建新的事件循环
-                # 直接设置为None，让Python垃圾回收处理
+                # Attempt synchronous cleanup to avoid creating new event loops
+                # Set to None directly and let Python garbage collection handle cleanup
                 logger.info("LightRAG resources cleaned up (sync mode)")
                 self.rag_instance = None
                 self._initialized = False
@@ -279,28 +383,33 @@ class LightRAGCore:
                 self._initialized = False
 
     def _load_graph_from_graphml(self, graphml_file: str, graph_name: str) -> KnowledgeGraph:
-        """
-        从GraphML文件加载知识图谱
+        """Load a knowledge graph from a GraphML file.
+
+        This method parses a GraphML file generated by LightRAG and converts
+        it into a KnowledgeGraph object with proper entity and relation mappings.
 
         Args:
-            graphml_file: GraphML文件路径
-            graph_name: 图谱名称
+            graphml_file: Path to the GraphML file to load.
+            graph_name: Name to assign to the loaded knowledge graph.
 
         Returns:
-            KnowledgeGraph: 加载的知识图谱
+            KnowledgeGraph: The loaded knowledge graph with entities and relations.
+
+        Raises:
+            Exception: If there are errors parsing the GraphML file or creating entities/relations.
         """
         try:
-            # 解析GraphML文件
+            # Parse GraphML file
             tree = ET.parse(graphml_file)
             root = tree.getroot()
 
-            # GraphML命名空间
+            # GraphML namespace
             ns = {"graphml": "http://graphml.graphdrawing.org/xmlns"}
 
-            # 创建知识图谱
+            # Create knowledge graph
             graph = KnowledgeGraph(name=graph_name)
 
-            # 解析节点（实体）
+            # Parse nodes (entities)
             entities_map: Dict[str, Entity] = {}
             for node in root.findall(".//graphml:node", ns):
                 node_id = node.get("id")
@@ -311,7 +420,7 @@ class LightRAGCore:
                     entities_map[node_id] = entity
                     graph.add_entity(entity)
 
-            # 解析边（关系）
+            # Parse edges (relations)
             for edge in root.findall(".//graphml:edge", ns):
                 relation = self._parse_graphml_edge(edge, ns, entities_map)
                 if relation:
@@ -329,26 +438,28 @@ class LightRAGCore:
             raise
 
     def _parse_graphml_node(self, node: Any, ns: Dict[str, str]) -> Optional[Entity]:
-        """
-        解析GraphML节点为实体
+        """Parse a GraphML node into an Entity object.
+
+        This method extracts entity information from GraphML node elements
+        according to LightRAG's GraphML format specifications.
 
         Args:
-            node: XML节点
-            ns: 命名空间
+            node: XML node element to parse.
+            ns: XML namespace dictionary for GraphML parsing.
 
         Returns:
-            Entity: 解析的实体
+            Entity: Parsed entity object, or None if parsing fails.
         """
         try:
             node_id = node.get("id")
             entity_data = {}
 
-            # 提取节点属性
+            # Extract node attributes
             for data in node.findall("graphml:data", ns):
                 key = data.get("key")
                 value = data.text
                 if key and value:
-                    # 根据LightRAG的GraphML格式映射属性
+                    # Map attributes according to LightRAG's GraphML format
                     if key == "d0":  # entity_id
                         entity_data["entity_id"] = value
                     elif key == "d1":  # entity_type
@@ -362,11 +473,11 @@ class LightRAGCore:
                     elif key == "d5":  # created_at
                         entity_data["created_at"] = value
 
-            # 映射实体类型
+            # Map entity type
             entity_type_str = entity_data.get("entity_type", "unknown").lower()
             entity_type = self._map_entity_type(entity_type_str)
 
-            # 创建实体
+            # Create entity
             entity = Entity(
                 id=node_id,
                 name=entity_data.get("entity_id", node_id),
@@ -387,16 +498,19 @@ class LightRAGCore:
             return None
 
     def _parse_graphml_edge(self, edge: Any, ns: Dict[str, str], entities_map: Dict[str, Entity]) -> Optional[Relation]:
-        """
-        解析GraphML边为关系
+        """Parse a GraphML edge into a Relation object.
+
+        This method extracts relationship information from GraphML edge elements
+        and creates appropriate relation objects linking entities.
 
         Args:
-            edge: XML边
-            ns: 命名空间
-            entities_map: 实体映射
+            edge: XML edge element to parse.
+            ns: XML namespace dictionary for GraphML parsing.
+            entities_map: Dictionary mapping node IDs to Entity objects.
 
         Returns:
-            Relation: 解析的关系
+            Relation: Parsed relation object, or None if parsing fails
+                or referenced entities don't exist.
         """
         try:
             source_id = edge.get("source")
@@ -406,7 +520,7 @@ class LightRAGCore:
                 return None
 
             edge_data = {}
-            # 提取边属性
+            # Extract edge attributes
             for data in edge.findall("graphml:data", ns):
                 key = data.get("key")
                 value = data.text
@@ -424,11 +538,11 @@ class LightRAGCore:
                     elif key == "d11":  # created_at
                         edge_data["created_at"] = value
 
-            # 创建关系
+            # Create relation
             relation = Relation(
                 head_entity=entities_map[source_id],
                 tail_entity=entities_map[target_id],
-                relation_type=RelationType.RELATED_TO,  # LightRAG通常不区分关系类型
+                relation_type=RelationType.RELATED_TO,  # LightRAG typically doesn't distinguish relation types
                 confidence=edge_data.get("weight", 1.0),
                 source="lightrag",
                 properties={
@@ -446,15 +560,19 @@ class LightRAGCore:
             logger.error("Error parsing GraphML edge: %s", e)
             return None
 
-    def _map_entity_type(self, entity_type_str: str) -> EntityType:
-        """
-        映射实体类型字符串到EntityType枚举
+    def _map_entity_type(self, entity_type_str: str) -> "EntityType":
+        """Map entity type string to EntityType enumeration.
+
+        This method provides a mapping from string representations of entity
+        types (as found in GraphML files) to the corresponding EntityType
+        enumeration values used by the system.
 
         Args:
-            entity_type_str: 实体类型字符串
+            entity_type_str: String representation of the entity type.
 
         Returns:
-            EntityType: 映射的实体类型
+            EntityType: Corresponding EntityType enumeration value.
+                Returns EntityType.UNKNOWN for unrecognized types.
         """
         type_mapping = {
             "person": EntityType.PERSON,
@@ -471,20 +589,22 @@ class LightRAGCore:
         return type_mapping.get(entity_type_str.lower(), EntityType.UNKNOWN)
 
     def export_to_graphml(self, graph: KnowledgeGraph, output_path: str) -> bool:
-        """
-        将知识图谱导出为GraphML格式
+        """Export a knowledge graph to GraphML format.
+
+        This method converts a KnowledgeGraph object into a GraphML file
+        that is compatible with LightRAG's format specifications.
 
         Args:
-            graph: 知识图谱
-            output_path: 输出文件路径
+            graph: Knowledge graph to export.
+            output_path: File path where the GraphML file should be written.
 
         Returns:
-            bool: 导出是否成功
+            bool: True if export was successful, False otherwise.
         """
         try:
             from xml.dom import minidom  # pylint: disable=import-outside-toplevel
 
-            # 创建GraphML根元素
+            # Create GraphML root element
             root = ET.Element("graphml")
             root.set("xmlns", "http://graphml.graphdrawing.org/xmlns")
             root.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
@@ -493,7 +613,7 @@ class LightRAGCore:
                 "http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd",
             )
 
-            # 定义属性键
+            # Define attribute keys
             keys = [
                 ("d0", "node", "entity_id", "string"),
                 ("d1", "node", "entity_type", "string"),
@@ -516,19 +636,19 @@ class LightRAGCore:
                 key_elem.set("attr.name", attr_name)
                 key_elem.set("attr.type", attr_type)
 
-            # 创建图元素
+            # Create graph element
             graph_elem = ET.SubElement(root, "graph")
             graph_elem.set("edgedefault", "undirected")
 
-            # 添加节点
+            # Add nodes
             for entity in graph.entities.values():
                 node_elem = ET.SubElement(graph_elem, "node")
                 node_elem.set("id", entity.id)
 
-                # 添加节点属性
+                # Add node attributes
                 data_attrs = [
                     ("d0", entity.name),
-                    ("d1", entity.entity_type.value),
+                    ("d1", get_type_value(entity.entity_type)),
                     ("d2", entity.description),
                     ("d3", entity.properties.get("source_id", "")),
                     ("d4", entity.properties.get("file_path", "")),
@@ -541,14 +661,14 @@ class LightRAGCore:
                         data_elem.set("key", key)
                         data_elem.text = str(value)
 
-            # 添加边
+            # Add edges
             for relation in graph.relations.values():
                 if relation.head_entity and relation.tail_entity:
                     edge_elem = ET.SubElement(graph_elem, "edge")
                     edge_elem.set("source", relation.head_entity.id)
                     edge_elem.set("target", relation.tail_entity.id)
 
-                    # 添加边属性
+                    # Add edge attributes
                     data_attrs = [
                         ("d6", str(relation.confidence)),
                         ("d7", relation.properties.get("description", "")),
@@ -564,7 +684,7 @@ class LightRAGCore:
                             data_elem.set("key", key)
                             data_elem.text = str(value)
 
-            # 写入文件
+            # Write to file
             rough_string = ET.tostring(root, "unicode")
             reparsed = minidom.parseString(rough_string)
 
@@ -579,11 +699,18 @@ class LightRAGCore:
             return False
 
     def get_basic_statistics(self) -> Dict[str, Any]:
-        """
-        获取图谱统计信息
+        """Get basic statistics about the knowledge graph.
+
+        This method provides information about the current state of the
+        knowledge graph including entity and relation counts.
 
         Returns:
-            Dict[str, Any]: 统计信息
+            Dict[str, Any]: Dictionary containing graph statistics including:
+                - entities_count: Number of entities in the graph
+                - relations_count: Number of relations in the graph
+                - graphml_file: Path to the GraphML file (if exists)
+                - last_modified: Timestamp of last modification
+                - status: Current status of the graph
         """
         try:
             graphml_file = self.working_dir / "graph_chunk_entity_relation.graphml"
@@ -617,14 +744,24 @@ class LightRAGCore:
 
 
 class MinimalLightRAGBuilder(BasicGraphBuilder):
-    """
-    最小化的LightRAG图构建器 - 只实现核心构建功能
+    """Minimal LightRAG graph builder implementing only core building functionality.
 
-    适用于只需要基本图构建而不需要更新、合并或其他高级功能的客户端。
+    This class provides a lightweight implementation for basic knowledge graph
+    construction using LightRAG. It's designed for clients that only need
+    essential graph building capabilities without additional features like
+    updates, merging, or other advanced functionality.
+
+    Attributes:
+        lightrag_core: Core LightRAG functionality handler.
     """
 
     def __init__(self, working_dir: str = "minimal_lightrag_storage"):
-        """初始化最小化LightRAG图构建器"""
+        """Initialize the minimal LightRAG graph builder.
+
+        Args:
+            working_dir: Directory path for LightRAG storage. Defaults to
+                "minimal_lightrag_storage".
+        """
         self.lightrag_core = LightRAGCore(working_dir)
 
     async def build_graph(
@@ -633,23 +770,42 @@ class MinimalLightRAGBuilder(BasicGraphBuilder):
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "minimal_lightrag_graph",
     ) -> KnowledgeGraph:
-        """构建知识图谱 - 异步版本"""
+        """Build a knowledge graph asynchronously using LightRAG.
+
+        Args:
+            texts: List of text documents to process for entity and relation extraction.
+            database_schema: Database schema information (currently not used).
+            graph_name: Name identifier for the generated graph.
+
+        Returns:
+            KnowledgeGraph: Constructed knowledge graph from input texts.
+        """
         return await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
 
     def cleanup(self) -> None:
-        """清理资源"""
+        """Clean up LightRAG resources."""
         self.lightrag_core.cleanup()
 
 
 class FlexibleLightRAGBuilder(UpdatableGraphBuilder):
-    """
-    灵活的LightRAG图构建器 - 支持构建和更新
+    """Flexible LightRAG graph builder supporting building and updating operations.
 
-    适用于需要更新图谱但不需要合并、验证等高级功能的客户端。
+    This builder extends the basic functionality with update capabilities
+    using LightRAG's document insertion mechanism. It's suitable for clients
+    that need graph updates but don't require advanced features like
+    merging or validation.
+
+    Attributes:
+        lightrag_core: Core LightRAG functionality handler.
     """
 
     def __init__(self, working_dir: str = "flexible_lightrag_storage"):
-        """初始化灵活LightRAG图构建器"""
+        """Initialize the flexible LightRAG graph builder.
+
+        Args:
+            working_dir: Directory path for LightRAG storage. Defaults to
+                "flexible_lightrag_storage".
+        """
         self.lightrag_core = LightRAGCore(working_dir)
 
     async def build_graph(
@@ -658,7 +814,16 @@ class FlexibleLightRAGBuilder(UpdatableGraphBuilder):
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "flexible_lightrag_graph",
     ) -> KnowledgeGraph:
-        """异步构建知识图谱"""
+        """Build a knowledge graph asynchronously using LightRAG.
+
+        Args:
+            texts: List of text documents to process for entity and relation extraction.
+            database_schema: Database schema information (currently not used).
+            graph_name: Name identifier for the generated graph.
+
+        Returns:
+            KnowledgeGraph: Constructed knowledge graph from input texts.
+        """
         return await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
 
     async def update_graph(
@@ -667,7 +832,19 @@ class FlexibleLightRAGBuilder(UpdatableGraphBuilder):
         new_entities: Optional[List[Entity]] = None,
         new_relations: Optional[List[Relation]] = None,
     ) -> KnowledgeGraph:
-        """更新现有图谱"""
+        """Update the existing graph (LightRAG limitation notice).
+
+        Note: LightRAG does not support direct entity/relation updates.
+        This method returns the original graph unchanged and logs a warning.
+
+        Args:
+            graph: Existing knowledge graph to update.
+            new_entities: New entities to add (ignored due to LightRAG limitations).
+            new_relations: New relations to add (ignored due to LightRAG limitations).
+
+        Returns:
+            KnowledgeGraph: The original graph unchanged.
+        """
         logger.warning("LightRAG does not support direct entity/relation updates")
         logger.info("To update the graph, please add new documents using update_graph_with_texts")
         return graph
@@ -677,11 +854,22 @@ class FlexibleLightRAGBuilder(UpdatableGraphBuilder):
         texts: List[str],
         graph_name: Optional[str] = None,
     ) -> KnowledgeGraph:
-        """使用新文本更新图谱"""
+        """Update the graph by adding new text documents.
+
+        This method provides the proper way to update a LightRAG-based
+        knowledge graph by processing additional text documents.
+
+        Args:
+            texts: List of new text documents to add to the graph.
+            graph_name: Optional name for the updated graph.
+
+        Returns:
+            KnowledgeGraph: Updated knowledge graph with new documents processed.
+        """
         return await self.lightrag_core.update_graph_with_texts_async(texts, graph_name)
 
     def cleanup(self) -> None:
-        """清理资源"""
+        """Clean up LightRAG resources."""
         self.lightrag_core.cleanup()
 
 
@@ -692,15 +880,27 @@ class LightRAGBuilder(
     GraphStatisticsMixin,
     FullFeaturedGraphBuilder,
 ):
-    """
-    全功能LightRAG图构建器 - 包含所有功能
+    """Comprehensive LightRAG graph builder with all available features.
 
-    只有需要所有功能的客户端才应该使用这个类。
-    大多数客户端应该使用更专注的接口。
+    This is the most feature-complete builder that combines all available
+    functionality through multiple mixins. It provides building, updating,
+    merging, validation, exporting, and statistics capabilities using LightRAG.
+
+    Only use this builder when you actually need ALL the functionality.
+    For most use cases, consider using more focused builders like
+    MinimalLightRAGBuilder or FlexibleLightRAGBuilder for better performance.
+
+    Attributes:
+        lightrag_core: Core LightRAG functionality handler.
     """
 
     def __init__(self, working_dir: str = "comprehensive_lightrag_storage"):
-        """初始化全功能LightRAG图构建器"""
+        """Initialize the comprehensive LightRAG graph builder.
+
+        Args:
+            working_dir: Directory path for LightRAG storage. Defaults to
+                "comprehensive_lightrag_storage".
+        """
         super().__init__()
         self.lightrag_core = LightRAGCore(working_dir)
 
@@ -710,11 +910,23 @@ class LightRAGBuilder(
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "comprehensive_lightrag_graph",
     ) -> KnowledgeGraph:
-        """构建全功能图谱"""
-        # 委托给核心构建器
+        """Build a comprehensive knowledge graph with full processing capabilities.
+
+        This method leverages LightRAG's functionality to construct a knowledge
+        graph and additionally provides validation through the mixin capabilities.
+
+        Args:
+            texts: List of text documents to process for entity and relation extraction.
+            database_schema: Database schema information (currently not used).
+            graph_name: Name identifier for the generated graph.
+
+        Returns:
+            KnowledgeGraph: Comprehensive graph with validation performed.
+        """
+        # Delegate to core builder
         graph = await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
 
-        # 执行验证
+        # Perform validation
         validation_result = await self.validate_graph(graph)
         if not validation_result.get("valid", True):
             logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
@@ -727,11 +939,23 @@ class LightRAGBuilder(
         new_entities: Optional[List[Entity]] = None,
         new_relations: Optional[List[Relation]] = None,
     ) -> KnowledgeGraph:
-        """更新图谱并验证"""
+        """Update the graph with validation (LightRAG limitation notice).
+
+        Note: LightRAG does not support direct entity/relation updates.
+        This method performs validation on the existing graph.
+
+        Args:
+            graph: Existing knowledge graph to update.
+            new_entities: New entities to add (ignored due to LightRAG limitations).
+            new_relations: New relations to add (ignored due to LightRAG limitations).
+
+        Returns:
+            KnowledgeGraph: The original graph with validation performed.
+        """
         logger.warning("LightRAG does not support direct entity/relation updates")
         logger.info("To update the graph, please add new documents using update_graph_with_texts")
 
-        # 执行验证
+        # Perform validation
         validation_result = await self.validate_graph(graph)
         if not validation_result.get("valid", True):
             logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
@@ -743,7 +967,19 @@ class LightRAGBuilder(
         texts: List[str],
         graph_name: Optional[str] = None,
     ) -> KnowledgeGraph:
-        """使用新文本更新图谱并验证"""
+        """Update the graph with new texts and perform validation.
+
+        This method provides the proper way to update a LightRAG-based
+        knowledge graph by processing additional text documents, followed
+        by validation.
+
+        Args:
+            texts: List of new text documents to add to the graph.
+            graph_name: Optional name for the updated graph.
+
+        Returns:
+            KnowledgeGraph: Updated and validated knowledge graph.
+        """
         graph = await self.lightrag_core.update_graph_with_texts_async(texts, graph_name)
 
         # 执行验证
@@ -763,14 +999,24 @@ class LightRAGBuilder(
 
 
 class StreamingLightRAGBuilder(StreamingGraphBuilder, IncrementalBuilderMixin):
-    """
-    流式LightRAG图构建器 - 适用于实时增量更新
+    """Streaming LightRAG graph builder for real-time incremental updates.
 
-    专为需要实时处理文档流而不需要合并或验证功能的应用设计。
+    This builder is optimized for real-time applications that need to process
+    documents as they arrive in a stream. It provides incremental update
+    capabilities without requiring merging or validation features that
+    might slow down streaming operations.
+
+    Attributes:
+        lightrag_core: Core LightRAG functionality handler.
     """
 
     def __init__(self, working_dir: str = "streaming_lightrag_storage"):
-        """初始化流式LightRAG图构建器"""
+        """Initialize the streaming LightRAG graph builder.
+
+        Args:
+            working_dir: Directory path for LightRAG storage. Defaults to
+                "streaming_lightrag_storage".
+        """
         super().__init__()
         self.lightrag_core = LightRAGCore(working_dir)
 
@@ -780,13 +1026,13 @@ class StreamingLightRAGBuilder(StreamingGraphBuilder, IncrementalBuilderMixin):
         database_schema: Optional[Dict[str, Any]] = None,
         graph_name: str = "streaming_lightrag_graph",
     ) -> KnowledgeGraph:
-        """构建初始图谱用于流式处理"""
+        """Build initial graph for streaming operations."""
         graph = await self.lightrag_core.build_graph_async(texts, database_schema, graph_name)
         self._current_graph = graph
         return graph
 
     async def add_documents(self, documents: List[str], document_ids: Optional[List[str]] = None) -> KnowledgeGraph:
-        """添加新文档到流式图谱"""
+        """Add new documents to streaming graph."""
         if not documents:
             return self._current_graph or KnowledgeGraph()
 
@@ -805,7 +1051,7 @@ class StreamingLightRAGBuilder(StreamingGraphBuilder, IncrementalBuilderMixin):
         return graph
 
     async def remove_documents(self, document_ids: List[str]) -> KnowledgeGraph:
-        """移除文档（LightRAG不直接支持，返回当前图谱）"""
+        """Remove documents (LightRAG does not directly support this, returns current graph)."""
         logger.warning("LightRAG does not support document removal")
         logger.info("Consider rebuilding the graph from scratch if document removal is required")
 

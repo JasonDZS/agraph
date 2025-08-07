@@ -8,22 +8,20 @@
 import asyncio
 import json
 import logging
+import os.path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from openai.types.chat import (
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-
-from ..embeddings import JsonVectorStorage, OpenAIEmbedding, VectorStorage
+from ..config import settings
+from ..embeddings import OpenAIEmbedding
 from ..entities import Entity
 from ..extractors.llm_entity_extractor import LLMEntityExtractor
 from ..extractors.llm_relation_extractor import LLMRelationExtractor
 from ..graph import KnowledgeGraph
 from ..relations import Relation
+from ..storage import JsonVectorStorage, VectorStorage
 from ..types import EntityType, RelationType
+from ..utils import get_type_value
 from .interfaces import (
     BasicGraphBuilder,
     BatchGraphBuilder,
@@ -266,7 +264,7 @@ class LLMAsyncProcessor:
             entities_data = [
                 {
                     "name": entity.name,
-                    "type": entity.entity_type.value,
+                    "type": get_type_value(entity.entity_type),
                     "description": entity.description,
                     "aliases": entity.aliases,
                     "properties": entity.properties,
@@ -282,7 +280,7 @@ class LLMAsyncProcessor:
                 {
                     "head_entity": relation.head_entity.name if relation.head_entity else "",
                     "tail_entity": relation.tail_entity.name if relation.tail_entity else "",
-                    "relation_type": relation.relation_type.value,
+                    "relation_type": get_type_value(relation.relation_type),
                     "description": relation.description,
                     "properties": relation.properties,
                     "confidence": relation.confidence,
@@ -311,7 +309,7 @@ class LLMAsyncProcessor:
                 entities_data = [
                     {
                         "name": entity.name,
-                        "type": entity.entity_type.value,
+                        "type": get_type_value(entity.entity_type),
                         "description": entity.description,
                         "aliases": entity.aliases,
                         "properties": entity.properties,
@@ -327,7 +325,7 @@ class LLMAsyncProcessor:
                     {
                         "head_entity": relation.head_entity.name if relation.head_entity else "",
                         "tail_entity": relation.tail_entity.name if relation.tail_entity else "",
-                        "relation_type": relation.relation_type.value,
+                        "relation_type": get_type_value(relation.relation_type),
                         "description": relation.description,
                         "properties": relation.properties,
                         "confidence": relation.confidence,
@@ -379,7 +377,7 @@ class LLMAsyncProcessor:
         return [
             {
                 "name": entity.name,
-                "type": entity.entity_type.value,
+                "type": get_type_value(entity.entity_type),
                 "description": entity.description,
                 "aliases": entity.aliases,
                 "properties": entity.properties,
@@ -661,7 +659,7 @@ class LLMGraphUtils:
                 and relation.tail_entity
                 and relation.head_entity.name == head_name
                 and relation.tail_entity.name == tail_name
-                and relation.relation_type.value == relation_type
+                and get_type_value(relation.relation_type) == relation_type
             ):
                 return relation
         return None
@@ -791,7 +789,7 @@ class MinimalLLMGraphBuilder(BasicGraphBuilder):
                 entity_data = [
                     {
                         "name": entity.name,
-                        "type": entity.entity_type.value,
+                        "type": get_type_value(entity.entity_type),
                         "description": entity.description,
                         "aliases": entity.aliases,
                         "properties": entity.properties,
@@ -806,7 +804,7 @@ class MinimalLLMGraphBuilder(BasicGraphBuilder):
                     {
                         "head_entity": relation.head_entity.name if relation.head_entity else "",
                         "tail_entity": relation.tail_entity.name if relation.tail_entity else "",
-                        "relation_type": relation.relation_type.value,
+                        "relation_type": get_type_value(relation.relation_type),
                         "description": relation.description,
                         "properties": relation.properties,
                         "confidence": relation.confidence,
@@ -1098,7 +1096,9 @@ class LLMGraphBuilder(
         validation_result = await self.validate_graph(graph)
         if not validation_result.get("valid", True):
             logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
-
+        with open(os.path.join(settings.workdir, "graph.json"), "w") as f:
+            json.dump(graph.to_dict(), f, ensure_ascii=False, indent=2)
+        self.flexible_builder.vector_storage.save()
         return graph
 
     async def update_graph(
@@ -1406,492 +1406,6 @@ class BatchLLMGraphBuilder(GraphMergerMixin, BatchGraphBuilder):
         self.flexible_builder.cleanup()
 
 
-class LLMSearchBuilder(GraphExporterMixin):
-    """
-    LLM搜索构建器 - 专门用于搜索和问答功能
-
-    遵循ISP：只实现搜索、检索和导出相关的接口，不包含构建功能。
-    基于向量相似度和LLM推理提供智能搜索和问答能力。
-    """
-
-    def __init__(
-        self,
-        graph: KnowledgeGraph,
-        openai_api_key: str,
-        openai_api_base: Optional[str] = None,
-        llm_model: str = "gpt-4o-mini",
-        embedding_model: str = "text-embedding-3-small",
-        max_tokens: int = 4000,
-        temperature: float = 0.1,
-        vector_storage: Optional[VectorStorage] = None,
-    ):
-        """
-        初始化LLM搜索构建器
-
-        Args:
-            graph: 要搜索的知识图谱
-            openai_api_key: OpenAI API密钥
-            openai_api_base: OpenAI API基础URL
-            llm_model: 使用的LLM模型
-            embedding_model: 使用的嵌入模型
-            max_tokens: 最大token数
-            temperature: 温度参数
-            vector_storage: 向量存储后端
-        """
-        super().__init__()
-        self.graph = graph
-        self.openai_api_key = openai_api_key
-        self.openai_api_base = openai_api_base
-        self.llm_model = llm_model
-        self.max_tokens = max_tokens
-        self.temperature = temperature
-
-        # 初始化向量存储和嵌入
-        self.vector_storage = vector_storage or JsonVectorStorage("llm_search_vectors.json")
-        self.graph_embedding = OpenAIEmbedding(
-            vector_storage=self.vector_storage,
-            openai_api_key=openai_api_key,
-            openai_api_base=openai_api_base,
-            embedding_model=embedding_model,
-        )
-
-        # 初始化LLM客户端
-        try:
-            import openai
-
-            self.llm_client = openai.OpenAI(
-                api_key=openai_api_key,
-                base_url=openai_api_base,
-            )
-        except ImportError:
-            logger.error("OpenAI library not installed. Please install with: pip install openai")
-            raise
-
-    async def search_entities(
-        self, query: str, top_k: int = 10, similarity_threshold: float = 0.7
-    ) -> List[Dict[str, Any]]:
-        """
-        基于查询搜索相关实体
-
-        Args:
-            query: 搜索查询
-            top_k: 返回的最大结果数
-            similarity_threshold: 相似度阈值
-
-        Returns:
-            List[Dict[str, Any]]: 搜索结果列表
-        """
-        try:
-            logger.info(f"Searching entities for query: {query}")
-
-            # 确保图谱嵌入已构建
-            await self._ensure_embeddings_built()
-
-            # 获取查询文本的嵌入向量
-            query_embedding = await self.graph_embedding.embed_text(query)
-            if query_embedding is None:
-                logger.warning("Failed to get query embedding")
-                return []
-
-            # 搜索相似的实体向量
-            similar_vectors = self.vector_storage.search_similar_vectors(
-                query_vector=query_embedding, top_k=top_k * 2, threshold=similarity_threshold  # 搜索更多结果，然后过滤
-            )
-
-            # 格式化结果 - 只保留实体向量
-            results = []
-            for vector_id, similarity in similar_vectors:
-                if vector_id.startswith("entity_"):
-                    # 提取实体ID (去掉"entity_"前缀)
-                    entity_id = vector_id[7:]
-                    entity = self.graph.get_entity(entity_id)
-
-                    if entity:
-                        result = {
-                            "entity_id": entity.id,
-                            "entity_name": entity.name,
-                            "entity_type": entity.entity_type.value,
-                            "description": entity.description,
-                            "similarity_score": similarity,
-                            "properties": entity.properties,
-                            "aliases": entity.aliases,
-                            "source": entity.source,
-                        }
-                        results.append(result)
-
-                        if len(results) >= top_k:
-                            break
-
-            logger.info(f"Found {len(results)} relevant entities")
-            return results
-
-        except Exception as e:
-            logger.error(f"Error searching entities: {e}")
-            raise
-
-    async def search_relations(
-        self, query: str, top_k: int = 10, similarity_threshold: float = 0.7
-    ) -> List[Dict[str, Any]]:
-        """
-        基于查询搜索相关关系
-
-        Args:
-            query: 搜索查询
-            top_k: 返回的最大结果数
-            similarity_threshold: 相似度阈值
-
-        Returns:
-            List[Dict[str, Any]]: 搜索结果列表
-        """
-        try:
-            logger.info(f"Searching relations for query: {query}")
-
-            # 确保图谱嵌入已构建
-            await self._ensure_embeddings_built()
-
-            # 获取查询文本的嵌入向量
-            query_embedding = await self.graph_embedding.embed_text(query)
-            if query_embedding is None:
-                logger.warning("Failed to get query embedding")
-                return []
-
-            # 搜索相似的关系向量
-            similar_vectors = self.vector_storage.search_similar_vectors(
-                query_vector=query_embedding, top_k=top_k * 2, threshold=similarity_threshold  # 搜索更多结果，然后过滤
-            )
-
-            # 格式化结果 - 只保留关系向量
-            results = []
-            for vector_id, similarity in similar_vectors:
-                if vector_id.startswith("relation_"):
-                    # 提取关系ID (去掉"relation_"前缀)
-                    relation_id = vector_id[9:]
-                    relation = self.graph.get_relation(relation_id)
-
-                    if relation:
-                        result = {
-                            "relation_id": relation.id,
-                            "head_entity": {
-                                "id": relation.head_entity.id if relation.head_entity else None,
-                                "name": relation.head_entity.name if relation.head_entity else None,
-                                "type": relation.head_entity.entity_type.value if relation.head_entity else None,
-                            },
-                            "tail_entity": {
-                                "id": relation.tail_entity.id if relation.tail_entity else None,
-                                "name": relation.tail_entity.name if relation.tail_entity else None,
-                                "type": relation.tail_entity.entity_type.value if relation.tail_entity else None,
-                            },
-                            "relation_type": relation.relation_type.value,
-                            "description": relation.description,
-                            "similarity_score": similarity,
-                            "confidence": relation.confidence,
-                            "properties": relation.properties,
-                            "source": relation.source,
-                        }
-                        results.append(result)
-
-                        if len(results) >= top_k:
-                            break
-
-            logger.info(f"Found {len(results)} relevant relations")
-            return results
-
-        except Exception as e:
-            logger.error(f"Error searching relations: {e}")
-            raise
-
-    async def search_graph(
-        self, query: str, search_type: str = "hybrid", top_k: int = 10, similarity_threshold: float = 0.7
-    ) -> Dict[str, Any]:
-        """
-        综合搜索图谱（实体和关系）
-
-        Args:
-            query: 搜索查询
-            search_type: 搜索类型 ("entities", "relations", "hybrid")
-            top_k: 返回的最大结果数
-            similarity_threshold: 相似度阈值
-
-        Returns:
-            Dict[str, Any]: 综合搜索结果
-        """
-        try:
-            logger.info(f"Searching graph with query: {query}, type: {search_type}")
-
-            results: Dict[str, Any] = {
-                "query": query,
-                "search_type": search_type,
-                "timestamp": datetime.now().isoformat(),
-                "entities": [],
-                "relations": [],
-            }
-
-            if search_type in ["entities", "hybrid"]:
-                results["entities"] = await self.search_entities(query, top_k, similarity_threshold)
-
-            if search_type in ["relations", "hybrid"]:
-                results["relations"] = await self.search_relations(query, top_k, similarity_threshold)
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Error searching graph: {e}")
-            raise
-
-    async def answer_question(
-        self, question: str, context_entities: int = 5, context_relations: int = 5, include_reasoning: bool = True
-    ) -> Dict[str, Any]:
-        """
-        基于知识图谱回答问题
-
-        Args:
-            question: 要回答的问题
-            context_entities: 上下文实体数量
-            context_relations: 上下文关系数量
-            include_reasoning: 是否包含推理过程
-
-        Returns:
-            Dict[str, Any]: 问答结果
-        """
-        try:
-            logger.info(f"Answering question: {question}")
-
-            # 1. 搜索相关上下文
-            search_results = await self.search_graph(
-                query=question,
-                search_type="hybrid",
-                top_k=max(context_entities, context_relations),
-                similarity_threshold=0.6,
-            )
-
-            # 2. 构建上下文信息
-            context_info = self._build_context_for_qa(search_results, context_entities, context_relations)
-
-            # 3. 生成回答
-            answer_result = await self._generate_answer_with_llm(
-                question=question, context=context_info, include_reasoning=include_reasoning
-            )
-
-            # 4. 整合结果
-            result = {
-                "question": question,
-                "answer": answer_result["answer"],
-                "confidence": answer_result.get("confidence", 0.0),
-                "context": {
-                    "entities_used": len(search_results["entities"][:context_entities]),
-                    "relations_used": len(search_results["relations"][:context_relations]),
-                    "search_results": search_results if include_reasoning else None,
-                },
-                "timestamp": datetime.now().isoformat(),
-            }
-
-            if include_reasoning:
-                result["reasoning"] = answer_result.get("reasoning", "")
-
-            logger.info("Question answered successfully")
-            return result
-
-        except Exception as e:
-            logger.error(f"Error answering question: {e}")
-            raise
-
-    async def _ensure_embeddings_built(self) -> None:
-        """确保图谱嵌入已构建"""
-        try:
-            # 检查向量存储中是否已有嵌入
-            vectors, _ = self.vector_storage.load_vectors()
-            if not vectors:
-                logger.info("Building embeddings for search functionality")
-                await self.graph_embedding.build_text_embeddings(self.graph)
-                self.graph_embedding.save_embeddings()
-            else:
-                logger.info(f"Found {len(vectors)} existing embeddings")
-        except Exception as e:
-            logger.warning(f"Error building embeddings: {e}")
-            # 继续执行，使用基于文本的搜索
-
-    def _build_context_for_qa(self, search_results: Dict[str, Any], max_entities: int, max_relations: int) -> str:
-        """构建问答的上下文信息"""
-        context_parts = []
-
-        # 添加实体信息
-        entities = search_results.get("entities", [])[:max_entities]
-        if entities:
-            context_parts.append("相关实体信息:")
-            for entity in entities:
-                entity_info = f"- {entity['entity_name']} ({entity['entity_type']}): {entity['description']}"
-                if entity.get("aliases"):
-                    entity_info += f" [别名: {', '.join(entity['aliases'])}]"
-                context_parts.append(entity_info)
-
-        # 添加关系信息
-        relations = search_results.get("relations", [])[:max_relations]
-        if relations:
-            context_parts.append("\n相关关系信息:")
-            for relation in relations:
-                head_name = relation["head_entity"]["name"] if relation["head_entity"] else "Unknown"
-                tail_name = relation["tail_entity"]["name"] if relation["tail_entity"] else "Unknown"
-                relation_info = f"- {head_name} --({relation['relation_type']})--> {tail_name}"
-                if relation["description"]:
-                    relation_info += f": {relation['description']}"
-                context_parts.append(relation_info)
-
-        return "\n".join(context_parts)
-
-    async def _generate_answer_with_llm(self, question: str, context: str, include_reasoning: bool) -> Dict[str, Any]:
-        """使用LLM生成答案"""
-        try:
-            # 构建系统提示
-            system_prompt = """你是一个知识图谱问答助手。基于提供的知识图谱信息回答用户问题。
-
-要求：
-1. 基于提供的上下文信息回答问题
-2. 如果信息不足，明确说明无法回答或信息不完整
-3. 保持回答准确、简洁且有条理
-4. 优先使用上下文中的具体实体和关系信息"""
-
-            if include_reasoning:
-                system_prompt += "\n5. 在回答后简要说明你的推理过程"
-
-            # 构建用户消息
-            user_message = f"""问题: {question}
-
-知识图谱上下文信息:
-{context}
-
-请基于上述信息回答问题。"""
-
-            # 调用LLM
-            messages: List[ChatCompletionMessageParam] = [
-                ChatCompletionSystemMessageParam(role="system", content=system_prompt),
-                ChatCompletionUserMessageParam(role="user", content=user_message),
-            ]
-
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-            )
-
-            answer_text = response.choices[0].message.content
-            if answer_text is None:
-                answer_text = "No response generated"
-            else:
-                answer_text = answer_text.strip()
-
-            # 解析回答和推理（如果需要）
-            result = {"answer": answer_text}
-
-            if include_reasoning and "推理过程" in answer_text:
-                # 尝试分离回答和推理
-                parts = answer_text.split("推理过程")
-                if len(parts) == 2:
-                    result["answer"] = parts[0].strip()
-                    result["reasoning"] = ("推理过程" + parts[1]).strip()
-
-            # 估算置信度（基于上下文匹配程度）
-            confidence = self._estimate_answer_confidence(question, context, answer_text)
-            result["confidence"] = str(confidence)
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Error generating answer with LLM: {e}")
-            return {
-                "answer": "抱歉，在生成回答时遇到了错误。",
-                "confidence": 0.0,
-                "reasoning": f"错误信息: {str(e)}" if include_reasoning else None,
-            }
-
-    def _estimate_answer_confidence(self, question: str, context: str, answer: str) -> float:
-        """估算答案的置信度"""
-        try:
-            # 简单的置信度估算：基于上下文长度和答案中是否提及上下文实体
-            if not context.strip():
-                return 0.1  # 没有上下文信息，置信度很低
-
-            # 检查答案中是否包含上下文信息
-            answer_lower = answer.lower()
-
-            # 计算上下文实体在答案中的出现比例
-            context_entities = []
-            for line in context.split("\n"):
-                if line.strip().startswith("- "):
-                    # 提取实体名称
-                    entity_part = line.strip()[2:].split("(")[0].strip()
-                    if entity_part:
-                        context_entities.append(entity_part.lower())
-
-            if not context_entities:
-                return 0.3
-
-            mentioned_entities = sum(1 for entity in context_entities if entity in answer_lower)
-            mention_ratio = mentioned_entities / len(context_entities)
-
-            # 基于提及比例和答案长度计算置信度
-            base_confidence = 0.3 + (mention_ratio * 0.5)
-
-            # 如果答案明确表示无法回答，降低置信度
-            uncertainty_phrases = ["无法回答", "信息不足", "不知道", "不确定", "抱歉"]
-            if any(phrase in answer_lower for phrase in uncertainty_phrases):
-                base_confidence *= 0.5
-
-            return min(max(base_confidence, 0.0), 1.0)
-
-        except Exception:
-            return 0.5  # 默认中等置信度
-
-    async def export_to_format(self, graph: KnowledgeGraph, format_type: str) -> Dict[str, Any]:
-        """导出图谱到指定格式"""
-        try:
-            format_lower = format_type.lower()
-
-            if format_lower == "json":
-                return graph.to_dict()
-            elif format_lower == "summary":
-                # 生成图谱摘要
-                return {
-                    "graph_name": graph.name,
-                    "entities_count": len(graph.entities),
-                    "relations_count": len(graph.relations),
-                    "entity_types": list(set(e.entity_type.value for e in graph.entities.values())),
-                    "relation_types": list(set(r.relation_type.value for r in graph.relations.values())),
-                    "export_timestamp": datetime.now().isoformat(),
-                }
-            else:
-                raise ValueError(f"Unsupported export format: {format_type}")
-
-        except Exception as e:
-            logger.error(f"Error exporting graph: {e}")
-            raise
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """获取搜索统计信息"""
-        try:
-            return {
-                "graph_name": self.graph.name,
-                "entities_count": len(self.graph.entities),
-                "relations_count": len(self.graph.relations),
-                "has_embeddings": bool(self.vector_storage.load_vectors()[0]),
-                "llm_model": self.llm_model,
-                "search_capabilities": ["entity_search", "relation_search", "question_answering"],
-                "last_updated": datetime.now().isoformat(),
-            }
-        except Exception as e:
-            logger.error(f"Error getting statistics: {e}")
-            return {"error": str(e)}
-
-    def cleanup(self) -> None:
-        """清理资源"""
-        try:
-            if self.graph_embedding:
-                self.graph_embedding.save_embeddings()
-            logger.info("LLM search builder resources cleaned up")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
-
-
 # 导出所有公共类和函数
 __all__ = [
     "LLMUsageTracker",
@@ -1902,5 +1416,4 @@ __all__ = [
     "LLMGraphBuilder",
     "StreamingLLMGraphBuilder",
     "BatchLLMGraphBuilder",
-    "LLMSearchBuilder",
 ]

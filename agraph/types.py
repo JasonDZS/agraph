@@ -1,34 +1,56 @@
 """
-图谱类型定义和枚举
+Graph type definitions and enumerations.
+
+This module provides enum definitions for entity and relation types.
 """
 
 from enum import Enum
-from typing import Any, Union
-
-from .config import settings
+from typing import Union
 
 
-def create_entity_type_enum() -> Any:
-    """从配置动态创建实体类型枚举"""
-    entity_types = {
-        entity_type.upper().replace("-", "_").replace(" ", "_"): entity_type for entity_type in settings.ENTITY_TYPES
-    }
-    return Enum("EntityType", entity_types)
+class EntityType(Enum):
+    """Entity type enumeration."""
+
+    PERSON = "person"
+    ORGANIZATION = "organization"
+    LOCATION = "location"
+    CONCEPT = "concept"
+    EVENT = "event"
+    OTHER = "other"
+    TABLE = "table"
+    COLUMN = "column"
+    DATABASE = "database"
+    DOCUMENT = "document"
+    KEYWORD = "keyword"
+    PRODUCT = "product"
+    SOFTWARE = "software"
+    UNKNOWN = "unknown"
 
 
-def create_relation_type_enum() -> Any:
-    """从配置动态创建关系类型枚举"""
-    relation_types = {
-        relation_type.upper().replace("-", "_").replace(" ", "_"): relation_type
-        for relation_type in settings.RELATION_TYPES
-    }
-    return Enum("RelationType", relation_types)
+class RelationType(Enum):
+    """Relation type enumeration."""
+
+    CONTAINS = "contains"
+    BELONGS_TO = "belongs_to"
+    LOCATED_IN = "located_in"
+    WORKS_FOR = "works_for"
+    CAUSES = "causes"
+    PART_OF = "part_of"
+    IS_A = "is_a"
+    REFERENCES = "references"
+    SIMILAR_TO = "similar_to"
+    RELATED_TO = "related_to"
+    DEPENDS_ON = "depends_on"
+    FOREIGN_KEY = "foreign_key"
+    MENTIONS = "mentions"
+    DESCRIBES = "describes"
+    SYNONYMS = "synonyms"
+    DEVELOPS = "develops"
+    CREATES = "creates"
+    FOUNDED_BY = "founded_by"
+    OTHER = "other"
 
 
-# 创建动态枚举类型
-EntityType = create_entity_type_enum()
-RelationType = create_relation_type_enum()
-
-# 类型别名，用于类型注解
-EntityTypeType = Union[Any, Enum]
-RelationTypeType = Union[Any, Enum]
+# Type aliases for type annotations
+EntityTypeType = Union[EntityType, str]
+RelationTypeType = Union[RelationType, str]

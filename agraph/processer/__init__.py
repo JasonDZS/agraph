@@ -1,52 +1,78 @@
-"""
-Document processing module for agraph.
+"""Document processing module for agraph.
 
-This module provides document processing interfaces for various file formats including:
-- PDF files (.pdf)
-- Microsoft Word documents (.docx, .doc)
-- Plain text and Markdown files (.txt, .md, .markdown)
-- HTML files (.html, .htm)
-- Spreadsheet files (.csv, .xlsx, .xls)
-- JSON files (.json, .jsonl, .ndjson)
-- Image files (.jpg, .jpeg, .png, .gif, .bmp, .tiff, .webp) using multimodal AI models
+This module provides comprehensive document processing capabilities for various file formats,
+including traditional documents (PDF, Word, HTML, etc.) and modern multimodal processing
+for images using state-of-the-art AI models.
 
-Basic usage:
-    from agraph.processer import process_document, extract_metadata, can_process
+Supported File Formats:
+    - PDF files (.pdf)
+    - Microsoft Word documents (.docx, .doc)
+    - Plain text and Markdown files (.txt, .md, .markdown)
+    - HTML files (.html, .htm)
+    - Spreadsheet files (.csv, .xlsx, .xls)
+    - JSON files (.json, .jsonl, .ndjson)
+    - Image files (.jpg, .jpeg, .png, .gif, .bmp, .tiff, .webp) using multimodal AI models
 
-    # Process a document
-    text_content = process_document("document.pdf")
+Architecture:
+    The module follows a factory pattern with the following key components:
+    - DocumentProcessor: Abstract base class for all processors
+    - DocumentProcessorFactory: Factory for creating appropriate processors
+    - DocumentProcessorManager: High-level interface for document processing
+    - Individual processors: Specialized classes for each file type
 
-    # Extract metadata
-    metadata = extract_metadata("document.pdf")
+Basic Usage:
+    >>> from agraph.processer import process_document, extract_metadata, can_process
 
-    # Check if file can be processed
-    if can_process("document.pdf"):
-        content = process_document("document.pdf")
+    >>> # Process a document
+    >>> text_content = process_document("document.pdf")
 
-    # Process images with multimodal models
-    image_text = process_document("image.jpg", prompt="Describe this image in detail")
+    >>> # Extract metadata
+    >>> metadata = extract_metadata("document.pdf")
 
-    # Extract text from images (OCR-like)
-    from agraph.processer import ImageProcessor
-    processor = ImageProcessor()
-    extracted_text = processor.extract_text_from_image("image.jpg")
+    >>> # Check if file can be processed
+    >>> if can_process("document.pdf"):
+    ...     content = process_document("document.pdf")
 
-Advanced usage:
-    from agraph.processer import DocumentProcessorManager, DocumentProcessorFactory
-    from agraph.processer import ImageProcessorFactory
+Image Processing Usage:
+    >>> # Process images with multimodal models
+    >>> image_text = process_document("image.jpg", prompt="Describe this image in detail")
 
-    # Create processor instance
-    processor = DocumentProcessorManager()
+    >>> # Extract text from images (OCR-like functionality)
+    >>> from agraph.processer import ImageProcessor
+    >>> processor = ImageProcessor()
+    >>> extracted_text = processor.extract_text_from_image("image.jpg")
 
-    # Process multiple files
-    results = processor.process_multiple(["file1.pdf", "file2.docx", "image.jpg"])
+Advanced Usage:
+    >>> from agraph.processer import DocumentProcessorManager, DocumentProcessorFactory
+    >>> from agraph.processer import ImageProcessorFactory
 
-    # Custom image processors with specific models
-    openai_processor = ImageProcessorFactory.create_openai_processor()
-    claude_processor = ImageProcessorFactory.create_claude_processor()
+    >>> # Create processor instance
+    >>> processor = DocumentProcessorManager()
 
-    # Process image with specific model
-    description = openai_processor.describe_image("image.jpg", detail_level="comprehensive")
+    >>> # Process multiple files
+    >>> results = processor.process_multiple(["file1.pdf", "file2.docx", "image.jpg"])
+
+    >>> # Custom image processors with specific models
+    >>> openai_processor = ImageProcessorFactory.create_openai_processor()
+    >>> claude_processor = ImageProcessorFactory.create_claude_processor()
+
+    >>> # Process image with specific model
+    >>> description = openai_processor.describe_image("image.jpg", detail_level="comprehensive")
+
+Dependencies:
+    Optional dependencies are required for specific file types:
+    - beautifulsoup4: HTML processing
+    - pypdf: PDF processing
+    - python-docx: Word document processing
+    - pandas, openpyxl: Excel/CSV processing
+    - pillow: Image processing and metadata extraction
+    - pytesseract: OCR functionality
+    - openai: OpenAI GPT-4V for image analysis
+    - anthropic: Claude Vision for image analysis
+
+Raises:
+    ProcessingError: When document processing fails due to unsupported format,
+                    corrupted file, missing dependencies, or processing errors.
 """
 
 from .base import DocumentProcessor, ProcessingError

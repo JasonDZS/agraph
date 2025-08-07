@@ -1,3 +1,10 @@
+"""Spreadsheet document processor implementation.
+
+This module provides functionality for extracting text and metadata from CSV files
+and Excel spreadsheets. It supports various formatting options, multiple sheets,
+and comprehensive data analysis.
+"""
+
 import csv
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Union
@@ -9,34 +16,83 @@ from .base import DocumentProcessor, ProcessingError
 
 
 class SpreadsheetProcessor(DocumentProcessor):
-    """Processor for CSV and Excel spreadsheet files."""
+    """Document processor for CSV and Excel spreadsheet files.
+
+    This processor handles multiple spreadsheet formats with flexible text extraction:
+    - CSV files with automatic delimiter detection
+    - Excel files (.xlsx, .xls) with multi-sheet support
+    - Configurable formatting and row limits
+    - Comprehensive metadata extraction
+    - Data structure analysis
+
+    Features:
+    - Automatic CSV delimiter detection
+    - Multi-sheet Excel processing
+    - Configurable row limits for large files
+    - Formatted text output with column alignment
+    - Header inclusion/exclusion options
+    - Encoding fallback for CSV files
+
+    Dependencies:
+        pandas: Required for Excel file processing (.xlsx, .xls)
+        openpyxl: Required for .xlsx files (installed with pandas[excel])
+    """
 
     @property
     def supported_extensions(self) -> List[str]:
+        """Return list of supported spreadsheet file extensions.
+
+        Returns:
+            List containing '.csv', '.xlsx', and '.xls' extensions.
+        """
         return [".csv", ".xlsx", ".xls"]
 
     def process(self, file_path: Union[str, Path], **kwargs: Any) -> str:
-        """Extract text from spreadsheet file.
+        """Extract text content from spreadsheet files.
+
+        This method processes various spreadsheet formats and returns formatted
+        text that preserves the tabular structure in a readable format.
 
         Args:
-            file_path: Path to the spreadsheet file
-            **kwargs: Additional parameters (sheet_name, max_rows, separator, etc.)
+            file_path: Path to the spreadsheet file to process.
+            **kwargs: Additional processing parameters:
+                - sheet_name (str|int|'all'): For Excel files, specify sheet name,
+                  index, or 'all' for all sheets (default: 0 for first sheet)
+                - max_rows (int): Maximum number of rows to process (default: 1000)
+                - include_headers (bool): Whether to include column headers (default: True)
+                - delimiter (str): CSV delimiter override (default: auto-detect)
+                - encoding (str): Text encoding for CSV files (default: 'utf-8')
 
         Returns:
-            Extracted content as formatted text
+            Formatted text content preserving tabular structure with proper alignment.
+
+        Raises:
+            ProcessingError: If required dependencies are missing, file format
+                           is unsupported, or processing fails.
         """
         self.validate_file(file_path)
         file_path = Path(file_path)
 
         if file_path.suffix.lower() == ".csv":
-            return self._process_csv(file_path, **kwargs)
+            return self._process_csv_file(file_path, **kwargs)
         elif file_path.suffix.lower() in [".xlsx", ".xls"]:
-            return self._process_excel(file_path, **kwargs)
+            return self._process_excel_file(file_path, **kwargs)
         else:
             raise ProcessingError(f"Unsupported file extension: {file_path.suffix}")
 
-    def _process_csv(self, file_path: Path, **kwargs: Any) -> str:
-        """Process CSV files."""
+    def _process_csv_file(self, file_path: Path, **kwargs: Any) -> str:
+        """Process CSV files with automatic delimiter detection and encoding fallback.
+
+        Args:
+            file_path: Path to the CSV file.
+            **kwargs: Processing parameters.
+
+        Returns:
+            Formatted CSV content as text.
+
+        Raises:
+            ProcessingError: If file cannot be processed or decoded.
+        """
         encoding = kwargs.get("encoding", "utf-8")
         delimiter = kwargs.get("delimiter", ",")
         max_rows = kwargs.get("max_rows", 1000)
@@ -50,15 +106,9 @@ class SpreadsheetProcessor(DocumentProcessor):
                     raise ValueError("File is empty")
                 file.seek(0)
 
-                # Auto-detect delimiter if not specified
+                # Auto-detect delimiter if not specified or using default
                 if delimiter == ",":
-                    sample = file.read(1024)
-                    file.seek(0)
-                    sniffer = csv.Sniffer()
-                    try:
-                        delimiter = sniffer.sniff(sample).delimiter
-                    except csv.Error:
-                        delimiter = ","
+                    delimiter = self._detect_csv_delimiter(file)
 
                 reader = csv.reader(file, delimiter=delimiter)
                 rows = []
@@ -71,48 +121,59 @@ class SpreadsheetProcessor(DocumentProcessor):
                 except StopIteration:
                     return ""
 
-                # Read data rows
+                # Read data rows with limit
                 for i, row in enumerate(reader):
                     if max_rows and i >= max_rows:
                         break
                     rows.append(row)
 
-                # Format as text
-                if not rows:
-                    return ""
-
-                # Calculate column widths for formatting
-                col_widths = [0] * len(rows[0])
-                for row in rows:
-                    for i, cell in enumerate(row):
-                        if i < len(col_widths):
-                            col_widths[i] = max(col_widths[i], len(str(cell)))
-
-                # Format rows
-                formatted_rows = []
-                for row in rows:
-                    formatted_cells = []
-                    for i, cell in enumerate(row):
-                        width = col_widths[i] if i < len(col_widths) else 0
-                        formatted_cells.append(str(cell).ljust(width))
-                    formatted_rows.append(" | ".join(formatted_cells))
-
-                return "\n".join(formatted_rows)
+                return self._format_table_rows(rows) if rows else ""
 
         except UnicodeDecodeError:
-            # Try alternative encodings only if we haven't already tried them
+            # Try alternative encodings for CSV files
             if encoding == "utf-8":
                 for alt_encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                     try:
-                        return self._process_csv(file_path, encoding=alt_encoding, **kwargs)
+                        return self._process_csv_file(file_path, encoding=alt_encoding, **kwargs)
                     except UnicodeDecodeError:
                         continue
             raise ProcessingError(f"Could not decode CSV file {file_path} with any supported encoding")
         except Exception as e:
             raise ProcessingError(f"Failed to process CSV file {file_path}: {str(e)}")
 
-    def _process_excel(self, file_path: Path, **kwargs: Any) -> str:
-        """Process Excel files."""
+    def _detect_csv_delimiter(self, file: Any) -> str:
+        """Detect the delimiter used in a CSV file.
+
+        Args:
+            file: Open file object.
+
+        Returns:
+            Detected delimiter character.
+        """
+        sample = file.read(1024)
+        file.seek(0)
+
+        sniffer = csv.Sniffer()
+        try:
+            dialect = sniffer.sniff(sample)
+            return dialect.delimiter
+        except csv.Error:
+            # Fallback to comma if detection fails
+            return ","
+
+    def _process_excel_file(self, file_path: Path, **kwargs: Any) -> str:
+        """Process Excel files with multi-sheet support.
+
+        Args:
+            file_path: Path to the Excel file.
+            **kwargs: Processing parameters.
+
+        Returns:
+            Formatted Excel content as text.
+
+        Raises:
+            ProcessingError: If pandas is not available or processing fails.
+        """
         try:
             import pandas as pd
         except ImportError:
@@ -123,31 +184,54 @@ class SpreadsheetProcessor(DocumentProcessor):
         include_headers = kwargs.get("include_headers", True)
 
         try:
-            # Read Excel file
             if sheet_name == "all":
-                # Read all sheets
-                excel_file = pd.ExcelFile(file_path)
-                all_content = []
-                for sheet in excel_file.sheet_names:
-                    df = pd.read_excel(file_path, sheet_name=sheet, nrows=max_rows)
-                    if not df.empty:
-                        all_content.append(f"Sheet: {sheet}")
-                        all_content.append(self._dataframe_to_text(df, include_headers))
-                        all_content.append("")  # Empty line between sheets
-                return "\n".join(all_content)
+                return self._process_all_excel_sheets(file_path, max_rows, include_headers)
             else:
                 df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=max_rows)
-                return self._dataframe_to_text(df, include_headers)
+                return self._dataframe_to_formatted_text(df, include_headers)
 
         except Exception as e:
             raise ProcessingError(f"Failed to process Excel file {file_path}: {str(e)}")
 
-    def _dataframe_to_text(self, df: "pd.DataFrame", include_headers: bool = True) -> str:
-        """Convert DataFrame to formatted text."""
+    def _process_all_excel_sheets(self, file_path: Path, max_rows: int, include_headers: bool) -> str:
+        """Process all sheets in an Excel file.
+
+        Args:
+            file_path: Path to the Excel file.
+            max_rows: Maximum rows per sheet.
+            include_headers: Whether to include headers.
+
+        Returns:
+            Formatted content from all sheets.
+        """
+        import pandas as pd
+
+        excel_file = pd.ExcelFile(file_path)
+        all_content = []
+
+        for sheet in excel_file.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet, nrows=max_rows)
+            if not df.empty:
+                all_content.append(f"Sheet: {sheet}")
+                all_content.append(self._dataframe_to_formatted_text(df, include_headers))
+                all_content.append("")  # Empty line between sheets
+
+        return "\n".join(all_content)
+
+    def _dataframe_to_formatted_text(self, df: "pd.DataFrame", include_headers: bool = True) -> str:
+        """Convert DataFrame to well-formatted text with proper column alignment.
+
+        Args:
+            df: Pandas DataFrame to convert.
+            include_headers: Whether to include column headers.
+
+        Returns:
+            Formatted text representation of the DataFrame.
+        """
         if df.empty:
             return ""
 
-        # Convert all values to strings and handle NaN
+        # Convert all values to strings and handle NaN values
         df_str = df.astype(str).replace("nan", "")
 
         rows = []
@@ -160,17 +244,30 @@ class SpreadsheetProcessor(DocumentProcessor):
         for _, row in df_str.iterrows():
             rows.append(row.tolist())
 
+        return self._format_table_rows(rows)
+
+    def _format_table_rows(self, rows: List[List[str]]) -> str:
+        """Format table rows with proper column alignment.
+
+        Args:
+            rows: List of rows, each row is a list of cell values.
+
+        Returns:
+            Formatted table as string with aligned columns.
+        """
         if not rows:
             return ""
 
         # Calculate column widths for formatting
-        col_widths = [0] * len(rows[0])
+        max_cols = max(len(row) for row in rows) if rows else 0
+        col_widths = [0] * max_cols
+
         for row in rows:
             for i, cell in enumerate(row):
                 if i < len(col_widths):
                     col_widths[i] = max(col_widths[i], len(str(cell)))
 
-        # Format rows
+        # Format rows with proper spacing
         formatted_rows = []
         for row in rows:
             formatted_cells = []
@@ -182,13 +279,26 @@ class SpreadsheetProcessor(DocumentProcessor):
         return "\n".join(formatted_rows)
 
     def extract_metadata(self, file_path: Union[str, Path]) -> Dict[str, Any]:
-        """Extract metadata from spreadsheet file.
+        """Extract comprehensive metadata from spreadsheet files.
+
+        This method analyzes spreadsheet structure, content, and provides detailed
+        information about the data organization and format.
 
         Args:
-            file_path: Path to the spreadsheet file
+            file_path: Path to the spreadsheet file.
 
         Returns:
-            Dictionary containing metadata
+            Dictionary containing metadata with keys:
+            - file_path: Original file path
+            - file_size: File size in bytes
+            - file_type: File extension
+            - created/modified: File timestamps
+            - CSV specific:
+              - row_count, column_count: Data dimensions
+            - Excel specific:
+              - sheet_names, sheet_count: Sheet information
+              - sheets_info: Per-sheet analysis with row/column counts
+            - content_analysis_error: Error message if analysis fails
         """
         self.validate_file(file_path)
         file_path = Path(file_path)
@@ -203,60 +313,90 @@ class SpreadsheetProcessor(DocumentProcessor):
         }
 
         if file_path.suffix.lower() == ".csv":
-            try:
-                with open(file_path, "r", encoding="utf-8") as file:
-                    reader = csv.reader(file)
-                    row_count = sum(1 for _ in reader)
-                    file.seek(0)
-
-                    # Get column count from first row
-                    try:
-                        first_row = next(reader)
-                        col_count = len(first_row)
-                    except StopIteration:
-                        col_count = 0
-
-                    metadata.update(
-                        {
-                            "row_count": row_count,
-                            "column_count": col_count,
-                        }
-                    )
-
-            except Exception as e:
-                metadata["content_analysis_error"] = str(e)
-
+            metadata.update(self._analyze_csv_metadata(file_path))
         elif file_path.suffix.lower() in [".xlsx", ".xls"]:
-            try:
-                import pandas as pd
-
-                excel_file = pd.ExcelFile(file_path)
-
-                metadata.update(
-                    {
-                        "sheet_names": excel_file.sheet_names,
-                        "sheet_count": len(excel_file.sheet_names),
-                    }
-                )
-
-                # Get info for each sheet
-                sheet_info = {}
-                for sheet_name in excel_file.sheet_names:
-                    try:
-                        df = pd.read_excel(file_path, sheet_name=sheet_name)
-                        sheet_info[sheet_name] = {
-                            "row_count": len(df),
-                            "column_count": len(df.columns),
-                            "columns": df.columns.tolist(),
-                        }
-                    except Exception as e:
-                        sheet_info[sheet_name] = {"error": str(e)}
-
-                metadata["sheets_info"] = sheet_info
-
-            except ImportError:
-                metadata["analysis_error"] = "pandas not available for Excel metadata"
-            except Exception as e:
-                metadata["content_analysis_error"] = str(e)
+            metadata.update(self._analyze_excel_metadata(file_path))
 
         return metadata
+
+    def _analyze_csv_metadata(self, file_path: Path) -> Dict[str, Any]:
+        """Analyze metadata for CSV files.
+
+        Args:
+            file_path: Path to the CSV file.
+
+        Returns:
+            Dictionary with CSV-specific metadata.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                # Detect delimiter
+                delimiter = self._detect_csv_delimiter(file)
+
+                reader = csv.reader(file, delimiter=delimiter)
+                row_count = sum(1 for _ in reader)
+                file.seek(0)
+
+                # Get column count from first row
+                try:
+                    first_row = next(reader)
+                    col_count = len(first_row)
+                except StopIteration:
+                    col_count = 0
+
+                return {
+                    "format": "csv",
+                    "row_count": row_count,
+                    "column_count": col_count,
+                    "detected_delimiter": delimiter,
+                }
+
+        except Exception as e:
+            return {"content_analysis_error": str(e)}
+
+    def _analyze_excel_metadata(self, file_path: Path) -> Dict[str, Any]:
+        """Analyze metadata for Excel files.
+
+        Args:
+            file_path: Path to the Excel file.
+
+        Returns:
+            Dictionary with Excel-specific metadata.
+        """
+        try:
+            import pandas as pd
+
+            excel_file = pd.ExcelFile(file_path)
+
+            metadata = {
+                "format": "excel",
+                "sheet_names": excel_file.sheet_names,
+                "sheet_count": len(excel_file.sheet_names),
+            }
+
+            # Get detailed info for each sheet
+            sheet_info = {}
+            for sheet_name in excel_file.sheet_names:
+                try:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                    sheet_info[sheet_name] = {
+                        "row_count": len(df),
+                        "column_count": len(df.columns),
+                        "columns": df.columns.tolist(),
+                        "has_data": not df.empty,
+                    }
+
+                    # Add data type analysis for non-empty sheets
+                    if not df.empty:
+                        sheet_info[sheet_name]["column_types"] = df.dtypes.to_dict()
+
+                except Exception as e:
+                    sheet_info[sheet_name] = {"error": str(e)}
+
+            metadata["sheets_info"] = sheet_info
+            return metadata
+
+        except ImportError:
+            return {"analysis_error": "pandas not available for Excel metadata extraction"}
+        except Exception as e:
+            return {"content_analysis_error": str(e)}

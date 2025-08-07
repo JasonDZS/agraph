@@ -1,39 +1,72 @@
-"""
-知识检索器模块
+"""Knowledge retriever module.
 
-专门负责知识图谱的检索功能，与构建过程分离
+Dedicated to knowledge graph retrieval functionality, separated from the building process.
 """
 
 import asyncio
+import json
 import logging
+import os.path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..embeddings import GraphEmbedding
+from openai import AsyncOpenAI
+
+from ..config import settings
+from ..embeddings import GraphEmbedding, OpenAIEmbedding
 from ..graph import KnowledgeGraph
+from ..storage import JsonVectorStorage, VectorStorage
+from ..utils import get_type_value
+from .base import RetrievalEntity, RetrievalRelation, RetrievalResult
 
 logger = logging.getLogger(__name__)
 
 
 class KnowledgeRetriever:
-    """知识检索器 - 专门负责知识图谱的检索功能"""
+    """Knowledge retriever - dedicated to knowledge graph retrieval functionality."""
 
     def __init__(
         self,
-        graph: KnowledgeGraph,
+        graph: Optional[KnowledgeGraph] = None,
         graph_embedding: Optional[GraphEmbedding] = None,
+        vector_storage: Optional[VectorStorage] = None,
     ):
-        """
-        初始化知识检索器
+        """Initialize knowledge retriever.
 
         Args:
-            graph: 知识图谱
-            graph_embedding: 图嵌入实例，用于向量检索
+            graph: Knowledge graph instance.
+            graph_embedding: Graph embedding instance for vector retrieval
+                (mutually exclusive with vector_storage).
+            vector_storage: Vector storage instance for direct vector retrieval.
         """
-        self.graph = graph
-        self.graph_embedding = graph_embedding
+        if graph is not None:
+            self.graph = graph
+        else:
+            with open(os.path.join(settings.workdir, "graph.json"), "r", encoding="utf-8") as f:
+                graph_data = json.load(f)
+            # Load graph data from JSON string
+            self.graph = KnowledgeGraph().from_dict(graph_data)
 
-        # 初始化检索统计
+        if vector_storage is not None:
+            self.vector_storage = vector_storage
+        else:
+            self.vector_storage = JsonVectorStorage(os.path.join(settings.workdir, "vectors.json"))
+
+        if graph_embedding is not None:
+            self.graph_embedding = graph_embedding
+        else:
+            self.graph_embedding = OpenAIEmbedding(
+                vector_storage=self.vector_storage,
+                openai_api_key=settings.OPENAI_API_KEY,
+                openai_api_base=settings.OPENAI_API_BASE,
+                embedding_model=settings.EMBEDDING_MODEL,
+            )
+
+        # Use direct vector_storage if provided, otherwise get from graph_embedding
+        if not self.vector_storage and self.graph_embedding:
+            self.vector_storage = self.graph_embedding.vector_storage
+
+        # Initialize retrieval statistics
         self.retrieval_stats: Dict[str, Any] = {
             "total_searches": 0,
             "entity_searches": 0,
@@ -46,44 +79,56 @@ class KnowledgeRetriever:
 
     async def search_entities(
         self, query: str, top_k: int = 10, similarity_threshold: float = 0.5
-    ) -> List[Tuple[str, float]]:
-        """
-        基于embedding搜索相似实体
+    ) -> List[RetrievalEntity]:
+        """Search for similar entities based on embedding.
 
         Args:
-            query: 查询文本
-            top_k: 返回数量
-            similarity_threshold: 相似度阈值
+            query: Query text.
+            top_k: Number of results to return.
+            similarity_threshold: Similarity threshold.
 
         Returns:
-            List[Tuple[str, float]]: 实体ID和相似度列表
+            List[RetrievalEntity]: List of entities with similarity scores.
         """
-        if not self.graph_embedding:
-            logger.warning("No graph embedding configured for search")
+        if not self.vector_storage:
+            logger.warning("No vector storage configured for search")
             return []
 
         try:
-            # 使用文本嵌入进行相似度搜索
-            query_embedding = await self.graph_embedding.embed_text(query)
+            # Use text embedding for similarity search
+            if self.graph_embedding:
+                query_embedding = await self.graph_embedding.embed_text(query)
+            else:
+                logger.warning("No graph embedding available, cannot embed query text")
+                return []
+
             if query_embedding is None:
                 return []
 
-            # 使用向量存储搜索相似实体
-            similar_vectors = self.graph_embedding.vector_storage.search_similar_vectors(
-                query_embedding, top_k + 10, similarity_threshold  # 多取一些，再过滤
+            # Use vector storage to search for similar entities
+            similar_vectors = self.vector_storage.search_similar_vectors(
+                query_embedding, top_k + 10, similarity_threshold  # Get more, then filter
             )
+            logger.info("search similar vectors: %s", similar_vectors)
 
-            # 过滤出实体向量，确保实体存在于图中
+            # Filter entity vectors, ensure entities exist in the graph
             filtered_results = []
             for vector_id, similarity in similar_vectors:
                 if vector_id.startswith("entity_"):
-                    entity_id = vector_id[7:]  # 移除"entity_"前缀
-                    if entity_id in self.graph.entities:
-                        filtered_results.append((entity_id, similarity))
+                    entity_id = vector_id[len("entity_") :]  # Remove prefix
+                    if self.graph and entity_id in self.graph.entities:
+                        entity = self.graph.get_entity(entity_id)
+                        if entity is not None:
+                            filtered_results.append(
+                                RetrievalEntity(
+                                    entity=entity,
+                                    score=similarity,
+                                )
+                            )
                         if len(filtered_results) >= top_k:
                             break
 
-            # 跟踪搜索统计
+            # Track search statistics
             self._track_search("entity_search", query, len(filtered_results), True)
 
             return filtered_results
@@ -95,44 +140,56 @@ class KnowledgeRetriever:
 
     async def search_relations(
         self, query: str, top_k: int = 10, similarity_threshold: float = 0.5
-    ) -> List[Tuple[str, float]]:
-        """
-        基于embedding搜索相似关系
+    ) -> List[RetrievalRelation]:
+        """Search for similar relations based on embedding.
 
         Args:
-            query: 查询文本
-            top_k: 返回数量
-            similarity_threshold: 相似度阈值
+            query: Query text.
+            top_k: Number of results to return.
+            similarity_threshold: Similarity threshold.
 
         Returns:
-            List[Tuple[str, float]]: 关系ID和相似度列表
+            List[RetrievalRelation]: List of relations with similarity scores.
         """
-        if not self.graph_embedding:
-            logger.warning("No graph embedding configured for search")
+        if not self.vector_storage:
+            logger.warning("No vector storage configured for search")
             return []
 
         try:
-            # 使用文本嵌入进行相似度搜索
-            query_embedding = await self.graph_embedding.embed_text(query)
+            # Use text embedding for similarity search
+            if self.graph_embedding:
+                query_embedding = await self.graph_embedding.embed_text(query)
+            else:
+                logger.warning("No graph embedding available, cannot embed query text")
+                return []
+
             if query_embedding is None:
                 return []
 
-            # 使用向量存储搜索相似关系
-            similar_vectors = self.graph_embedding.vector_storage.search_similar_vectors(
-                query_embedding, top_k + 10, similarity_threshold  # 多取一些，再过滤
+            # Use vector storage to search for similar relations
+            similar_vectors = self.vector_storage.search_similar_vectors(
+                query_embedding, top_k + 10, similarity_threshold  # Get more, then filter
             )
 
-            # 过滤出关系向量，确保关系存在于图中
+            # Filter relation vectors, ensure relations exist in the graph
             filtered_results = []
             for vector_id, similarity in similar_vectors:
                 if vector_id.startswith("relation_"):
-                    relation_id = vector_id[9:]  # 移除"relation_"前缀
-                    if relation_id in self.graph.relations:
-                        filtered_results.append((relation_id, similarity))
+                    relation_id = vector_id[len("relation_") :]  # Remove prefix
+                    # Ensure relation exists in the graph
+                    if self.graph and relation_id in self.graph.relations:
+                        relation = self.graph.get_relation(relation_id)
+                        if relation is not None:
+                            filtered_results.append(
+                                RetrievalRelation(
+                                    relation=relation,
+                                    score=similarity,
+                                )
+                            )
                         if len(filtered_results) >= top_k:
                             break
 
-            # 跟踪搜索统计
+            # Track search statistics
             self._track_search("relation_search", query, len(filtered_results), True)
 
             return filtered_results
@@ -144,33 +201,36 @@ class KnowledgeRetriever:
 
     async def search_knowledge(
         self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, similarity_threshold: float = 0.5
-    ) -> Dict[str, List[Tuple[str, float]]]:
-        """
-        综合搜索知识图谱
+    ) -> RetrievalResult:
+        """Comprehensive knowledge graph search.
 
         Args:
-            query: 查询文本
-            top_k_entities: 返回实体数量
-            top_k_relations: 返回关系数量
-            similarity_threshold: 相似度阈值
+            query: Query text.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            similarity_threshold: Similarity threshold.
 
         Returns:
-            Dict: 包含entities和relations的搜索结果
+            RetrievalResult: Search results containing entities and relations.
         """
-        if not self.graph_embedding:
-            logger.warning("No graph embedding configured for search")
-            return {"entities": [], "relations": []}
+        result = RetrievalResult()
+        if not self.vector_storage:
+            logger.warning("No vector storage configured for search")
+            return result
 
         try:
-            # 并行搜索实体和关系
+            # Search entities and relations in parallel
             entity_task = self.search_entities(query, top_k_entities, similarity_threshold)
             relation_task = self.search_relations(query, top_k_relations, similarity_threshold)
 
             entities, relations = await asyncio.gather(entity_task, relation_task)
 
-            result = {"entities": entities, "relations": relations}
+            # result = {"entities": entities, "relations": relations}
+            result.entities = entities
+            result.relations = relations
+            result.success = True
 
-            # 跟踪综合搜索统计
+            # Track comprehensive search statistics
             total_results = len(entities) + len(relations)
             self._track_search("knowledge_search", query, total_results, True)
 
@@ -179,23 +239,24 @@ class KnowledgeRetriever:
         except Exception as e:
             logger.error(f"Error searching knowledge: {e}")
             self._track_search("knowledge_search", query, 0, False, str(e))
-            return {"entities": [], "relations": []}
+            result.success = False
+            result.msg = str(e)
+            return result
 
     def search_entities_by_type(self, entity_type: str, top_k: int = 10) -> List[Tuple[str, Any]]:
-        """
-        按类型搜索实体
+        """Search entities by type.
 
         Args:
-            entity_type: 实体类型
-            top_k: 返回数量
+            entity_type: Entity type to search for.
+            top_k: Number of results to return.
 
         Returns:
-            List[Tuple[str, Any]]: 实体ID和实体对象列表
+            List[Tuple[str, Any]]: List of tuples containing entity ID and entity object.
         """
         try:
             results = []
             for entity_id, entity in self.graph.entities.items():
-                if entity.entity_type.value == entity_type:
+                if get_type_value(entity.entity_type) == entity_type:
                     results.append((entity_id, entity))
                     if len(results) >= top_k:
                         break
@@ -209,20 +270,19 @@ class KnowledgeRetriever:
             return []
 
     def search_relations_by_type(self, relation_type: str, top_k: int = 10) -> List[Tuple[str, Any]]:
-        """
-        按类型搜索关系
+        """Search relations by type.
 
         Args:
-            relation_type: 关系类型
-            top_k: 返回数量
+            relation_type: Relation type to search for.
+            top_k: Number of results to return.
 
         Returns:
-            List[Tuple[str, Any]]: 关系ID和关系对象列表
+            List[Tuple[str, Any]]: List of tuples containing relation ID and relation object.
         """
         try:
             results = []
             for relation_id, relation in self.graph.relations.items():
-                if relation.relation_type.value == relation_type:
+                if get_type_value(relation.relation_type) == relation_type:
                     results.append((relation_id, relation))
                     if len(results) >= top_k:
                         break
@@ -236,15 +296,14 @@ class KnowledgeRetriever:
             return []
 
     def get_entity_neighbors(self, entity_id: str, max_hops: int = 1) -> Dict[str, List[str]]:
-        """
-        获取实体的邻居节点
+        """Get neighbor nodes of an entity.
 
         Args:
-            entity_id: 实体ID
-            max_hops: 最大跳数
+            entity_id: Entity ID to find neighbors for.
+            max_hops: Maximum number of hops to traverse.
 
         Returns:
-            Dict[str, List[str]]: 邻居实体按跳数分组
+            Dict[str, List[str]]: Neighbor entities grouped by hop distance.
         """
         try:
             if entity_id not in self.graph.entities:
@@ -258,7 +317,7 @@ class KnowledgeRetriever:
                 next_level = set()
 
                 for current_entity_id in current_level:
-                    # 查找通过关系连接的邻居
+                    # Find neighbors connected through relations
                     for relation in self.graph.relations.values():
                         neighbor_id = None
 
@@ -293,16 +352,15 @@ class KnowledgeRetriever:
             return {}
 
     def get_shortest_path(self, start_entity_id: str, end_entity_id: str, max_length: int = 5) -> Optional[List[str]]:
-        """
-        查找两个实体之间的最短路径
+        """Find the shortest path between two entities.
 
         Args:
-            start_entity_id: 起始实体ID
-            end_entity_id: 终止实体ID
-            max_length: 最大路径长度
+            start_entity_id: Starting entity ID.
+            end_entity_id: Target entity ID.
+            max_length: Maximum path length to consider.
 
         Returns:
-            Optional[List[str]]: 路径上的实体ID列表，如果没有路径则返回None
+            Optional[List[str]]: List of entity IDs in the path, or None if no path exists.
         """
         try:
             if start_entity_id not in self.graph.entities or end_entity_id not in self.graph.entities:
@@ -311,7 +369,7 @@ class KnowledgeRetriever:
             if start_entity_id == end_entity_id:
                 return [start_entity_id]
 
-            # BFS查找最短路径
+            # BFS to find shortest path
             from collections import deque
 
             queue = deque([(start_entity_id, [start_entity_id])])
@@ -323,7 +381,7 @@ class KnowledgeRetriever:
                 if len(path) > max_length:
                     continue
 
-                # 获取当前实体的邻居
+                # Get neighbors of current entity
                 neighbors = self.get_entity_neighbors(current_id, max_hops=1)
                 for neighbor_id in neighbors.get("hop_1", []):
                     if neighbor_id == end_entity_id:
@@ -344,27 +402,25 @@ class KnowledgeRetriever:
             return None
 
     def update_graph(self, new_graph: KnowledgeGraph) -> None:
-        """
-        更新底层知识图谱
+        """Update the underlying knowledge graph.
 
         Args:
-            new_graph: 新的知识图谱
+            new_graph: New knowledge graph instance.
         """
         self.graph = new_graph
         self.retrieval_stats["last_updated"] = datetime.now()
         logger.info("Knowledge retriever updated with new graph")
 
     def get_retrieval_statistics(self) -> Dict[str, Any]:
-        """
-        获取检索统计信息
+        """Get retrieval statistics.
 
         Returns:
-            Dict[str, Any]: 检索统计信息
+            Dict[str, Any]: Retrieval statistics information.
         """
         return self.retrieval_stats.copy()
 
     def reset_statistics(self) -> None:
-        """重置检索统计信息"""
+        """Reset retrieval statistics."""
         self.retrieval_stats.update(
             {
                 "total_searches": 0,
@@ -381,15 +437,14 @@ class KnowledgeRetriever:
     def _track_search(
         self, search_type: str, query: str, result_count: int, success: bool, error_msg: Optional[str] = None
     ) -> None:
-        """
-        跟踪搜索统计
+        """Track search statistics.
 
         Args:
-            search_type: 搜索类型
-            query: 查询内容
-            result_count: 结果数量
-            success: 是否成功
-            error_msg: 错误信息
+            search_type: Type of search operation.
+            query: Query content.
+            result_count: Number of results returned.
+            success: Whether the search was successful.
+            error_msg: Error message if any.
         """
         self.retrieval_stats["total_searches"] += 1
 
@@ -403,7 +458,7 @@ class KnowledgeRetriever:
         else:
             self.retrieval_stats["errors"] += 1
 
-        # 记录搜索历史
+        # Record search history
         search_record = {
             "timestamp": datetime.now(),
             "search_type": search_type,
@@ -414,6 +469,119 @@ class KnowledgeRetriever:
         }
         self.retrieval_stats["search_history"].append(search_record)
 
-        # 限制历史记录数量
+        # Limit history record count
         if len(self.retrieval_stats["search_history"]) > 1000:
             self.retrieval_stats["search_history"] = self.retrieval_stats["search_history"][-1000:]
+
+
+class ChatKnowledgeRetriever(KnowledgeRetriever):
+    """Knowledge-based chat retriever for conversational interfaces."""
+
+    llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_API_BASE)
+
+    async def chat_llm(
+        self, query: str, entities: List[RetrievalEntity], relations: List[RetrievalRelation], history_messages: list
+    ) -> str | None:
+        """Generate chat response using LLM.
+
+        Args:
+            query: User query.
+            entities: List of retrieved entities.
+            relations: List of retrieved relations.
+            history_messages: Chat history message list.
+
+        Returns:
+            str | None: LLM generated response, or None if generation fails.
+        """
+        # This can call actual LLM API for chat response generation
+        # For example, using OpenAI's API
+        # This is just an example, actual implementation needs to be adjusted according to specific LLM API
+        result = await self.llm.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": settings.RAG_SYS_PROMPT.format(
+                        history=history_messages,
+                        kg_context=json.dumps(
+                            {
+                                "entities": [entity.entity.to_dict() for entity in entities],
+                                "relations": [relation.relation.to_dict() for relation in relations],
+                            },
+                            ensure_ascii=False,
+                        ),
+                        response_type="text",
+                    ),
+                },
+                {"role": "user", "content": query},
+            ],
+            model=settings.LLM_MODEL,
+        )
+        result_txt = result.choices[0].message.content
+        return result_txt if isinstance(result_txt, str) else None
+
+    async def achat(
+        self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, history_messages: list = []
+    ) -> Any:
+        """Knowledge-based chat (async version).
+
+        Args:
+            query: User query.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            history_messages: Chat history message list.
+
+        Returns:
+            Dict[str, Any]: Search results containing entities and relations.
+        """
+        try:
+            # Perform knowledge retrieval
+            results = await self.search_knowledge(query, top_k_entities, top_k_relations)
+            logger.info(
+                "retrieved entities and relations successfully, %s entities, %s relations",
+                len(results.entities),
+                len(results.relations),
+            )
+            answer = await self.chat_llm(
+                query, entities=results.entities, relations=results.relations, history_messages=history_messages
+            )
+
+            # Generate chat response
+            response = {
+                "query": query,
+                "entities": results.entities,
+                "relations": results.relations,
+                "timestamp": datetime.now().isoformat(),
+                "answer": answer,
+            }
+
+            # Track chat statistics
+            self._track_search("chat", query, len(results.entities) + len(results.relations), True)
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in chat: {e}")
+            self._track_search("chat", query, 0, False, str(e))
+            return {"error": str(e)}
+
+    def chat(
+        self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, history_messages: list = []
+    ) -> Dict[str, Any]:
+        """Synchronous chat method.
+
+        Args:
+            query: User query.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            history_messages: Chat history message list.
+
+        Returns:
+            Dict[str, Any]: Search results containing entities and relations.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.achat(query, top_k_entities, top_k_relations, history_messages))
+        except Exception as e:
+            logger.warning("No event loop running, using asyncio.run(), %s", e)
+            # If no event loop exists, use asyncio.run()
+            return asyncio.run(self.achat(query, top_k_entities, top_k_relations, history_messages))

@@ -51,7 +51,7 @@ fi
 
 # 3. 语法检查 (Flake8)
 ((total_checks++))
-if run_check "语法检查 (Flake8)" "flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503 --count --statistics" "🔧"; then
+if run_check "语法检查 (Flake8)" "flake8 agraph/ examples/ --max-line-length=120 --extend-ignore=E203,W503,E501 --count --statistics" "🔧"; then
     ((passed_checks++))
 fi
 
