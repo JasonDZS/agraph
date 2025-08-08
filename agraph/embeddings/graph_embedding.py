@@ -340,7 +340,7 @@ class OpenAIEmbedding(GraphEmbedding):
         openai_api_key: Optional[str] = None,
         openai_api_base: Optional[str] = None,
         embedding_model: str = "text-embedding-3-small",
-        batch_size: int = 100,
+        batch_size: int = 64,
         max_concurrent: int = 5,
     ):
         """
