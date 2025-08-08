@@ -5,7 +5,6 @@ Provides JSON file-based storage for knowledge graphs.
 """
 
 import json
-import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -13,10 +12,9 @@ from typing import Any, Dict, List, Optional
 from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from .base_storage import GraphStorage
-
-logger = logging.getLogger(__name__)
 
 
 class JsonStorage(GraphStorage):

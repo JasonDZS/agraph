@@ -4,7 +4,6 @@ Neo4j graph database storage implementation.
 Provides Neo4j-based storage for knowledge graphs with full database features.
 """
 
-import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -12,12 +11,11 @@ from neo4j import Driver
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from ..types import EntityType, RelationType
 from ..utils import get_type_value
 from .base_storage import GraphStorage
-
-logger = logging.getLogger(__name__)
 
 
 class Neo4jStorage(GraphStorage):

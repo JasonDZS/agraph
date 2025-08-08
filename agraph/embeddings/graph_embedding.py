@@ -5,7 +5,6 @@
 """
 
 import asyncio
-import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
@@ -15,11 +14,10 @@ from openai import AsyncOpenAI
 from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from ..storage import JsonVectorStorage, VectorStorage
 from ..utils import get_type_value
-
-logger = logging.getLogger(__name__)
 
 
 class GraphEmbedding(ABC):

@@ -24,14 +24,12 @@ following the principle that clients should not depend on interfaces they don't 
 """
 
 import asyncio
-import logging
 from typing import Any, Dict, List, Optional
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
-
-logger = logging.getLogger(__name__)
 
 
 class GraphMergerMixin:

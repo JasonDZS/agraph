@@ -1,11 +1,11 @@
 import asyncio
-import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..entities import Entity
 from ..extractors.entity_extractor import BaseEntityExtractor, DatabaseEntityExtractor, TextEntityExtractor
 from ..extractors.relation_extractor import BaseRelationExtractor, DatabaseRelationExtractor, TextRelationExtractor
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from .interfaces import (
     BasicGraphBuilder,
@@ -21,8 +21,6 @@ from .mixins import (
     GraphValidatorMixin,
     IncrementalBuilderMixin,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class MinimalGraphBuilder(BasicGraphBuilder):

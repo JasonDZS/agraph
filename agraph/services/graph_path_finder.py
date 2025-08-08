@@ -13,15 +13,13 @@ Key Features:
 - Configurable search depth limits
 """
 
-import logging
 from collections import deque
 from typing import List, Optional, Set, Union
 
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from ..types import RelationType
-
-logger = logging.getLogger(__name__)
 
 
 class GraphPathFinder:

@@ -5,15 +5,13 @@ This module provides utility functions for knowledge graph operations including
 export to visualization formats, graph analysis, path finding, and validation.
 """
 
-import logging
 from collections import deque
 from typing import Any, Dict, List, Optional, Union
 
 from .graph import KnowledgeGraph
+from .logger import logger
 from .relations import Relation
 from .types import EntityType, RelationType
-
-logger = logging.getLogger(__name__)
 
 
 def get_type_value(type_obj: Union[EntityType, RelationType, str]) -> str:

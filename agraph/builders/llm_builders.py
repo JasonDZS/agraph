@@ -7,7 +7,6 @@
 
 import asyncio
 import json
-import logging
 import os.path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -18,6 +17,7 @@ from ..entities import Entity
 from ..extractors.llm_entity_extractor import LLMEntityExtractor
 from ..extractors.llm_relation_extractor import LLMRelationExtractor
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from ..storage import JsonVectorStorage, VectorStorage
 from ..types import EntityType, RelationType
@@ -36,8 +36,6 @@ from .mixins import (
     GraphValidatorMixin,
     IncrementalBuilderMixin,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class LLMUsageTracker:

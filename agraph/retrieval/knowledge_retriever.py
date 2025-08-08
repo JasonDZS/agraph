@@ -5,7 +5,6 @@ Dedicated to knowledge graph retrieval functionality, separated from the buildin
 
 import asyncio
 import json
-import logging
 import os.path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,11 +14,10 @@ from openai import AsyncOpenAI
 from ..config import settings
 from ..embeddings import GraphEmbedding, OpenAIEmbedding
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..storage import JsonVectorStorage, VectorStorage
 from ..utils import get_type_value
 from .base import RetrievalEntity, RetrievalRelation, RetrievalResult
-
-logger = logging.getLogger(__name__)
 
 
 class KnowledgeRetriever:

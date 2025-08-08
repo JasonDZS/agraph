@@ -5,16 +5,14 @@ Provides JSON file-based vector storage implementation with similarity search.
 """
 
 import json
-import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from ..config import settings
+from ..logger import logger
 from .interfaces import VectorStorage
-
-logger = logging.getLogger(__name__)
 
 
 class JsonVectorStorage(VectorStorage):

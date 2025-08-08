@@ -5,15 +5,13 @@ Provides abstract base class for graph storage implementations.
 """
 
 import json
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
-
-logger = logging.getLogger(__name__)
 
 
 class GraphStorage(ABC):
