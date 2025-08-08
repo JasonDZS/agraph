@@ -13,13 +13,11 @@ Key Features:
 - Entity importance scoring
 """
 
-import logging
 from typing import Any, Dict, List, Set
 
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..types import EntityType, RelationType
-
-logger = logging.getLogger(__name__)
 
 
 class GraphAnalyzer:

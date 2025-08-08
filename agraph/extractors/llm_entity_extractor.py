@@ -4,7 +4,6 @@ LLM-based entity extractor module
 
 import asyncio
 import json
-import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -12,11 +11,10 @@ from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from ..entities import Entity
+from ..logger import logger
 from ..types import EntityType
 from ..utils import get_type_value
 from .entity_extractor import BaseEntityExtractor
-
-logger = logging.getLogger(__name__)
 
 
 class LLMEntityExtractor(BaseEntityExtractor):

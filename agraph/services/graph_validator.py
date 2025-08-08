@@ -14,12 +14,10 @@ Key Features:
 - Configurable validation severity levels
 """
 
-import logging
 from typing import Any, Dict, List, Set
 
 from ..graph import KnowledgeGraph
-
-logger = logging.getLogger(__name__)
+from ..logger import logger
 
 
 class GraphValidator:

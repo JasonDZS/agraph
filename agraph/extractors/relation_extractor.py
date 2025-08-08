@@ -5,16 +5,14 @@ This module provides relation extraction capabilities from various data sources.
 Includes base classes and concrete implementations for text and database relation extraction.
 """
 
-import logging
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from ..entities import Entity
+from ..logger import logger
 from ..relations import Relation
 from ..types import EntityType, RelationType
-
-logger = logging.getLogger(__name__)
 
 
 class BaseRelationExtractor(ABC):

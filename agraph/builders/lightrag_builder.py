@@ -8,7 +8,6 @@ Based on LightRAG framework for knowledge graph construction with automatic
 entity and relation extraction from documents, generating GraphML format files.
 """
 
-import logging
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, TypeVar
 from ..config import settings
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
 from ..types import EntityType, RelationType
 from ..utils import get_type_value
@@ -35,8 +35,6 @@ from .mixins import (
     GraphValidatorMixin,
     IncrementalBuilderMixin,
 )
-
-logger = logging.getLogger(__name__)
 
 # 定义类型变量
 T = TypeVar("T")

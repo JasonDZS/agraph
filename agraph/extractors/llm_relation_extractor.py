@@ -4,7 +4,6 @@ LLM-based relation extractor module
 
 import asyncio
 import json
-import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -12,12 +11,11 @@ from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from ..entities import Entity
+from ..logger import logger
 from ..relations import Relation
 from ..types import RelationType
 from ..utils import get_type_value
 from .relation_extractor import BaseRelationExtractor
-
-logger = logging.getLogger(__name__)
 
 
 class LLMRelationExtractor(BaseRelationExtractor):

@@ -5,15 +5,13 @@ This module provides entity extraction capabilities from various data sources.
 Includes base classes and concrete implementations for text and database entity extraction.
 """
 
-import logging
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set
 
 from ..entities import Entity
+from ..logger import logger
 from ..types import EntityType
-
-logger = logging.getLogger(__name__)
 
 
 class BaseEntityExtractor(ABC):

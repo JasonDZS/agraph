@@ -9,7 +9,6 @@ Each interface has a single, well-defined responsibility:
 - GraphExport: Export functionality
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -17,9 +16,8 @@ import numpy as np
 
 from ..entities import Entity
 from ..graph import KnowledgeGraph
+from ..logger import logger
 from ..relations import Relation
-
-logger = logging.getLogger(__name__)
 
 
 class GraphConnection(ABC):

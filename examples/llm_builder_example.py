@@ -1,14 +1,11 @@
 import asyncio
-import logging
 import os
 
 from agraph import ChatKnowledgeRetriever
 from agraph.builders import LLMGraphBuilder
 from agraph.config import settings
+from agraph.logger import logger
 from agraph.storage import JsonVectorStorage
-
-# 配置日志系统以显示详细信息
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 settings.workdir = "./workdir/llm_builder_example"  # 设置工作目录
 os.makedirs(settings.workdir, exist_ok=True)  # 确保工作目录存在
@@ -34,18 +31,18 @@ async def build_knowledge_graph():
 
     graph = await builder.build_graph(texts=texts, graph_name="科技公司")
 
-    print(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
+    logger.info(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
 
     # 打印实体信息用于调试
-    print("\n=== 构建的实体 ===")
+    logger.info("\n=== 构建的实体 ===")
     for entity_id, entity in graph.entities.items():
-        print(f"- {entity.name} ({entity.entity_type.value}): {entity.description}")
+        logger.info(f"- {entity.name} ({entity.entity_type.value}): {entity.description}")
 
     # 打印关系信息用于调试
-    print(f"\n=== 构建的关系 ({len(graph.relations)}) ===")
+    logger.info(f"\n=== 构建的关系 ({len(graph.relations)}) ===")
     for relation_id, relation in graph.relations.items():
         if relation.head_entity and relation.tail_entity:
-            print(
+            logger.info(
                 f"- {relation.head_entity.name} --{relation.relation_type.value}--> {relation.tail_entity.name}: {relation.description}"
             )
     return graph, builder
@@ -58,14 +55,14 @@ if __name__ == "__main__":
     retriever = ChatKnowledgeRetriever()
     result = retriever.chat("谁创立了苹果公司？")
 
-    print("\n=== 检索结果调试 ===")
-    print(f"检索到的实体数量: {len(result.get('entities', []))}")
-    print(f"检索到的关系数量: {len(result.get('relations', []))}")
+    logger.info("\n=== 检索结果调试 ===")
+    logger.info(f"检索到的实体数量: {len(result.get('entities', []))}")
+    logger.info(f"检索到的关系数量: {len(result.get('relations', []))}")
     if result.get("entities"):
-        print("检索到的实体:")
+        logger.info("检索到的实体:")
         for entity in result["entities"]:
             if hasattr(entity, "entity"):
-                print(f"  - {entity.entity.name}: score={entity.score}")
+                logger.info(f"  - {entity.entity.name}: score={entity.score}")
 
-    print("\n=== 最终结果 ===")
+    logger.info("\n=== 最终结果 ===")
     print(result)
