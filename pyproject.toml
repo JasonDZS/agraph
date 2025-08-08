@@ -44,13 +44,12 @@ dependencies = [
     "beautifulsoup4>=4.13.4",
     "chromadb<1.0",
     "docx2txt>=0.9",
-    "lightrag-hku>=1.4.4",
     "loguru>=0.7.3",
-    "neo4j>=5.28.2",
     "numpy<2.0",
     "openai>=1.98.0",
     "pypdf>=5.9.0",
     "python-dotenv>=1.0.0",
+    "tiktoken>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -120,6 +119,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

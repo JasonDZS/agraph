@@ -8,7 +8,7 @@ extraction, and comprehensive text analysis.
 from pathlib import Path
 from typing import Any, Dict, List, Union, cast
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from .base import DocumentProcessor, ProcessingError
 
@@ -256,9 +256,6 @@ class TextProcessor(DocumentProcessor):
             return {}
 
         frontmatter_text = match.group(1)
-
-        if yaml is None:
-            return {"raw_frontmatter": frontmatter_text}
 
         try:
             result = yaml.safe_load(frontmatter_text)
