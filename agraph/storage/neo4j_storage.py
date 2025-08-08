@@ -7,8 +7,6 @@ Provides Neo4j-based storage for knowledge graphs with full database features.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from neo4j import Driver
-
 from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..logger import logger
@@ -32,6 +30,12 @@ class Neo4jStorage(GraphStorage):
             database: Database name (default: "neo4j")
         """
         super().__init__()
+        try:
+            from neo4j import Driver
+        except ImportError:
+            logger.error("neo4j package not installed. Please install it with: pip install neo4j")
+            raise ImportError("neo4j package is required for Neo4jStorage")
+
         self.uri = uri
         self.username = username
         self.password = password

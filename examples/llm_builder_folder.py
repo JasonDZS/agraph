@@ -3,6 +3,7 @@ import logging
 import os
 
 from agraph.builders import LLMGraphBuilder
+from agraph.chunker import TokenChunker
 from agraph.config import settings
 from agraph.processer.factory import DocumentProcessorFactory
 from agraph.retrieval import ChatKnowledgeRetriever
@@ -26,6 +27,13 @@ async def build_knowledge_graph():
         temperature=0.1,
     )
 
+    # 创建Token分割器
+    chunker = TokenChunker(
+        chunk_size=800,  # 每个chunk最大800个token
+        chunk_overlap=100,  # chunk之间重叠100个token
+        model=settings.LLM_MODEL,  # 使用配置中的模型来计算token
+    )
+
     document_paths = [
         "./examples/documents/company_info.txt",
         "./examples/documents/products.json",
@@ -34,15 +42,30 @@ async def build_knowledge_graph():
         "./examples/documents/technology_stack.md",
     ]
 
-    texts = []
+    all_chunks = []
     processor_factory = DocumentProcessorFactory()
 
+    print("开始处理和分割文档...")
     for doc_path in document_paths:
+        print(f"处理文档: {doc_path}")
         processor = processor_factory.get_processor(doc_path)
         content = processor.process(doc_path)
-        texts.append(f"文档: {doc_path}\n{content}")
 
-    graph = await builder.build_graph(texts=texts, graph_name="科技公司")
+        # 使用chunker分割文档内容
+        document_text = f"文档: {doc_path}\n{content}"
+        chunks = chunker.split_text(document_text)
+
+        print(f"  - 文档被分割为 {len(chunks)} 个chunks")
+        for i, chunk in enumerate(chunks):
+            token_count = chunker.count_tokens(chunk)
+            print(f"    chunk {i+1}: {token_count} tokens, {len(chunk)} 字符")
+
+        all_chunks.extend(chunks)
+
+    print(f"\n总计处理了 {len(all_chunks)} 个文本块")
+
+    # 使用分割后的chunks构建知识图谱
+    graph = await builder.build_graph(texts=all_chunks, graph_name="科技公司")
 
     print(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
     return graph, builder

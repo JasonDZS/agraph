@@ -88,7 +88,7 @@ class WordProcessor(DocumentProcessor):
             raise ProcessingError("python-docx is required for .docx processing. Install with: pip install python-docx")
 
         try:
-            doc = docx.Document(file_path)
+            doc = docx.Document(str(file_path))
             text_content = []
 
             # Extract text from paragraphs
@@ -226,7 +226,7 @@ class WordProcessor(DocumentProcessor):
         try:
             import docx
 
-            doc = docx.Document(file_path)
+            doc = docx.Document(str(file_path))
 
             # Extract core document properties
             props = doc.core_properties
