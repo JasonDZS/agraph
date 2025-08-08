@@ -1,3 +1,8 @@
+# v0.1.2
+
+- fix embedding batch size
+- add loguru as logger module
+
 # v0.1.1
 Change the base class for `Entity` and `Relation` to `ABC` to ensure they are abstract classes.
 
