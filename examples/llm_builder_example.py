@@ -5,7 +5,7 @@ from agraph import ChatKnowledgeRetriever
 from agraph.builders import LLMGraphBuilder
 from agraph.config import settings
 from agraph.logger import logger
-from agraph.storage import JsonVectorStorage
+from agraph.storage import ChromaDBGraphStorage
 
 settings.workdir = "./workdir/llm_builder_example"  # 设置工作目录
 os.makedirs(settings.workdir, exist_ok=True)  # 确保工作目录存在
@@ -18,7 +18,7 @@ async def build_knowledge_graph():
         openai_api_base=settings.OPENAI_API_BASE,
         llm_model=settings.LLM_MODEL,  # 指定LLM模型
         embedding_model=settings.EMBEDDING_MODEL,  # 指定嵌入模型
-        vector_storage=JsonVectorStorage(),  # 使用JSON向量存储
+        vector_storage=ChromaDBGraphStorage(),  # 使用ChromaDB向量存储
         temperature=0.1,
     )
 
@@ -52,12 +52,15 @@ async def build_knowledge_graph():
 if __name__ == "__main__":
     graph, builder = asyncio.run(build_knowledge_graph())
     # 使用构建的知识图谱和构建器
-    retriever = ChatKnowledgeRetriever()
+    retriever = ChatKnowledgeRetriever(
+        vector_storage=ChromaDBGraphStorage(),  # 使用ChromaDB向量存储
+    )
     result = retriever.chat("谁创立了苹果公司？")
 
     logger.info("\n=== 检索结果调试 ===")
     logger.info(f"检索到的实体数量: {len(result.get('entities', []))}")
     logger.info(f"检索到的关系数量: {len(result.get('relations', []))}")
+    logger.info(f"检索到的文本数量: {len(result.get('texts', []))}")
     if result.get("entities"):
         logger.info("检索到的实体:")
         for entity in result["entities"]:

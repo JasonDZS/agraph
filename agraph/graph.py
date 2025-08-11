@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from .entities import Entity
 from .relations import Relation
+from .text import TextChunk
 
 
 @dataclass
@@ -26,8 +27,10 @@ class KnowledgeGraph:
         name: Human-readable name for the knowledge graph.
         entities: Dictionary mapping entity IDs to Entity objects.
         relations: Dictionary mapping relation IDs to Relation objects.
+        text_chunks: Dictionary mapping text chunk IDs to TextChunk objects.
         entity_index: Index mapping entity types to sets of entity IDs.
         relation_index: Index mapping relation types to sets of relation IDs.
+        text_chunk_index: Index mapping chunk types to sets of text chunk IDs.
         created_at: Timestamp when the graph was created.
         updated_at: Timestamp when the graph was last updated.
     """
@@ -36,8 +39,10 @@ class KnowledgeGraph:
     name: str = ""
     entities: Dict[str, Entity] = field(default_factory=dict)
     relations: Dict[str, Relation] = field(default_factory=dict)
+    text_chunks: Dict[str, TextChunk] = field(default_factory=dict)
     entity_index: Dict[str, Set[str]] = field(default_factory=dict)  # Index entities by type
     relation_index: Dict[str, Set[str]] = field(default_factory=dict)  # Index relations by type
+    text_chunk_index: Dict[str, Set[str]] = field(default_factory=dict)  # Index text chunks by type
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
@@ -81,6 +86,23 @@ class KnowledgeGraph:
 
         self.relations[relation.id] = relation
         self._index_relation(relation)
+        self.updated_at = datetime.now()
+        return True
+
+    def add_text_chunk(self, text_chunk: TextChunk) -> bool:
+        """Add a text chunk to the knowledge graph.
+
+        Args:
+            text_chunk: The TextChunk object to add.
+
+        Returns:
+            bool: True if text chunk was added successfully, False if it already exists.
+        """
+        if text_chunk.id in self.text_chunks:
+            return False
+
+        self.text_chunks[text_chunk.id] = text_chunk
+        self._index_text_chunk(text_chunk)
         self.updated_at = datetime.now()
         return True
 
@@ -133,6 +155,32 @@ class KnowledgeGraph:
         self.updated_at = datetime.now()
         return True
 
+    def remove_text_chunk(self, chunk_id: str) -> bool:
+        """Remove a text chunk from the knowledge graph.
+
+        Args:
+            chunk_id: The ID of the text chunk to remove.
+
+        Returns:
+            bool: True if text chunk was removed successfully, False if not found.
+        """
+        if chunk_id not in self.text_chunks:
+            return False
+
+        text_chunk = self.text_chunks[chunk_id]
+
+        # Remove connections from entities and relations
+        for entity in self.entities.values():
+            entity.remove_text_chunk(chunk_id)
+
+        for relation in self.relations.values():
+            relation.remove_text_chunk(chunk_id)
+
+        del self.text_chunks[chunk_id]
+        self._unindex_text_chunk(text_chunk)
+        self.updated_at = datetime.now()
+        return True
+
     def get_entity(self, entity_id: str) -> Optional[Entity]:
         """Get an entity by its ID.
 
@@ -154,6 +202,17 @@ class KnowledgeGraph:
             Optional[Relation]: The relation if found, None otherwise.
         """
         return self.relations.get(relation_id)
+
+    def get_text_chunk(self, chunk_id: str) -> Optional[TextChunk]:
+        """Get a text chunk by its ID.
+
+        Args:
+            chunk_id: The ID of the text chunk to retrieve.
+
+        Returns:
+            Optional[TextChunk]: The text chunk if found, None otherwise.
+        """
+        return self.text_chunks.get(chunk_id)
 
     def get_entities_by_type(self, entity_type: Any) -> List[Entity]:
         """Get all entities of a specific type.
@@ -180,6 +239,101 @@ class KnowledgeGraph:
         relation_type_value = getattr(relation_type, "value", str(relation_type))
         relation_ids = self.relation_index.get(relation_type_value, set())
         return [self.relations[relation_id] for relation_id in relation_ids if relation_id in self.relations]
+
+    def get_text_chunks_by_type(self, chunk_type: str) -> List[TextChunk]:
+        """Get all text chunks of a specific type.
+
+        Args:
+            chunk_type: The type of text chunks to retrieve.
+
+        Returns:
+            List[TextChunk]: List of text chunks matching the specified type.
+        """
+        chunk_ids = self.text_chunk_index.get(chunk_type, set())
+        return [self.text_chunks[chunk_id] for chunk_id in chunk_ids if chunk_id in self.text_chunks]
+
+    def get_text_chunks_by_source(self, source: str) -> List[TextChunk]:
+        """Get all text chunks from a specific source.
+
+        Args:
+            source: The source to filter by.
+
+        Returns:
+            List[TextChunk]: List of text chunks from the specified source.
+        """
+        return [chunk for chunk in self.text_chunks.values() if chunk.source == source]
+
+    def get_entity_text_chunks(self, entity_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific entity.
+
+        Args:
+            entity_id: The ID of the entity.
+
+        Returns:
+            List[TextChunk]: List of text chunks connected to the entity.
+        """
+        if entity_id not in self.entities:
+            return []
+
+        return [chunk for chunk in self.text_chunks.values() if chunk.has_entity(entity_id)]
+
+    def get_relation_text_chunks(self, relation_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific relation.
+
+        Args:
+            relation_id: The ID of the relation.
+
+        Returns:
+            List[TextChunk]: List of text chunks connected to the relation.
+        """
+        if relation_id not in self.relations:
+            return []
+
+        return [chunk for chunk in self.text_chunks.values() if chunk.has_relation(relation_id)]
+
+    def connect_text_chunk_to_entity(self, chunk_id: str, entity_id: str) -> bool:
+        """Connect a text chunk to an entity.
+
+        Args:
+            chunk_id: The ID of the text chunk.
+            entity_id: The ID of the entity.
+
+        Returns:
+            bool: True if connection was successful, False otherwise.
+        """
+        if chunk_id not in self.text_chunks or entity_id not in self.entities:
+            return False
+
+        text_chunk = self.text_chunks[chunk_id]
+        entity = self.entities[entity_id]
+
+        text_chunk.add_entity(entity_id)
+        entity.add_text_chunk(chunk_id)
+
+        self.updated_at = datetime.now()
+        return True
+
+    def connect_text_chunk_to_relation(self, chunk_id: str, relation_id: str) -> bool:
+        """Connect a text chunk to a relation.
+
+        Args:
+            chunk_id: The ID of the text chunk.
+            relation_id: The ID of the relation.
+
+        Returns:
+            bool: True if connection was successful, False otherwise.
+        """
+        if chunk_id not in self.text_chunks or relation_id not in self.relations:
+            return False
+
+        text_chunk = self.text_chunks[chunk_id]
+        relation = self.relations[relation_id]
+
+        text_chunk.add_relation(relation_id)
+        relation.add_text_chunk(chunk_id)
+
+        self.updated_at = datetime.now()
+        return True
 
     def get_entity_relations(
         self, entity_id: str, relation_type: Optional[Any] = None, direction: str = "both"
@@ -258,6 +412,7 @@ class KnowledgeGraph:
         return {
             "total_entities": len(self.entities),
             "total_relations": len(self.relations),
+            "total_text_chunks": len(self.text_chunks),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -304,6 +459,27 @@ class KnowledgeGraph:
         if relation_type in self.relation_index:
             self.relation_index[relation_type].discard(relation.id)
 
+    def _index_text_chunk(self, text_chunk: TextChunk) -> None:
+        """Add text chunk to type index for efficient lookup.
+
+        Args:
+            text_chunk: The text chunk to index.
+        """
+        chunk_type = text_chunk.chunk_type
+        if chunk_type not in self.text_chunk_index:
+            self.text_chunk_index[chunk_type] = set()
+        self.text_chunk_index[chunk_type].add(text_chunk.id)
+
+    def _unindex_text_chunk(self, text_chunk: TextChunk) -> None:
+        """Remove text chunk from type index.
+
+        Args:
+            text_chunk: The text chunk to remove from index.
+        """
+        chunk_type = text_chunk.chunk_type
+        if chunk_type in self.text_chunk_index:
+            self.text_chunk_index[chunk_type].discard(text_chunk.id)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the knowledge graph to a dictionary.
 
@@ -315,6 +491,7 @@ class KnowledgeGraph:
             "name": self.name,
             "entities": {eid: entity.to_dict() for eid, entity in self.entities.items()},
             "relations": {rid: relation.to_dict() for rid, relation in self.relations.items()},
+            "text_chunks": {cid: chunk.to_dict() for cid, chunk in self.text_chunks.items()},
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -343,6 +520,12 @@ class KnowledgeGraph:
             relation = Relation.from_dict(relation_data, graph.entities)
             if relation.head_entity and relation.tail_entity:
                 graph.add_relation(relation)
+
+        # Restore text chunks
+        text_chunks_data = data.get("text_chunks", {})
+        for chunk_data in text_chunks_data.values():
+            text_chunk = TextChunk.from_dict(chunk_data)
+            graph.add_text_chunk(text_chunk)
 
         if "created_at" in data:
             graph.created_at = datetime.fromisoformat(data["created_at"])

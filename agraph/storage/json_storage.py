@@ -14,6 +14,7 @@ from ..entities import Entity
 from ..graph import KnowledgeGraph
 from ..logger import logger
 from ..relations import Relation
+from ..text import TextChunk
 from .base_storage import GraphStorage
 
 
@@ -433,3 +434,451 @@ class JsonStorage(GraphStorage):
         except Exception as e:
             logger.error("Error getting storage info: %s", e)
             return {}
+
+    # TextChunk specific implementations
+
+    def add_text_chunk(self, graph_id: str, text_chunk: TextChunk) -> bool:
+        """Add text chunk to specified graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            graph.add_text_chunk(text_chunk)
+            return self.save_graph(graph)
+
+        except Exception as e:
+            logger.error("Error adding text chunk: %s", e)
+            return False
+
+    def update_text_chunk(self, graph_id: str, text_chunk: TextChunk) -> bool:
+        """Update text chunk in specified graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            if text_chunk.id in graph.text_chunks:
+                graph.text_chunks[text_chunk.id] = text_chunk
+                graph.updated_at = datetime.now()
+                return self.save_graph(graph)
+            return self.add_text_chunk(graph_id, text_chunk)
+
+        except Exception as e:
+            logger.error("Error updating text chunk: %s", e)
+            return False
+
+    def remove_text_chunk(self, graph_id: str, chunk_id: str) -> bool:
+        """Remove text chunk from specified graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            success = graph.remove_text_chunk(chunk_id)
+            if success:
+                return self.save_graph(graph)
+            return False
+
+        except Exception as e:
+            logger.error("Error removing text chunk: %s", e)
+            return False
+
+    def query_text_chunks(self, conditions: Dict[str, Any]) -> List[TextChunk]:
+        """Query text chunks based on specified conditions."""
+
+        if not self.is_connected():
+            logger.error("Not connected to storage")
+            return []
+
+        try:
+            graph_id = conditions.get("graph_id")
+            if not graph_id:
+                logger.error("graph_id is required for text chunk query")
+                return []
+
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+
+            chunks = list(graph.text_chunks.values())
+
+            # Apply filter conditions
+            if "chunk_type" in conditions:
+                chunk_type = conditions["chunk_type"]
+                chunks = [c for c in chunks if c.chunk_type == chunk_type]
+
+            if "language" in conditions:
+                language = conditions["language"]
+                chunks = [c for c in chunks if c.language == language]
+
+            if "source" in conditions:
+                source = conditions["source"]
+                chunks = [c for c in chunks if c.source == source]
+
+            if "min_confidence" in conditions:
+                min_confidence = conditions["min_confidence"]
+                chunks = [c for c in chunks if c.confidence >= min_confidence]
+
+            if "entity_ids" in conditions:
+                entity_ids = set(conditions["entity_ids"])
+                chunks = [c for c in chunks if entity_ids.intersection(c.entities)]
+
+            if "relation_ids" in conditions:
+                relation_ids = set(conditions["relation_ids"])
+                chunks = [c for c in chunks if relation_ids.intersection(c.relations)]
+
+            # Limit results
+            limit = conditions.get("limit", 100)
+            return chunks[:limit]
+
+        except Exception as e:
+            logger.error("Error querying text chunks: %s", e)
+            return []
+
+    def get_text_chunk(self, graph_id: str, chunk_id: str) -> Optional[TextChunk]:
+        """Get text chunk by ID."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return None
+            return graph.get_text_chunk(chunk_id)
+
+        except Exception as e:
+            logger.error("Error getting text chunk: %s", e)
+            return None
+
+    def get_chunks_by_entity(self, graph_id: str, entity_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific entity."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+            return graph.get_entity_text_chunks(entity_id)
+
+        except Exception as e:
+            logger.error("Error getting chunks by entity: %s", e)
+            return []
+
+    def get_chunks_by_relation(self, graph_id: str, relation_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific relation."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+            return graph.get_relation_text_chunks(relation_id)
+
+        except Exception as e:
+            logger.error("Error getting chunks by relation: %s", e)
+            return []
+
+    def batch_add_text_chunks(self, graph_id: str, text_chunks: List[TextChunk]) -> bool:
+        """Batch add text chunks to graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            success_count = 0
+            for chunk in text_chunks:
+                if graph.add_text_chunk(chunk):
+                    success_count += 1
+
+            if success_count > 0:
+                self.save_graph(graph)
+                logger.info("Successfully added %d/%d text chunks", success_count, len(text_chunks))
+
+            return success_count == len(text_chunks)
+
+        except Exception as e:
+            logger.error("Error batch adding text chunks: %s", e)
+            return False
+
+    def batch_update_text_chunks(self, graph_id: str, text_chunks: List[TextChunk]) -> bool:
+        """Batch update text chunks in graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            success_count = 0
+            for chunk in text_chunks:
+                if chunk.id in graph.text_chunks:
+                    graph.text_chunks[chunk.id] = chunk
+                    success_count += 1
+                else:
+                    # If chunk doesn't exist, add it
+                    if graph.add_text_chunk(chunk):
+                        success_count += 1
+
+            if success_count > 0:
+                graph.updated_at = datetime.now()
+                self.save_graph(graph)
+                logger.info("Successfully updated %d/%d text chunks", success_count, len(text_chunks))
+
+            return success_count == len(text_chunks)
+
+        except Exception as e:
+            logger.error("Error batch updating text chunks: %s", e)
+            return False
+
+    def batch_remove_text_chunks(self, graph_id: str, chunk_ids: List[str]) -> bool:
+        """Batch remove text chunks from graph."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                logger.error("Graph %s not found", graph_id)
+                return False
+
+            success_count = 0
+            for chunk_id in chunk_ids:
+                if graph.remove_text_chunk(chunk_id):
+                    success_count += 1
+
+            if success_count > 0:
+                self.save_graph(graph)
+                logger.info("Successfully removed %d/%d text chunks", success_count, len(chunk_ids))
+
+            return success_count == len(chunk_ids)
+
+        except Exception as e:
+            logger.error("Error batch removing text chunks: %s", e)
+            return False
+
+    def get_chunks_by_source(self, graph_id: str, source: str) -> List[TextChunk]:
+        """Get all text chunks from a specific source."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+            return graph.get_text_chunks_by_source(source)
+
+        except Exception as e:
+            logger.error("Error getting chunks by source: %s", e)
+            return []
+
+    def get_chunks_by_type(self, graph_id: str, chunk_type: str) -> List[TextChunk]:
+        """Get all text chunks of a specific type."""
+        try:
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+            return graph.get_text_chunks_by_type(chunk_type)
+
+        except Exception as e:
+            logger.error("Error getting chunks by type: %s", e)
+            return []
+
+    def get_chunks_by_language(self, graph_id: str, language: str) -> List[TextChunk]:
+        """Get all text chunks in a specific language."""
+        try:
+            conditions = {"graph_id": graph_id, "language": language}
+            return self.query_text_chunks(conditions)
+
+        except Exception as e:
+            logger.error("Error getting chunks by language: %s", e)
+            return []
+
+    # Embedding-related implementations (basic file-based storage)
+
+    def add_chunk_embedding(self, graph_id: str, chunk_id: str, embedding: List[float]) -> bool:
+        """Add or update embedding for a text chunk."""
+        try:
+            chunk = self.get_text_chunk(graph_id, chunk_id)
+            if not chunk:
+                logger.error("Text chunk %s not found in graph %s", chunk_id, graph_id)
+                return False
+
+            chunk.embedding = embedding
+            return self.update_text_chunk(graph_id, chunk)
+
+        except Exception as e:
+            logger.error("Error adding chunk embedding: %s", e)
+            return False
+
+    def get_chunk_embedding(self, graph_id: str, chunk_id: str) -> Optional[List[float]]:
+        """Get embedding for a text chunk."""
+        try:
+            chunk = self.get_text_chunk(graph_id, chunk_id)
+            if chunk:
+                return chunk.embedding
+            return None
+
+        except Exception as e:
+            logger.error("Error getting chunk embedding: %s", e)
+            return None
+
+    def search_chunks_by_embedding(
+        self,
+        graph_id: str,
+        query_embedding: List[float],
+        top_k: int = 10,
+        threshold: float = 0.0,
+        chunk_type: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> List[tuple]:
+        """Search text chunks by embedding similarity."""
+        try:
+            conditions = {"graph_id": graph_id}
+            if chunk_type:
+                conditions["chunk_type"] = chunk_type
+            if language:
+                conditions["language"] = language
+
+            chunks = self.query_text_chunks(conditions)
+            chunk_similarities = []
+
+            for chunk in chunks:
+                if chunk.embedding is not None:
+                    similarity = self._compute_cosine_similarity(query_embedding, chunk.embedding)
+                    if similarity >= threshold:
+                        chunk_similarities.append((chunk, similarity))
+
+            # Sort by similarity (descending)
+            chunk_similarities.sort(key=lambda x: x[1], reverse=True)
+            return chunk_similarities[:top_k]
+
+        except Exception as e:
+            logger.error("Error searching chunks by embedding: %s", e)
+            return []
+
+    def search_chunks_hybrid(
+        self,
+        graph_id: str,
+        query_text: str,
+        query_embedding: Optional[List[float]] = None,
+        top_k: int = 10,
+        text_weight: float = 0.3,
+        embedding_weight: float = 0.7,
+        chunk_type: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> List[tuple]:
+        """Hybrid search combining text and embedding similarity."""
+        try:
+            # Validate weights
+            if abs(text_weight + embedding_weight - 1.0) > 0.001:
+                logger.warning("Text and embedding weights do not sum to 1.0, normalizing...")
+                total_weight = text_weight + embedding_weight
+                text_weight /= total_weight
+                embedding_weight /= total_weight
+
+            conditions = {"graph_id": graph_id}
+            if chunk_type:
+                conditions["chunk_type"] = chunk_type
+            if language:
+                conditions["language"] = language
+
+            chunks = self.query_text_chunks(conditions)
+            chunk_scores = []
+
+            query_lower = query_text.lower()
+
+            for chunk in chunks:
+                total_score = 0.0
+
+                # Text similarity score
+                text_score = 0.0
+                if query_lower in chunk.content.lower():
+                    text_score = 0.8  # High score for exact match
+                elif query_lower in chunk.title.lower():
+                    text_score = 0.6  # Medium score for title match
+                else:
+                    # Simple word overlap scoring
+                    query_words = set(query_lower.split())
+                    content_words = set(chunk.content.lower().split())
+                    if query_words and content_words:
+                        overlap = len(query_words.intersection(content_words))
+                        text_score = overlap / len(query_words)
+
+                total_score += text_score * text_weight
+
+                # Embedding similarity score
+                if query_embedding is not None and chunk.embedding is not None:
+                    embedding_score = self._compute_cosine_similarity(query_embedding, chunk.embedding)
+                    total_score += embedding_score * embedding_weight
+
+                if total_score > 0:
+                    chunk_scores.append((chunk, total_score))
+
+            # Sort by combined score (descending)
+            chunk_scores.sort(key=lambda x: x[1], reverse=True)
+            return chunk_scores[:top_k]
+
+        except Exception as e:
+            logger.error("Error in hybrid search: %s", e)
+            return []
+
+    def get_chunk_neighbors(self, graph_id: str, chunk_id: str, max_distance: int = 2) -> List[tuple]:
+        """Get neighboring text chunks through entity/relation connections."""
+        try:
+            chunk = self.get_text_chunk(graph_id, chunk_id)
+            if not chunk:
+                return []
+
+            graph = self.load_graph(graph_id)
+            if not graph:
+                return []
+
+            neighbors = []
+            visited_chunks = {chunk_id}
+
+            # BFS to find neighbors within max_distance
+            current_level = [(chunk, 0)]
+
+            while current_level and any(distance < max_distance for _, distance in current_level):
+                next_level = []
+
+                for current_chunk, distance in current_level:
+                    if distance < max_distance:
+                        # Find chunks connected through shared entities
+                        for entity_id in current_chunk.entities:
+                            connected_chunks = graph.get_entity_text_chunks(entity_id)
+                            for connected_chunk in connected_chunks:
+                                if connected_chunk.id not in visited_chunks:
+                                    neighbors.append((connected_chunk, distance + 1))
+                                    next_level.append((connected_chunk, distance + 1))
+                                    visited_chunks.add(connected_chunk.id)
+
+                        # Find chunks connected through shared relations
+                        for relation_id in current_chunk.relations:
+                            connected_chunks = graph.get_relation_text_chunks(relation_id)
+                            for connected_chunk in connected_chunks:
+                                if connected_chunk.id not in visited_chunks:
+                                    neighbors.append((connected_chunk, distance + 1))
+                                    next_level.append((connected_chunk, distance + 1))
+                                    visited_chunks.add(connected_chunk.id)
+
+                current_level = next_level
+
+            return neighbors
+
+        except Exception as e:
+            logger.error("Error getting chunk neighbors: %s", e)
+            return []
+
+    def _compute_cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Compute cosine similarity between two vectors."""
+        try:
+            import numpy as np
+
+            vec1_array = np.array(vec1, dtype=np.float32)
+            vec2_array = np.array(vec2, dtype=np.float32)
+
+            dot_product = np.dot(vec1_array, vec2_array)
+            norm1 = np.linalg.norm(vec1_array)
+            norm2 = np.linalg.norm(vec2_array)
+
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+
+            similarity = dot_product / (norm1 * norm2)
+            return float(max(0.0, min(1.0, similarity)))
+
+        except Exception as e:
+            logger.error("Error computing cosine similarity: %s", e)
+            return 0.0

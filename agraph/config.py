@@ -119,6 +119,13 @@ When handling information with timestamps:
 - Do not include information not provided by the Data Sources."""
     )
 
+    MAX_CHUNK_SIZE: int = Field(
+        default_factory=lambda: int(os.getenv("MAX_CHUNK_SIZE", "512"))
+    )  # Maximum size of each text chunk in tokens
+    CHUNK_OVERLAP: int = Field(
+        default_factory=lambda: int(os.getenv("CHUNK_OVERLAP", "100"))
+    )  # Overlap size between text chunks in tokens
+
     def __new__(cls, *args: Any, **kwargs: Any) -> Any:
         if not hasattr(cls, "_instance") or cls._instance is None:
             cls._instance = super().__new__(cls)

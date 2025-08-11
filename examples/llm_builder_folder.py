@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 
@@ -7,7 +6,7 @@ from agraph.chunker import TokenChunker
 from agraph.config import settings
 from agraph.processer.factory import DocumentProcessorFactory
 from agraph.retrieval import ChatKnowledgeRetriever
-from agraph.storage import JsonVectorStorage
+from agraph.storage import ChromaDBGraphStorage, JsonVectorStorage
 
 # 配置日志系统以显示详细信息
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -17,20 +16,30 @@ os.makedirs(settings.workdir, exist_ok=True)  # 确保工作目录存在
 
 
 async def build_knowledge_graph():
-    # 创建图构建器
+    # 创建图构建器 - 可以无缝切换存储类型
+    # 选择存储类型: 'chroma' 或 'json'
+    storage_type = "json"  # 切换为 'chroma' 来使用 ChromaDB
+
+    if storage_type == "chroma":
+        vector_storage = ChromaDBGraphStorage()
+        print("使用 ChromaDB 向量存储")
+    else:
+        vector_storage = JsonVectorStorage()
+        print("使用 JSON 向量存储")
+
     builder = LLMGraphBuilder(
         openai_api_key=settings.OPENAI_API_KEY,
         openai_api_base=settings.OPENAI_API_BASE,
         llm_model=settings.LLM_MODEL,  # 指定LLM模型
         embedding_model=settings.EMBEDDING_MODEL,  # 指定嵌入模型
-        vector_storage=JsonVectorStorage(),  # 使用JSON向量存储
+        vector_storage=vector_storage,  # 使用选择的向量存储
         temperature=0.1,
     )
 
     # 创建Token分割器
     chunker = TokenChunker(
-        chunk_size=800,  # 每个chunk最大800个token
-        chunk_overlap=100,  # chunk之间重叠100个token
+        chunk_size=settings.MAX_CHUNK_SIZE,  # 每个chunk最大800个token
+        chunk_overlap=settings.CHUNK_OVERLAP,  # chunk之间重叠100个token
         model=settings.LLM_MODEL,  # 使用配置中的模型来计算token
     )
 
@@ -68,13 +77,17 @@ async def build_knowledge_graph():
     graph = await builder.build_graph(texts=all_chunks, graph_name="科技公司")
 
     print(f"构建了包含 {len(graph.entities)} 个实体和 {len(graph.relations)} 个关系的知识图谱")
-    return graph, builder
+    return graph, builder, vector_storage
 
 
 # 运行示例
 if __name__ == "__main__":
-    graph, builder = asyncio.run(build_knowledge_graph())
+
+    # graph, builder, vector_storage = asyncio.run(build_knowledge_graph())
+
     # 使用构建的知识图谱和构建器
-    retriever = ChatKnowledgeRetriever()
+    # 使用相同的vector_storage实例保证数据一致性
+    vector_storage = JsonVectorStorage()
+    retriever = ChatKnowledgeRetriever(vector_storage=vector_storage)
     result = retriever.chat("公司总部位置")
     print(result)

@@ -40,10 +40,10 @@ from .retrieval import ChatKnowledgeRetriever, KnowledgeRetriever
 from .services import EntityMerger, GraphAnalyzer, GraphPathFinder, GraphValidator
 
 # 存储
-from .storage import GraphStorage, JsonStorage
+from .storage import ChromaDBGraphStorage, GraphStorage, JsonStorage
 from .storage import JsonVectorStorage as StorageJsonVectorStorage  # 区别于embeddings的版本
-from .storage import Neo4jStorage
 from .storage.interfaces import BasicGraphStorage, FullGraphStorage, QueryableGraphStorage, VectorStorage
+from .text import TextChunk, TextChunkConnection
 
 # 核心数据结构
 from .types import EntityType, RelationType
@@ -56,6 +56,8 @@ __all__ = [
     "RelationType",
     "Entity",
     "Relation",
+    "TextChunk",
+    "TextChunkConnection",
     "KnowledgeGraph",
     # 抽取器
     "BaseEntityExtractor",
@@ -72,9 +74,9 @@ __all__ = [
     "ComprehensiveGraphBuilder",
     # 存储
     "GraphStorage",
-    "Neo4jStorage",
     "JsonStorage",
     "StorageJsonVectorStorage",
+    "ChromaDBGraphStorage",
     # 嵌入
     "GraphEmbedding",
     # 检索

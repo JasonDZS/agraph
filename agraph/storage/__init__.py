@@ -5,6 +5,7 @@ Provides various graph storage implementations including JSON, Neo4j, and vector
 """
 
 from .base_storage import GraphStorage
+from .chroma_storage import ChromaDBGraphStorage
 from .interfaces import (
     BasicGraphStorage,
     FullGraphStorage,
@@ -20,12 +21,10 @@ from .interfaces import (
     VectorStorageQuery,
 )
 from .json_storage import JsonStorage
-from .neo4j_storage import Neo4jStorage
 from .vector_storage import JsonVectorStorage
 
 __all__ = [
     "GraphStorage",
-    "Neo4jStorage",
     "JsonStorage",
     "BasicGraphStorage",
     "QueryableGraphStorage",
@@ -41,4 +40,5 @@ __all__ = [
     "VectorStorageCRUD",
     "VectorStorageQuery",
     "JsonVectorStorage",
+    "ChromaDBGraphStorage",
 ]

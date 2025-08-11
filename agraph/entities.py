@@ -5,7 +5,7 @@ Entity-related data structures and operations.
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from .types import EntityType, EntityTypeType
 
@@ -24,6 +24,7 @@ class Entity:
         aliases: Alternative names for the entity
         confidence: Confidence score of entity extraction (0.0 to 1.0)
         source: Source document or origin of the entity
+        text_chunks: Set of text chunk IDs that mention or contain this entity
         created_at: Timestamp when the entity was created
         updated_at: Timestamp when the entity was last updated
     """
@@ -36,6 +37,7 @@ class Entity:
     aliases: List[str] = field(default_factory=list)
     confidence: float = 1.0
     source: str = ""
+    text_chunks: Set[str] = field(default_factory=set)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
@@ -82,6 +84,47 @@ class Entity:
         """
         return self.properties.get(key, default)
 
+    def add_text_chunk(self, chunk_id: str) -> None:
+        """
+        Add a text chunk connection to the entity.
+
+        Args:
+            chunk_id: The ID of the text chunk to connect
+        """
+        self.text_chunks.add(chunk_id)
+        self.updated_at = datetime.now()
+
+    def remove_text_chunk(self, chunk_id: str) -> None:
+        """
+        Remove a text chunk connection from the entity.
+
+        Args:
+            chunk_id: The ID of the text chunk to disconnect
+        """
+        self.text_chunks.discard(chunk_id)
+        self.updated_at = datetime.now()
+
+    def has_text_chunk(self, chunk_id: str) -> bool:
+        """
+        Check if the entity is connected to a specific text chunk.
+
+        Args:
+            chunk_id: The ID of the text chunk to check
+
+        Returns:
+            True if the text chunk is connected, False otherwise
+        """
+        return chunk_id in self.text_chunks
+
+    def get_text_chunk_count(self) -> int:
+        """
+        Get the number of text chunks connected to this entity.
+
+        Returns:
+            Number of connected text chunks
+        """
+        return len(self.text_chunks)
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert entity to dictionary representation.
@@ -100,6 +143,7 @@ class Entity:
             "aliases": self.aliases,
             "confidence": self.confidence,
             "source": self.source,
+            "text_chunks": list(self.text_chunks),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -130,7 +174,10 @@ class Entity:
             aliases=data.get("aliases", []),
             confidence=data.get("confidence", 1.0),
             source=data.get("source", ""),
+            text_chunks=set(data.get("text_chunks", [])),
         )
         if "created_at" in data:
             entity.created_at = datetime.fromisoformat(data["created_at"])
+        if "updated_at" in data:
+            entity.updated_at = datetime.fromisoformat(data["updated_at"])
         return entity
