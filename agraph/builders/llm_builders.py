@@ -11,6 +11,7 @@ import os.path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..chunker import TokenChunker
 from ..config import settings
 from ..embeddings import OpenAIEmbedding
 from ..entities import Entity
@@ -20,6 +21,7 @@ from ..graph import KnowledgeGraph
 from ..logger import logger
 from ..relations import Relation
 from ..storage import JsonVectorStorage, VectorStorage
+from ..text import TextChunk
 from ..types import EntityType, RelationType
 from ..utils import get_type_value
 from .interfaces import (
@@ -715,6 +717,126 @@ class LLMGraphUtils:
 
         return relations_added
 
+    @staticmethod
+    def create_text_chunks(
+        texts: List[str], chunk_size: int = 1000, chunk_overlap: int = 200, source: str = "unknown"
+    ) -> List[TextChunk]:
+        """从文本列表创建TextChunk"""
+        chunker = TokenChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        text_chunks = []
+
+        for text_idx, text in enumerate(texts):
+            if not text.strip():
+                continue
+
+            # 如果文本足够小，直接创建一个chunk
+            if chunker.count_tokens(text) <= chunk_size:
+                chunk = TextChunk(
+                    content=text,
+                    source=f"{source}_doc_{text_idx}",
+                    chunk_type="document" if len(texts) == 1 else "section",
+                    start_index=0,
+                    end_index=len(text),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                text_chunks.append(chunk)
+            else:
+                # 将大文本分块
+                chunks = chunker.split_text(text)
+                start_pos = 0
+
+                for chunk_idx, chunk_text in enumerate(chunks):
+                    end_pos = start_pos + len(chunk_text)
+                    chunk = TextChunk(
+                        content=chunk_text,
+                        source=f"{source}_doc_{text_idx}",
+                        chunk_type="chunk",
+                        start_index=start_pos,
+                        end_index=end_pos,
+                        metadata={
+                            "original_doc_index": text_idx,
+                            "chunk_index": chunk_idx,
+                            "total_chunks": len(chunks),
+                        },
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    )
+                    text_chunks.append(chunk)
+                    start_pos = end_pos
+
+        return text_chunks
+
+    @staticmethod
+    def link_chunks_to_entities_and_relations(
+        text_chunks: List[TextChunk],
+        graph: KnowledgeGraph,
+        entity_data_list: List[Dict[str, Any]],
+        relations_data: List[Dict[str, Any]],
+    ) -> None:
+        """将文本块与实体和关系建立连接"""
+        # 为每个chunk建立与实体和关系的连接
+        for chunk in text_chunks:
+            chunk_text_lower = chunk.content.lower()
+
+            # 连接实体
+            for entity_data in entity_data_list:
+                entity_name = entity_data["name"].lower()
+                aliases = [alias.lower() for alias in entity_data.get("aliases", [])]
+                all_names = [entity_name] + aliases
+
+                # 检查实体名称或别名是否在chunk中
+                for name in all_names:
+                    if name in chunk_text_lower:
+                        # 查找对应的实体ID
+                        for entity in graph.entities.values():
+                            if entity.name.lower() == entity_name:
+                                chunk.add_entity(entity.id)
+                                break
+
+            # 连接关系
+            for relation_data in relations_data:
+                head_name = relation_data["head_entity"].lower()
+                tail_name = relation_data["tail_entity"].lower()
+
+                # 如果chunk包含关系的两个实体，则建立连接
+                if head_name in chunk_text_lower and tail_name in chunk_text_lower:
+                    for relation in graph.relations.values():
+                        if (
+                            relation.head_entity
+                            and relation.tail_entity
+                            and relation.head_entity.name.lower() == head_name
+                            and relation.tail_entity.name.lower() == tail_name
+                        ):
+                            chunk.add_relation(relation.id)
+                            break
+
+    @staticmethod
+    def store_text_chunks(
+        graph: KnowledgeGraph, text_chunks: List[TextChunk], vector_storage: Optional[VectorStorage] = None
+    ) -> bool:
+        """将TextChunk存储到向量存储中"""
+        if not vector_storage:
+            return False
+
+        try:
+            # 检查storage是否支持text chunk操作
+            if hasattr(vector_storage, "batch_add_text_chunks"):
+                result = vector_storage.batch_add_text_chunks(graph.id, text_chunks)
+                return bool(result)
+            elif hasattr(vector_storage, "add_text_chunk"):
+                success = True
+                for chunk in text_chunks:
+                    if not vector_storage.add_text_chunk(graph.id, chunk):
+                        success = False
+                return success
+            else:
+                logger.warning("Vector storage does not support text chunk operations")
+                return False
+        except Exception as e:
+            logger.error(f"Error storing text chunks: {e}")
+            return False
+
 
 # ============================================================================
 # ISP-compliant LLM Builder Implementations
@@ -780,7 +902,13 @@ class MinimalLLMGraphBuilder(BasicGraphBuilder):
             all_entities = []
             all_relations = []
 
-            # 串行处理每个文本
+            # 1. 创建TextChunk
+            text_chunks = LLMGraphUtils.create_text_chunks(
+                texts, chunk_size=settings.MAX_CHUNK_SIZE, chunk_overlap=settings.CHUNK_OVERLAP, source=graph_name
+            )
+            logger.info(f"Created {len(text_chunks)} text chunks")
+
+            # 2. 串行处理每个文本进行实体和关系提取
             for text in texts:
                 # 异步提取实体
                 entities = await self.entity_extractor._extract_entities_async(text)
@@ -811,11 +939,22 @@ class MinimalLLMGraphBuilder(BasicGraphBuilder):
                 ]
                 all_relations.extend(relation_data)
 
-            # 构建图谱
+            # 3. 构建图谱
             entity_mapping = LLMGraphUtils.build_entities_from_data(graph, all_entities)
             LLMGraphUtils.build_relations_from_data(graph, all_relations, entity_mapping)
 
-            logger.info(f"Minimal LLM graph built: {len(graph.entities)} entities, {len(graph.relations)} relations")
+            # 4. 建立TextChunk与实体和关系的连接
+            LLMGraphUtils.link_chunks_to_entities_and_relations(text_chunks, graph, all_entities, all_relations)
+
+            # 5. 将TextChunk添加到图谱的metadata中（简单存储）
+            if not hasattr(graph, "text_chunks"):
+                graph.text_chunks = {}
+            for chunk in text_chunks:
+                graph.text_chunks[chunk.id] = chunk
+
+            logger.info(
+                f"Minimal LLM graph built: {len(graph.entities)} entities, {len(graph.relations)} relations, {len(text_chunks)} text chunks"
+            )
             return graph
 
         except Exception as e:
@@ -911,24 +1050,46 @@ class FlexibleLLMGraphBuilder(UpdatableGraphBuilder):
             # 更新会话统计
             self.usage_tracker.update_session_stats(len(texts), 0, 0)
 
-            # 异步处理文本
+            # 1. 创建TextChunk
+            text_chunks = LLMGraphUtils.create_text_chunks(texts, source=graph_name)
+            logger.info(f"Created {len(text_chunks)} text chunks")
+
+            # 2. 异步处理文本
             all_entities, all_relations = await self.async_processor.process_texts_async(texts)
 
-            # 去重实体
+            # 3. 去重实体
             deduplicated_entities = await self.async_processor.deduplicate_entities(all_entities)
 
-            # 构建图谱
+            # 4. 构建图谱
             entity_mapping = LLMGraphUtils.build_entities_from_data(graph, deduplicated_entities)
             relations_added = LLMGraphUtils.build_relations_from_data(graph, all_relations, entity_mapping)
 
-            # 更新统计
+            # 5. 建立TextChunk与实体和关系的连接
+            LLMGraphUtils.link_chunks_to_entities_and_relations(
+                text_chunks, graph, deduplicated_entities, all_relations
+            )
+
+            # 6. 存储TextChunk到vector storage
+            chunk_storage_success = LLMGraphUtils.store_text_chunks(graph, text_chunks, self.vector_storage)
+            if chunk_storage_success:
+                logger.info(f"Successfully stored {len(text_chunks)} text chunks to vector storage")
+            else:
+                logger.warning("Failed to store text chunks to vector storage")
+
+            # 7. 更新统计
             self.usage_tracker.update_session_stats(0, len(deduplicated_entities), relations_added)
 
-            # 构建嵌入（可选）
+            # 8. 构建嵌入（可选）
             if self.graph_embedding:
                 await self._build_embeddings(graph)
 
-            logger.info(f"Flexible LLM graph built: {len(graph.entities)} entities, {len(graph.relations)} relations")
+                # 为text chunks构建嵌入
+                if hasattr(self.graph_embedding, "build_chunk_embeddings"):
+                    await self.graph_embedding.build_chunk_embeddings(text_chunks)
+
+            logger.info(
+                f"Flexible LLM graph built: {len(graph.entities)} entities, {len(graph.relations)} relations, {len(text_chunks)} text chunks"
+            )
             return graph
 
         except Exception as e:
@@ -983,10 +1144,14 @@ class FlexibleLLMGraphBuilder(UpdatableGraphBuilder):
 
         logger.info(f"Updating graph with {len(texts)} new texts")
 
-        # 处理新文本
+        # 1. 创建新的TextChunk
+        new_text_chunks = LLMGraphUtils.create_text_chunks(texts, source=f"{graph.name}_update")
+        logger.info(f"Created {len(new_text_chunks)} new text chunks")
+
+        # 2. 处理新文本
         all_entities, all_relations = await self.async_processor.process_texts_async(texts)
 
-        # 与现有实体进行匹配和去重
+        # 3. 与现有实体进行匹配和去重
         new_entities = []
         for entity_data in all_entities:
             existing_entity = LLMGraphUtils.find_similar_entity(graph, entity_data)
@@ -995,19 +1160,35 @@ class FlexibleLLMGraphBuilder(UpdatableGraphBuilder):
             else:
                 new_entities.append(entity_data)
 
-        # 添加新实体
+        # 4. 添加新实体
         entity_mapping = {entity.name: entity.id for entity in graph.entities.values()}
         new_entity_mapping = LLMGraphUtils.build_entities_from_data(graph, new_entities)
         entity_mapping.update(new_entity_mapping)
 
-        # 添加新关系
+        # 5. 添加新关系
         relations_added = LLMGraphUtils.build_relations_from_data(graph, all_relations, entity_mapping)
 
-        # 更新嵌入
+        # 6. 建立新TextChunk与实体和关系的连接
+        LLMGraphUtils.link_chunks_to_entities_and_relations(new_text_chunks, graph, all_entities, all_relations)
+
+        # 7. 存储新的TextChunk
+        chunk_storage_success = LLMGraphUtils.store_text_chunks(graph, new_text_chunks, self.vector_storage)
+        if chunk_storage_success:
+            logger.info(f"Successfully stored {len(new_text_chunks)} new text chunks to vector storage")
+        else:
+            logger.warning("Failed to store new text chunks to vector storage")
+
+        # 8. 更新嵌入
         if self.graph_embedding:
             await self._build_embeddings(graph)
 
-        logger.info(f"Graph updated with texts: {len(new_entities)} new entities, {relations_added} new relations")
+            # 为新的text chunks构建嵌入
+            if hasattr(self.graph_embedding, "build_chunk_embeddings"):
+                await self.graph_embedding.build_chunk_embeddings(new_text_chunks)
+
+        logger.info(
+            f"Graph updated with texts: {len(new_entities)} new entities, {relations_added} new relations, {len(new_text_chunks)} new text chunks"
+        )
         return graph
 
     async def _build_embeddings(self, graph: KnowledgeGraph) -> None:
@@ -1094,8 +1275,11 @@ class LLMGraphBuilder(
         validation_result = await self.validate_graph(graph)
         if not validation_result.get("valid", True):
             logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
-        with open(os.path.join(settings.workdir, "graph.json"), "w") as f:
-            json.dump(graph.to_dict(), f, ensure_ascii=False, indent=2)
+
+        # 导出图谱和统计信息
+        await self._export_graph_to_file(graph, os.path.join(settings.workdir, "graph.json"))
+
+        # 保存向量存储
         self.flexible_builder.vector_storage.save()
         return graph
 
@@ -1115,6 +1299,21 @@ class LLMGraphBuilder(
             logger.warning(f"Graph validation issues: {validation_result.get('issues', [])}")
 
         return updated_graph
+
+    async def _export_graph_to_file(self, graph: KnowledgeGraph, file_path: str) -> None:
+        """导出图谱到文件"""
+        import asyncio
+        import json
+
+        # 使用 export_to_format 方法获取 JSON 格式的数据
+        graph_data = await self.export_to_format(graph, "json")
+
+        # 在事件循环中异步写入文件
+        def _write_file():
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(graph_data, f, ensure_ascii=False, indent=2)
+
+        await asyncio.get_event_loop().run_in_executor(None, _write_file)
 
     def get_usage_statistics(self) -> Dict[str, Any]:
         """获取使用统计信息"""
@@ -1183,7 +1382,11 @@ class StreamingLLMGraphBuilder(StreamingGraphBuilder, IncrementalBuilderMixin, G
         if not texts:
             graph = KnowledgeGraph(name=graph_name)
         else:
-            # 使用最小构建器创建初始图谱
+            # 1. 创建TextChunk
+            text_chunks = LLMGraphUtils.create_text_chunks(texts, source=graph_name)
+            logger.info(f"Created {len(text_chunks)} text chunks for streaming graph")
+
+            # 2. 使用最小构建器创建初始图谱
             minimal_builder = MinimalLLMGraphBuilder(
                 openai_api_key=self.entity_extractor.openai_client.api_key,
                 openai_api_base=(
@@ -1213,17 +1416,23 @@ class StreamingLLMGraphBuilder(StreamingGraphBuilder, IncrementalBuilderMixin, G
         logger.info(f"Adding {len(documents)} documents to streaming graph")
 
         try:
-            # 处理新文档
-            all_entities, all_relations = await self.async_processor.process_texts_async(documents)
-
-            # 简单去重（流式处理避免复杂去重）
-            simple_dedup_entities = self._simple_entity_dedup(all_entities)
-
-            # 确保当前图谱存在
+            # 1. 确保当前图谱存在
             if self._current_graph is None:
                 raise ValueError("Current graph is not initialized. Call build_initial_graph first.")
 
-            # 添加到当前图谱
+            # 2. 创建新文档的TextChunk
+            new_text_chunks = LLMGraphUtils.create_text_chunks(
+                documents, source=f"{self._current_graph.name}_streaming"
+            )
+            logger.info(f"Created {len(new_text_chunks)} text chunks for new documents")
+
+            # 3. 处理新文档
+            all_entities, all_relations = await self.async_processor.process_texts_async(documents)
+
+            # 4. 简单去重（流式处理避免复杂去重）
+            simple_dedup_entities = self._simple_entity_dedup(all_entities)
+
+            # 5. 添加到当前图谱
             entity_mapping = {entity.name: entity.id for entity in self._current_graph.entities.values()}
 
             # 构建新实体
@@ -1240,11 +1449,26 @@ class StreamingLLMGraphBuilder(StreamingGraphBuilder, IncrementalBuilderMixin, G
                 self._current_graph, all_relations, entity_mapping
             )
 
-            # 记录文档映射
-            for doc_id in document_ids:
-                self._document_registry[doc_id] = list(new_entity_mapping.values())
+            # 6. 建立新TextChunk与实体和关系的连接
+            LLMGraphUtils.link_chunks_to_entities_and_relations(
+                new_text_chunks, self._current_graph, simple_dedup_entities, all_relations
+            )
 
-            logger.info(f"Added {len(new_entities)} entities and {relations_added} relations from streaming documents")
+            # 7. 将新TextChunk添加到图谱
+            if not hasattr(self._current_graph, "text_chunks"):
+                self._current_graph.text_chunks = {}
+            for chunk in new_text_chunks:
+                self._current_graph.text_chunks[chunk.id] = chunk
+
+            # 8. 记录文档映射
+            for i, doc_id in enumerate(document_ids):
+                chunk_ids = [chunk.id for chunk in new_text_chunks if chunk.source.endswith(f"_doc_{i}")]
+                entity_ids = list(new_entity_mapping.values())
+                self._document_registry[doc_id] = entity_ids + chunk_ids
+
+            logger.info(
+                f"Added {len(new_entities)} entities, {relations_added} relations, and {len(new_text_chunks)} text chunks from streaming documents"
+            )
             return self._current_graph
 
         except Exception as e:
@@ -1275,18 +1499,32 @@ class StreamingLLMGraphBuilder(StreamingGraphBuilder, IncrementalBuilderMixin, G
 
         try:
             entities_to_remove = set()
+            chunks_to_remove = set()
 
-            # 收集要移除的文档的实体
+            # 收集要移除的文档的实体和chunks
             for doc_id in document_ids:
                 if doc_id in self._document_registry:
-                    entities_to_remove.update(self._document_registry[doc_id])
+                    items_to_remove = self._document_registry[doc_id]
+                    for item_id in items_to_remove:
+                        # 区分实体ID和chunk ID
+                        if item_id.startswith("entity_"):
+                            entities_to_remove.add(item_id)
+                        else:
+                            chunks_to_remove.add(item_id)
                     del self._document_registry[doc_id]
+
+            # 移除TextChunk
+            if hasattr(self._current_graph, "text_chunks"):
+                for chunk_id in chunks_to_remove:
+                    if chunk_id in self._current_graph.text_chunks:
+                        del self._current_graph.text_chunks[chunk_id]
 
             # 移除实体（这也会移除相关关系）
             for entity_id in entities_to_remove:
                 if entity_id in self._current_graph.entities:
                     self._current_graph.remove_entity(entity_id)
 
+            logger.info(f"Removed {len(entities_to_remove)} entities and {len(chunks_to_remove)} text chunks")
             return self._current_graph
 
         except Exception as e:

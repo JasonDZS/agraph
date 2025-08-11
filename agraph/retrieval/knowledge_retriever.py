@@ -16,8 +16,9 @@ from ..embeddings import GraphEmbedding, OpenAIEmbedding
 from ..graph import KnowledgeGraph
 from ..logger import logger
 from ..storage import JsonVectorStorage, VectorStorage
+from ..text import TextChunk
 from ..utils import get_type_value
-from .base import RetrievalEntity, RetrievalRelation, RetrievalResult
+from .base import RetrievalEntity, RetrievalRelation, RetrievalResult, RetrievalTextChunk
 
 
 class KnowledgeRetriever:
@@ -69,6 +70,7 @@ class KnowledgeRetriever:
             "total_searches": 0,
             "entity_searches": 0,
             "relation_searches": 0,
+            "text_chunk_searches": 0,
             "knowledge_searches": 0,
             "errors": 0,
             "search_history": [],
@@ -107,7 +109,7 @@ class KnowledgeRetriever:
             similar_vectors = self.vector_storage.search_similar_vectors(
                 query_embedding, top_k + 10, similarity_threshold  # Get more, then filter
             )
-            logger.info("search similar vectors: %s", similar_vectors)
+            logger.info(f"search similar vectors: {similar_vectors}")
 
             # Filter entity vectors, ensure entities exist in the graph
             filtered_results = []
@@ -197,8 +199,75 @@ class KnowledgeRetriever:
             self._track_search("relation_search", query, 0, False, str(e))
             return []
 
+    async def search_text_chunks(
+        self, query: str, top_k: int = 10, similarity_threshold: float = 0.5
+    ) -> List[RetrievalTextChunk]:
+        """Search for similar text chunks based on embedding.
+
+        Args:
+            query: Query text.
+            top_k: Number of results to return.
+            similarity_threshold: Similarity threshold.
+
+        Returns:
+            List[RetrievalTextChunk]: List of text chunks with similarity scores.
+        """
+        if not self.vector_storage:
+            logger.warning("No vector storage configured for search")
+            return []
+
+        try:
+            # Use text embedding for similarity search
+            if self.graph_embedding:
+                query_embedding = await self.graph_embedding.embed_text(query)
+            else:
+                logger.warning("No graph embedding available, cannot embed query text")
+                return []
+
+            if query_embedding is None:
+                return []
+
+            # Use vector storage to search for similar text chunks
+            similar_vectors = self.vector_storage.search_similar_vectors(
+                query_embedding, top_k + 10, similarity_threshold  # Get more, then filter
+            )
+            logger.info(f"search similar vectors: {similar_vectors}")
+
+            # Filter text chunk vectors, ensure text chunks exist in the graph
+            filtered_results = []
+            for vector_id, similarity in similar_vectors:
+                if vector_id.startswith("text_chunk_"):
+                    chunk_id = vector_id[len("text_chunk_") :]  # Remove prefix
+                    # Ensure text chunk exists in the graph
+                    if self.graph and chunk_id in self.graph.text_chunks:
+                        text_chunk = self.graph.get_text_chunk(chunk_id)
+                        if text_chunk is not None:
+                            filtered_results.append(
+                                RetrievalTextChunk(
+                                    text_chunk=text_chunk,
+                                    score=similarity,
+                                )
+                            )
+                        if len(filtered_results) >= top_k:
+                            break
+
+            # Track search statistics
+            self._track_search("text_chunk_search", query, len(filtered_results), True)
+
+            return filtered_results
+
+        except Exception as e:
+            logger.error(f"Error searching text chunks: {e}")
+            self._track_search("text_chunk_search", query, 0, False, str(e))
+            return []
+
     async def search_knowledge(
-        self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, similarity_threshold: float = 0.5
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        similarity_threshold: float = 0.5,
     ) -> RetrievalResult:
         """Comprehensive knowledge graph search.
 
@@ -206,10 +275,11 @@ class KnowledgeRetriever:
             query: Query text.
             top_k_entities: Number of entities to return.
             top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
             similarity_threshold: Similarity threshold.
 
         Returns:
-            RetrievalResult: Search results containing entities and relations.
+            RetrievalResult: Search results containing entities, relations, and text chunks.
         """
         result = RetrievalResult()
         if not self.vector_storage:
@@ -217,19 +287,20 @@ class KnowledgeRetriever:
             return result
 
         try:
-            # Search entities and relations in parallel
+            # Search entities, relations, and text chunks in parallel
             entity_task = self.search_entities(query, top_k_entities, similarity_threshold)
             relation_task = self.search_relations(query, top_k_relations, similarity_threshold)
+            text_chunk_task = self.search_text_chunks(query, top_k_text_chunks, similarity_threshold)
 
-            entities, relations = await asyncio.gather(entity_task, relation_task)
+            entities, relations, text_chunks = await asyncio.gather(entity_task, relation_task, text_chunk_task)
 
-            # result = {"entities": entities, "relations": relations}
             result.entities = entities
             result.relations = relations
+            result.text_chunks = text_chunks
             result.success = True
 
             # Track comprehensive search statistics
-            total_results = len(entities) + len(relations)
+            total_results = len(entities) + len(relations) + len(text_chunks)
             self._track_search("knowledge_search", query, total_results, True)
 
             return result
@@ -240,6 +311,146 @@ class KnowledgeRetriever:
             result.success = False
             result.msg = str(e)
             return result
+
+    async def search_knowledge_enhanced(
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        similarity_threshold: float = 0.5,
+        include_connected_chunks: bool = True,
+    ) -> RetrievalResult:
+        """Enhanced comprehensive knowledge graph search that includes connected text chunks.
+
+        Args:
+            query: Query text.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
+            similarity_threshold: Similarity threshold.
+            include_connected_chunks: Whether to include text chunks connected to found entities/relations.
+
+        Returns:
+            RetrievalResult: Enhanced search results with connected information.
+        """
+        result = RetrievalResult()
+        if not self.vector_storage:
+            logger.warning("No vector storage configured for search")
+            return result
+
+        try:
+            # First, perform basic knowledge search
+            basic_result = await self.search_knowledge(
+                query, top_k_entities, top_k_relations, top_k_text_chunks, similarity_threshold
+            )
+
+            if not basic_result.success:
+                return basic_result
+
+            result.entities = basic_result.entities
+            result.relations = basic_result.relations
+            result.text_chunks = basic_result.text_chunks
+
+            if include_connected_chunks:
+                # Find additional text chunks connected to retrieved entities and relations
+                connected_chunks = set()
+
+                # Get text chunks connected to retrieved entities
+                for entity_retrieval in result.entities:
+                    entity_chunks = self.get_text_chunks_by_entity(entity_retrieval.entity.id)
+                    for chunk in entity_chunks:
+                        connected_chunks.add(chunk)
+
+                # Get text chunks connected to retrieved relations
+                for relation_retrieval in result.relations:
+                    relation_chunks = self.get_text_chunks_by_relation(relation_retrieval.relation.id)
+                    for chunk in relation_chunks:
+                        connected_chunks.add(chunk)
+
+                # Add connected chunks that aren't already in results
+                existing_chunk_ids = {chunk.text_chunk.id for chunk in result.text_chunks}
+                additional_chunks = []
+
+                for chunk in connected_chunks:
+                    if chunk.id not in existing_chunk_ids:
+                        # Calculate relevance score based on connection strength
+                        connection_score = self._calculate_chunk_relevance_score(
+                            chunk, result.entities, result.relations
+                        )
+                        additional_chunks.append(RetrievalTextChunk(text_chunk=chunk, score=connection_score))
+
+                # Sort additional chunks by relevance and add top ones
+                additional_chunks.sort(key=lambda x: x.score, reverse=True)
+                max_additional = max(0, top_k_text_chunks - len(result.text_chunks))
+                result.text_chunks.extend(additional_chunks[:max_additional])
+
+            result.success = True
+            total_results = len(result.entities) + len(result.relations) + len(result.text_chunks)
+            self._track_search("enhanced_knowledge_search", query, total_results, True)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in enhanced knowledge search: {e}")
+            self._track_search("enhanced_knowledge_search", query, 0, False, str(e))
+            result.success = False
+            result.msg = str(e)
+            return result
+
+    def _calculate_chunk_relevance_score(
+        self, text_chunk: TextChunk, entities: List[RetrievalEntity], relations: List[RetrievalRelation]
+    ) -> float:
+        """Calculate relevance score for a text chunk based on connected entities and relations.
+
+        Args:
+            text_chunk: The text chunk to score.
+            entities: List of retrieved entities.
+            relations: List of retrieved relations.
+
+        Returns:
+            float: Relevance score between 0.0 and 1.0.
+        """
+        try:
+            entity_connections = 0
+            relation_connections = 0
+            total_entity_score = 0.0
+            total_relation_score = 0.0
+
+            # Count connections to retrieved entities
+            for entity_retrieval in entities:
+                if text_chunk.has_entity(entity_retrieval.entity.id):
+                    entity_connections += 1
+                    total_entity_score += entity_retrieval.score
+
+            # Count connections to retrieved relations
+            for relation_retrieval in relations:
+                if text_chunk.has_relation(relation_retrieval.relation.id):
+                    relation_connections += 1
+                    total_relation_score += relation_retrieval.score
+
+            # Calculate weighted score
+            if entity_connections + relation_connections == 0:
+                return 0.0
+
+            # Average scores weighted by connection counts
+            avg_entity_score = total_entity_score / entity_connections if entity_connections > 0 else 0.0
+            avg_relation_score = total_relation_score / relation_connections if relation_connections > 0 else 0.0
+
+            # Combine scores with weights favoring more connections
+            entity_weight = entity_connections / (entity_connections + relation_connections)
+            relation_weight = relation_connections / (entity_connections + relation_connections)
+
+            final_score = avg_entity_score * entity_weight + avg_relation_score * relation_weight
+
+            # Boost score based on number of connections
+            connection_boost = min(1.0, (entity_connections + relation_connections) / 5.0)
+
+            return min(1.0, final_score * (0.5 + 0.5 * connection_boost))
+
+        except Exception as e:
+            logger.error(f"Error calculating chunk relevance score: {e}")
+            return 0.0
 
     def search_entities_by_type(self, entity_type: str, top_k: int = 10) -> List[Tuple[str, Any]]:
         """Search entities by type.
@@ -291,6 +502,110 @@ class KnowledgeRetriever:
         except Exception as e:
             logger.error(f"Error searching relations by type: {e}")
             self._track_search("relation_type_search", f"type:{relation_type}", 0, False, str(e))
+            return []
+
+    def search_text_chunks_by_type(self, chunk_type: str, top_k: int = 10) -> List[Tuple[str, TextChunk]]:
+        """Search text chunks by type.
+
+        Args:
+            chunk_type: Text chunk type to search for.
+            top_k: Number of results to return.
+
+        Returns:
+            List[Tuple[str, TextChunk]]: List of tuples containing chunk ID and chunk object.
+        """
+        try:
+            results = []
+            for chunk_id, text_chunk in self.graph.text_chunks.items():
+                if text_chunk.chunk_type == chunk_type:
+                    results.append((chunk_id, text_chunk))
+                    if len(results) >= top_k:
+                        break
+
+            self._track_search("text_chunk_type_search", f"type:{chunk_type}", len(results), True)
+            return results
+
+        except Exception as e:
+            logger.error(f"Error searching text chunks by type: {e}")
+            self._track_search("text_chunk_type_search", f"type:{chunk_type}", 0, False, str(e))
+            return []
+
+    def search_text_chunks_by_source(self, source: str, top_k: int = 10) -> List[Tuple[str, TextChunk]]:
+        """Search text chunks by source.
+
+        Args:
+            source: Source to search for.
+            top_k: Number of results to return.
+
+        Returns:
+            List[Tuple[str, TextChunk]]: List of tuples containing chunk ID and chunk object.
+        """
+        try:
+            results = []
+            for chunk_id, text_chunk in self.graph.text_chunks.items():
+                if text_chunk.source == source:
+                    results.append((chunk_id, text_chunk))
+                    if len(results) >= top_k:
+                        break
+
+            self._track_search("text_chunk_source_search", f"source:{source}", len(results), True)
+            return results
+
+        except Exception as e:
+            logger.error(f"Error searching text chunks by source: {e}")
+            self._track_search("text_chunk_source_search", f"source:{source}", 0, False, str(e))
+            return []
+
+    def get_text_chunks_by_entity(self, entity_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific entity.
+
+        Args:
+            entity_id: Entity ID to find connected text chunks for.
+
+        Returns:
+            List[TextChunk]: List of text chunks connected to the entity.
+        """
+        try:
+            if entity_id not in self.graph.entities:
+                return []
+
+            connected_chunks = []
+            for text_chunk in self.graph.text_chunks.values():
+                if text_chunk.has_entity(entity_id):
+                    connected_chunks.append(text_chunk)
+
+            self._track_search("entity_chunks_search", f"entity:{entity_id}", len(connected_chunks), True)
+            return connected_chunks
+
+        except Exception as e:
+            logger.error(f"Error getting text chunks by entity: {e}")
+            self._track_search("entity_chunks_search", f"entity:{entity_id}", 0, False, str(e))
+            return []
+
+    def get_text_chunks_by_relation(self, relation_id: str) -> List[TextChunk]:
+        """Get all text chunks connected to a specific relation.
+
+        Args:
+            relation_id: Relation ID to find connected text chunks for.
+
+        Returns:
+            List[TextChunk]: List of text chunks connected to the relation.
+        """
+        try:
+            if relation_id not in self.graph.relations:
+                return []
+
+            connected_chunks = []
+            for text_chunk in self.graph.text_chunks.values():
+                if text_chunk.has_relation(relation_id):
+                    connected_chunks.append(text_chunk)
+
+            self._track_search("relation_chunks_search", f"relation:{relation_id}", len(connected_chunks), True)
+            return connected_chunks
+
+        except Exception as e:
+            logger.error(f"Error getting text chunks by relation: {e}")
+            self._track_search("relation_chunks_search", f"relation:{relation_id}", 0, False, str(e))
             return []
 
     def get_entity_neighbors(self, entity_id: str, max_hops: int = 1) -> Dict[str, List[str]]:
@@ -424,6 +739,7 @@ class KnowledgeRetriever:
                 "total_searches": 0,
                 "entity_searches": 0,
                 "relation_searches": 0,
+                "text_chunk_searches": 0,
                 "knowledge_searches": 0,
                 "errors": 0,
                 "search_history": [],
@@ -451,6 +767,8 @@ class KnowledgeRetriever:
                 self.retrieval_stats["entity_searches"] += 1
             elif search_type == "relation_search":
                 self.retrieval_stats["relation_searches"] += 1
+            elif search_type == "text_chunk_search":
+                self.retrieval_stats["text_chunk_searches"] += 1
             elif search_type == "knowledge_search":
                 self.retrieval_stats["knowledge_searches"] += 1
         else:
@@ -478,7 +796,12 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
     llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_API_BASE)
 
     async def chat_llm(
-        self, query: str, entities: List[RetrievalEntity], relations: List[RetrievalRelation], history_messages: list
+        self,
+        query: str,
+        entities: List[RetrievalEntity],
+        relations: List[RetrievalRelation],
+        text_chunks: List[RetrievalTextChunk],
+        history_messages: list,
     ) -> str | None:
         """Generate chat response using LLM.
 
@@ -486,29 +809,39 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
             query: User query.
             entities: List of retrieved entities.
             relations: List of retrieved relations.
+            text_chunks: List of retrieved text chunks.
             history_messages: Chat history message list.
 
         Returns:
             str | None: LLM generated response, or None if generation fails.
         """
-        # This can call actual LLM API for chat response generation
-        # For example, using OpenAI's API
-        # This is just an example, actual implementation needs to be adjusted according to specific LLM API
+        # Prepare context information
+        kg_context = {
+            "entities": [entity.entity.to_dict() for entity in entities],
+            "relations": [relation.relation.to_dict() for relation in relations],
+            "text_chunks": [chunk.text_chunk.to_dict() for chunk in text_chunks],
+        }
+
+        # Extract text content for better context
+        text_content = "\n".join(
+            [f"文本片段 {i+1}: {chunk.text_chunk.content[:200]}..." for i, chunk in enumerate(text_chunks)]
+        )
+
+        # Enhanced system prompt with text chunk information
+        enhanced_prompt = settings.RAG_SYS_PROMPT.format(
+            history=history_messages,
+            kg_context=json.dumps(kg_context, ensure_ascii=False),
+            response_type="text",
+        )
+
+        if text_chunks:
+            enhanced_prompt += f"\n\n相关文本内容:\n{text_content}"
+
         result = await self.llm.chat.completions.create(
             messages=[
                 {
                     "role": "system",
-                    "content": settings.RAG_SYS_PROMPT.format(
-                        history=history_messages,
-                        kg_context=json.dumps(
-                            {
-                                "entities": [entity.entity.to_dict() for entity in entities],
-                                "relations": [relation.relation.to_dict() for relation in relations],
-                            },
-                            ensure_ascii=False,
-                        ),
-                        response_type="text",
-                    ),
+                    "content": enhanced_prompt,
                 },
                 {"role": "user", "content": query},
             ],
@@ -518,7 +851,12 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
         return result_txt if isinstance(result_txt, str) else None
 
     async def achat(
-        self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, history_messages: list = []
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        history_messages: list = [],
     ) -> Any:
         """Knowledge-based chat (async version).
 
@@ -526,21 +864,26 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
             query: User query.
             top_k_entities: Number of entities to return.
             top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
             history_messages: Chat history message list.
 
         Returns:
-            Dict[str, Any]: Search results containing entities and relations.
+            Dict[str, Any]: Search results containing entities, relations, text chunks and answer.
         """
         try:
             # Perform knowledge retrieval
-            results = await self.search_knowledge(query, top_k_entities, top_k_relations)
+            results = await self.search_knowledge(query, top_k_entities, top_k_relations, top_k_text_chunks)
             logger.info(
-                "retrieved entities and relations successfully, %s entities, %s relations",
-                len(results.entities),
-                len(results.relations),
+                f"retrieved knowledge successfully: {len(results.entities)} entities, "
+                f"{len(results.relations)} relations, {len(results.text_chunks)} text chunks"
             )
+
             answer = await self.chat_llm(
-                query, entities=results.entities, relations=results.relations, history_messages=history_messages
+                query,
+                entities=results.entities,
+                relations=results.relations,
+                text_chunks=results.text_chunks,
+                history_messages=history_messages,
             )
 
             # Generate chat response
@@ -548,12 +891,14 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
                 "query": query,
                 "entities": results.entities,
                 "relations": results.relations,
+                "text_chunks": results.text_chunks,
                 "timestamp": datetime.now().isoformat(),
                 "answer": answer,
             }
 
             # Track chat statistics
-            self._track_search("chat", query, len(results.entities) + len(results.relations), True)
+            total_results = len(results.entities) + len(results.relations) + len(results.text_chunks)
+            self._track_search("chat", query, total_results, True)
 
             return response
 
@@ -563,7 +908,12 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
             return {"error": str(e)}
 
     def chat(
-        self, query: str, top_k_entities: int = 5, top_k_relations: int = 5, history_messages: list = []
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        history_messages: list = [],
     ) -> Dict[str, Any]:
         """Synchronous chat method.
 
@@ -571,15 +921,133 @@ class ChatKnowledgeRetriever(KnowledgeRetriever):
             query: User query.
             top_k_entities: Number of entities to return.
             top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
             history_messages: Chat history message list.
 
         Returns:
-            Dict[str, Any]: Search results containing entities and relations.
+            Dict[str, Any]: Search results containing entities, relations, text chunks and answer.
         """
         try:
             loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.achat(query, top_k_entities, top_k_relations, history_messages))
+            return loop.run_until_complete(
+                self.achat(query, top_k_entities, top_k_relations, top_k_text_chunks, history_messages)
+            )
         except Exception as e:
-            logger.warning("No event loop running, using asyncio.run(), %s", e)
+            logger.warning(f"No event loop running, using asyncio.run(), {e}")
             # If no event loop exists, use asyncio.run()
-            return asyncio.run(self.achat(query, top_k_entities, top_k_relations, history_messages))
+            return asyncio.run(self.achat(query, top_k_entities, top_k_relations, top_k_text_chunks, history_messages))
+
+    async def achat_enhanced(
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        history_messages: list = [],
+        include_connected_chunks: bool = True,
+    ) -> Any:
+        """Enhanced knowledge-based chat using enhanced retrieval.
+
+        Args:
+            query: User query.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
+            history_messages: Chat history message list.
+            include_connected_chunks: Whether to include connected text chunks.
+
+        Returns:
+            Dict[str, Any]: Enhanced search results with comprehensive context.
+        """
+        try:
+            # Perform enhanced knowledge retrieval
+            results = await self.search_knowledge_enhanced(
+                query,
+                top_k_entities,
+                top_k_relations,
+                top_k_text_chunks,
+                include_connected_chunks=include_connected_chunks,
+            )
+            logger.info(
+                f"enhanced retrieval completed: {len(results.entities)} entities, "
+                f"{len(results.relations)} relations, {len(results.text_chunks)} text chunks"
+            )
+
+            answer = await self.chat_llm(
+                query,
+                entities=results.entities,
+                relations=results.relations,
+                text_chunks=results.text_chunks,
+                history_messages=history_messages,
+            )
+
+            # Generate enhanced chat response
+            response = {
+                "query": query,
+                "entities": results.entities,
+                "relations": results.relations,
+                "text_chunks": results.text_chunks,
+                "timestamp": datetime.now().isoformat(),
+                "answer": answer,
+                "enhanced_search": True,
+                "total_context_items": len(results.entities) + len(results.relations) + len(results.text_chunks),
+            }
+
+            # Track enhanced chat statistics
+            total_results = len(results.entities) + len(results.relations) + len(results.text_chunks)
+            self._track_search("enhanced_chat", query, total_results, True)
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in enhanced chat: {e}")
+            self._track_search("enhanced_chat", query, 0, False, str(e))
+            return {"error": str(e)}
+
+    def chat_enhanced(
+        self,
+        query: str,
+        top_k_entities: int = 5,
+        top_k_relations: int = 5,
+        top_k_text_chunks: int = 5,
+        history_messages: list = [],
+        include_connected_chunks: bool = True,
+    ) -> Dict[str, Any]:
+        """Synchronous enhanced chat method.
+
+        Args:
+            query: User query.
+            top_k_entities: Number of entities to return.
+            top_k_relations: Number of relations to return.
+            top_k_text_chunks: Number of text chunks to return.
+            history_messages: Chat history message list.
+            include_connected_chunks: Whether to include connected text chunks.
+
+        Returns:
+            Dict[str, Any]: Enhanced search results with comprehensive context.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(
+                self.achat_enhanced(
+                    query,
+                    top_k_entities,
+                    top_k_relations,
+                    top_k_text_chunks,
+                    history_messages,
+                    include_connected_chunks,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"No event loop running, using asyncio.run(), {e}")
+            # If no event loop exists, use asyncio.run()
+            return asyncio.run(
+                self.achat_enhanced(
+                    query,
+                    top_k_entities,
+                    top_k_relations,
+                    top_k_text_chunks,
+                    history_messages,
+                    include_connected_chunks,
+                )
+            )

@@ -42,7 +42,7 @@ classifiers = [
 
 dependencies = [
     "beautifulsoup4>=4.13.4",
-    "chromadb<1.0",
+    "chromadb>1.0",
     "docx2txt>=0.9",
     "loguru>=0.7.3",
     "numpy<2.0",
@@ -71,7 +71,7 @@ all = []
 
 [project.urls]
 Homepage = "https://github.com/JasonDZS/agraph"
-Documentation = "https://github.com/JasonDZS/agraph"
+Documentation = "https://jasondizs.github.io/agraph/"
 Repository = "https://github.com/JasonDZS/agraph.git"
 "Bug Tracker" = "https://github.com/JasonDZS/agraph/issues"
 Changelog = "https://github.com/JasonDZS/agraph/blob/main/CHANGELOG.md"

@@ -17,6 +17,7 @@ from ..graph import KnowledgeGraph
 from ..logger import logger
 from ..relations import Relation
 from ..storage import JsonVectorStorage, VectorStorage
+from ..text import TextChunk
 from ..utils import get_type_value
 
 
@@ -36,6 +37,8 @@ class GraphEmbedding(ABC):
         self.id_to_entity: Dict[int, str] = {}
         self.relation_to_id: Dict[str, int] = {}
         self.id_to_relation: Dict[int, str] = {}
+        self.text_chunk_to_id: Dict[str, int] = {}
+        self.id_to_text_chunk: Dict[int, str] = {}
         self.openai_client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else None
         self.embedding_model = embedding_model
 
@@ -77,6 +80,18 @@ class GraphEmbedding(ABC):
         """
         return self.vector_storage.get_vector(f"relation_{relation_id}")
 
+    def get_text_chunk_embedding(self, text_chunk_id: str) -> Optional[np.ndarray]:
+        """
+        获取文本块嵌入向量
+
+        Args:
+            text_chunk_id: 文本块ID
+
+        Returns:
+            np.ndarray: 嵌入向量，如果不存在则返回None
+        """
+        return self.vector_storage.get_vector(f"text_chunk_{text_chunk_id}")
+
     def compute_entity_similarity(self, entity1_id: str, entity2_id: str) -> float:
         """
         计算实体相似度
@@ -98,7 +113,7 @@ class GraphEmbedding(ABC):
             return self.vector_storage.compute_cosine_similarity(emb1, emb2)
 
         except Exception as e:
-            logger.error("Error computing entity similarity: %s", e)
+            logger.error(f"Error computing entity similarity: {e}")
             return 0.0
 
     def recommend_entities(
@@ -136,7 +151,7 @@ class GraphEmbedding(ABC):
             return results[:top_k]
 
         except Exception as e:
-            logger.error("Error recommending entities: %s", e)
+            logger.error(f"Error recommending entities: {e}")
             return []
 
     async def embed_text(self, text: str) -> Optional[np.ndarray]:
@@ -163,7 +178,7 @@ class GraphEmbedding(ABC):
 
     async def build_text_embeddings(self, graph: KnowledgeGraph) -> bool:
         """
-        为图中的实体和关系构建文本嵌入
+        为图中的实体、关系和文本块构建文本嵌入
 
         Args:
             graph: 知识图谱
@@ -178,6 +193,7 @@ class GraphEmbedding(ABC):
         try:
             entity_vectors = {}
             relation_vectors = {}
+            text_chunk_vectors = {}
 
             # 为实体构建文本嵌入
             for entity_id, entity in graph.entities.items():
@@ -193,15 +209,25 @@ class GraphEmbedding(ABC):
                 if embedding is not None:
                     relation_vectors[f"relation_text_{relation_id}"] = embedding
 
+            # 为文本块构建文本嵌入
+            for text_chunk_id, text_chunk in graph.text_chunks.items():
+                text_chunk_text = self._text_chunk_to_text(text_chunk)
+                embedding = await self.embed_text(text_chunk_text)
+                if embedding is not None:
+                    text_chunk_vectors[f"text_chunk_text_{text_chunk_id}"] = embedding
+
             # 保存到向量存储
-            all_vectors = {**entity_vectors, **relation_vectors}
+            all_vectors = {**entity_vectors, **relation_vectors, **text_chunk_vectors}
             success = self.vector_storage.save_vectors(
                 all_vectors, {"embedding_model": self.embedding_model, "embedding_type": "text"}
             )
 
             if success:
                 logger.info(
-                    "Built text embeddings for %d entities and %d relations", len(entity_vectors), len(relation_vectors)
+                    "Built text embeddings for %d entities, %d relations and %d text chunks",
+                    len(entity_vectors),
+                    len(relation_vectors),
+                    len(text_chunk_vectors),
                 )
             return success
 
@@ -226,6 +252,8 @@ class GraphEmbedding(ABC):
                 "id_to_entity": self.id_to_entity,
                 "relation_to_id": self.relation_to_id,
                 "id_to_relation": self.id_to_relation,
+                "text_chunk_to_id": self.text_chunk_to_id,
+                "id_to_text_chunk": self.id_to_text_chunk,
                 "embedding_dim": self.embedding_dim,
                 "embedding_model": self.embedding_model,
             }
@@ -266,6 +294,8 @@ class GraphEmbedding(ABC):
             self.id_to_entity = metadata.get("id_to_entity", {})
             self.relation_to_id = metadata.get("relation_to_id", {})
             self.id_to_relation = metadata.get("id_to_relation", {})
+            self.text_chunk_to_id = metadata.get("text_chunk_to_id", {})
+            self.id_to_text_chunk = metadata.get("id_to_text_chunk", {})
             self.embedding_dim = metadata.get("embedding_dim", self.embedding_dim)
             self.embedding_model = metadata.get("embedding_model", self.embedding_model)
 
@@ -312,6 +342,33 @@ class GraphEmbedding(ABC):
 
         return " | ".join(text_parts)
 
+    def _text_chunk_to_text(self, text_chunk: TextChunk) -> str:
+        """将文本块转换为文本描述"""
+        text_parts = []
+
+        # 添加标题
+        if text_chunk.title:
+            text_parts.append(f"Title: {text_chunk.title}")
+
+        # 添加内容
+        if text_chunk.content:
+            text_parts.append(f"Content: {text_chunk.content}")
+
+        # 添加来源
+        if text_chunk.source:
+            text_parts.append(f"Source: {text_chunk.source}")
+
+        # 添加类型
+        if text_chunk.chunk_type:
+            text_parts.append(f"Type: {text_chunk.chunk_type}")
+
+        # 添加元数据
+        if text_chunk.metadata:
+            metadata_text = ", ".join([f"{k}: {v}" for k, v in text_chunk.metadata.items()])
+            text_parts.append(f"Metadata: {metadata_text}")
+
+        return " | ".join(text_parts)
+
     def _build_entity_mapping(self, graph: KnowledgeGraph) -> None:
         """构建实体映射"""
         entity_list = list(graph.entities.keys())
@@ -327,6 +384,12 @@ class GraphEmbedding(ABC):
         relation_list = list(relation_types)
         self.relation_to_id = {relation: i for i, relation in enumerate(relation_list)}
         self.id_to_relation = {i: relation for relation, i in self.relation_to_id.items()}
+
+    def _build_text_chunk_mapping(self, graph: KnowledgeGraph) -> None:
+        """构建文本块映射"""
+        text_chunk_list = list(graph.text_chunks.keys())
+        self.text_chunk_to_id = {text_chunk: i for i, text_chunk in enumerate(text_chunk_list)}
+        self.id_to_text_chunk = {i: text_chunk for text_chunk, i in self.text_chunk_to_id.items()}
 
 
 class OpenAIEmbedding(GraphEmbedding):
@@ -367,6 +430,7 @@ class OpenAIEmbedding(GraphEmbedding):
         self.max_concurrent = max_concurrent
         self._entity_embeddings_cache: Dict[str, np.ndarray] = {}
         self._relation_embeddings_cache: Dict[str, np.ndarray] = {}
+        self._text_chunk_embeddings_cache: Dict[str, np.ndarray] = {}
 
     def _get_embedding_dim_for_model(self, model: str) -> int:
         """根据模型名称获取embedding维度"""
@@ -407,7 +471,7 @@ class OpenAIEmbedding(GraphEmbedding):
             return False
 
     async def build_text_embeddings(self, graph: KnowledgeGraph) -> bool:
-        """为图中的实体和关系构建文本嵌入"""
+        """为图中的实体、关系和文本块构建文本嵌入"""
         try:
             logger.info("Building text embeddings using OpenAI API...")
 
@@ -426,6 +490,12 @@ class OpenAIEmbedding(GraphEmbedding):
                 text = self._relation_to_text(relation)
                 texts_to_embed.append(text)
                 text_to_id[text] = f"relation_{relation_id}"
+
+            # 文本块文本
+            for text_chunk_id, text_chunk in graph.text_chunks.items():
+                text = self._text_chunk_to_text(text_chunk)
+                texts_to_embed.append(text)
+                text_to_id[text] = f"text_chunk_{text_chunk_id}"
 
             if not texts_to_embed:
                 logger.warning("No texts to embed")
@@ -446,6 +516,9 @@ class OpenAIEmbedding(GraphEmbedding):
                 elif item_id.startswith("relation_"):
                     relation_id = item_id[9:]  # 去掉"relation_"前缀
                     self._relation_embeddings_cache[relation_id] = embedding
+                elif item_id.startswith("text_chunk_"):
+                    text_chunk_id = item_id[11:]  # 去掉"text_chunk_"前缀
+                    self._text_chunk_embeddings_cache[text_chunk_id] = embedding
 
             logger.info(f"Successfully built embeddings for {len(texts_to_embed)} items")
             return True
@@ -547,6 +620,19 @@ class OpenAIEmbedding(GraphEmbedding):
         embedding = self.vector_storage.get_vector(f"relation_{relation_id}")
         if embedding is not None:
             self._relation_embeddings_cache[relation_id] = embedding
+
+        return embedding
+
+    def get_text_chunk_embedding(self, text_chunk_id: str) -> Optional[np.ndarray]:
+        """获取文本块嵌入向量"""
+        # 先检查缓存
+        if text_chunk_id in self._text_chunk_embeddings_cache:
+            return self._text_chunk_embeddings_cache[text_chunk_id]
+
+        # 从存储中获取
+        embedding = self.vector_storage.get_vector(f"text_chunk_{text_chunk_id}")
+        if embedding is not None:
+            self._text_chunk_embeddings_cache[text_chunk_id] = embedding
 
         return embedding
 

@@ -8,7 +8,7 @@ relationships between entities in a knowledge graph.
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from .entities import Entity
 from .types import RelationType, RelationTypeType
@@ -30,6 +30,7 @@ class Relation:
         confidence (float): Confidence score for the relation (0.0 to 1.0).
         source (str): Source of the relation information.
         description (str): Human-readable description of the relation.
+        text_chunks (Set[str]): Set of text chunk IDs that mention or contain this relation.
         created_at (datetime): Timestamp when the relation was created.
         updated_at (datetime): Timestamp when the relation was last updated.
     """
@@ -42,6 +43,7 @@ class Relation:
     confidence: float = 1.0
     source: str = ""
     description: str = ""
+    text_chunks: Set[str] = field(default_factory=set)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
@@ -74,6 +76,43 @@ class Relation:
         """
         return self.properties.get(key, default)
 
+    def add_text_chunk(self, chunk_id: str) -> None:
+        """Add a text chunk connection to the relation.
+
+        Args:
+            chunk_id (str): The ID of the text chunk to connect.
+        """
+        self.text_chunks.add(chunk_id)
+        self.updated_at = datetime.now()
+
+    def remove_text_chunk(self, chunk_id: str) -> None:
+        """Remove a text chunk connection from the relation.
+
+        Args:
+            chunk_id (str): The ID of the text chunk to disconnect.
+        """
+        self.text_chunks.discard(chunk_id)
+        self.updated_at = datetime.now()
+
+    def has_text_chunk(self, chunk_id: str) -> bool:
+        """Check if the relation is connected to a specific text chunk.
+
+        Args:
+            chunk_id (str): The ID of the text chunk to check.
+
+        Returns:
+            bool: True if the text chunk is connected, False otherwise.
+        """
+        return chunk_id in self.text_chunks
+
+    def get_text_chunk_count(self) -> int:
+        """Get the number of text chunks connected to this relation.
+
+        Returns:
+            int: Number of connected text chunks.
+        """
+        return len(self.text_chunks)
+
     def is_valid(self) -> bool:
         """Check if the relation is valid.
 
@@ -101,6 +140,7 @@ class Relation:
             properties=self.properties.copy(),
             confidence=self.confidence,
             source=self.source,
+            text_chunks=self.text_chunks.copy(),
         )
 
     def _get_reverse_relation_type(self) -> Any:
@@ -140,7 +180,10 @@ class Relation:
             "properties": self.properties,
             "confidence": self.confidence,
             "source": self.source,
+            "description": self.description,
+            "text_chunks": list(self.text_chunks),
             "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
         }
 
     @classmethod
@@ -176,7 +219,11 @@ class Relation:
             properties=data.get("properties", {}),
             confidence=data.get("confidence", 1.0),
             source=data.get("source", ""),
+            description=data.get("description", ""),
+            text_chunks=set(data.get("text_chunks", [])),
         )
         if "created_at" in data:
             relation.created_at = datetime.fromisoformat(data["created_at"])
+        if "updated_at" in data:
+            relation.updated_at = datetime.fromisoformat(data["updated_at"])
         return relation

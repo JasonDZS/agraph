@@ -56,8 +56,8 @@ lint:
 # 文档
 docs:
 	@echo "📖 构建文档..."
-	cd docs && make html
-	@echo "📖 查看文档: open docs/_build/html/index.html"
+	sphinx-build -b html docs/source docs/build
+	@echo "📖 查看文档: open docs/build/index.html"
 
 # 构建和发布
 build:
@@ -73,6 +73,7 @@ clean:
 	rm -rf .coverage
 	rm -rf .pytest_cache/
 	rm -rf .mypy_cache/
+	rm -rf docs/build/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 

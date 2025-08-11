@@ -18,6 +18,28 @@ AGraph is a powerful Python toolkit specifically designed for automatically buil
 - **Python**: 3.10+
 - **Operating System**: Windows, macOS, Linux
 
+## 📖 Documentation
+
+Comprehensive documentation is available at: **https://jasondizs.github.io/agraph/**
+
+- [Getting Started Guide](https://jasondizs.github.io/agraph/getting_started.html)
+- [API Reference](https://jasondizs.github.io/agraph/api/modules.html)
+- [Examples](https://jasondizs.github.io/agraph/examples.html)
+- [Changelog](https://jasondizs.github.io/agraph/changelog.html)
+
+### Building Documentation Locally
+
+```bash
+# Install documentation dependencies
+uv sync --extra docs
+
+# Build documentation
+make docs
+
+# View documentation
+open docs/build/index.html
+```
+
 ## 🛠️ Quick Installation
 
 ### Basic Installation
@@ -60,17 +82,10 @@ pip install pillow pytesseract
 ```python
 import os
 import asyncio
-import logging
 from agraph.builders import LLMGraphBuilder
 from agraph.storage import JsonVectorStorage
 from agraph.config import settings
 from agraph import ChatKnowledgeRetriever
-
-# Configure logging system to show detailed information
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 settings.workdir = "./workdir/llm_builder_example"  # Set working directory
 os.makedirs(settings.workdir, exist_ok=True)  # Ensure working directory exists
@@ -134,18 +149,11 @@ if __name__ == "__main__":
 ```python
 import os
 import asyncio
-import logging
 from agraph.builders import LLMGraphBuilder
 from agraph.storage import JsonVectorStorage
 from agraph.config import settings
 from agraph.processer.factory import DocumentProcessorFactory
 from agraph.retrieval import ChatKnowledgeRetriever
-
-# Configure logging system to show detailed information
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 settings.workdir = "./workdir/llm_builder_folder"  # Set working directory
 os.makedirs(settings.workdir, exist_ok=True)  # Ensure working directory exists
