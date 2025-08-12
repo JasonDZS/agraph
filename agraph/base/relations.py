@@ -10,13 +10,14 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from pydantic import Field, model_validator
 
-from .base import GraphNodeBase, TextChunkMixin
+from agraph.base.base import GraphNodeBase, TextChunkMixin
+from agraph.base.types import RelationType, RelationTypeType
+from agraph.utils import get_type_value
+
 from .mixins import PropertyMixin
-from .types import RelationType, RelationTypeType
-from .utils import get_type_value
 
 if TYPE_CHECKING:
-    from .entities import Entity
+    from agraph.base.entities import Entity
 
 
 class Relation(GraphNodeBase, TextChunkMixin, PropertyMixin):

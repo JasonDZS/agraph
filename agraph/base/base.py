@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from .mixins import SerializableMixin
+from agraph.base.mixins import SerializableMixin
 
 
 class GraphNodeBase(BaseModel, SerializableMixin, ABC):

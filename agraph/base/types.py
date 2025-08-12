@@ -51,6 +51,21 @@ class RelationType(Enum):
     OTHER = "other"
 
 
+class ClusterType(Enum):
+    """Cluster type enumeration."""
+
+    SEMANTIC = "semantic"
+    HIERARCHICAL = "hierarchical"
+    SPATIAL = "spatial"
+    TEMPORAL = "temporal"
+    FUNCTIONAL = "functional"
+    TOPIC = "topic"
+    COMMUNITY = "community"
+    CUSTOM = "custom"
+    OTHER = "other"
+
+
 # Type aliases for type annotations
 EntityTypeType = Union[EntityType, str]
 RelationTypeType = Union[RelationType, str]
+ClusterTypeType = Union[ClusterType, str]

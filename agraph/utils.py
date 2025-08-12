@@ -6,10 +6,10 @@ This module provides common utility functions used across the package.
 
 from typing import Union
 
-from .types import EntityType, RelationType
+from agraph.base.types import ClusterType, EntityType, RelationType
 
 
-def get_type_value(type_obj: Union[EntityType, RelationType, str]) -> str:
+def get_type_value(type_obj: Union[EntityType, RelationType, ClusterType, str]) -> str:
     """
     Get the string value from a type object.
 
@@ -19,6 +19,6 @@ def get_type_value(type_obj: Union[EntityType, RelationType, str]) -> str:
     Returns:
         String representation of the type
     """
-    if isinstance(type_obj, (EntityType, RelationType)):
+    if isinstance(type_obj, (EntityType, RelationType, ClusterType)):
         return str(type_obj.value)
     return str(type_obj)

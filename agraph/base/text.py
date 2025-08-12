@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
-from .entities import Entity
+from agraph.base.entities import Entity
+
 from .mixins import SerializableMixin
 from .relations import Relation
 

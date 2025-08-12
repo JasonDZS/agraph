@@ -6,8 +6,8 @@ import unittest
 import uuid
 from datetime import datetime
 
-from agraph.entities import Entity
-from agraph.types import EntityType
+from agraph.base.entities import Entity
+from agraph.base.types import EntityType
 
 
 class TestEntity(unittest.TestCase):

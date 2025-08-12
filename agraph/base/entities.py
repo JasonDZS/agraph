@@ -8,10 +8,10 @@ from typing import Any, Dict, List
 
 from pydantic import Field, field_validator
 
-from .base import GraphNodeBase, TextChunkMixin
-from .mixins import PropertyMixin
-from .types import EntityType, EntityTypeType
-from .utils import get_type_value
+from agraph.base.base import GraphNodeBase, TextChunkMixin
+from agraph.base.mixins import PropertyMixin
+from agraph.base.types import EntityType, EntityTypeType
+from agraph.utils import get_type_value
 
 
 class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin):
@@ -76,6 +76,7 @@ class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin):
             "description": self.description,
             "properties": self.properties,
             "aliases": self.aliases,
+            # pylint: disable-next=duplicate-code
             "confidence": self.confidence,
             "source": self.source,
             "text_chunks": list(self.text_chunks),
@@ -84,6 +85,7 @@ class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin):
         }
 
     @classmethod
+    # pylint: disable=duplicate-code
     def from_dict(cls, data: Dict[str, Any], **kwargs: Any) -> "Entity":
         """
         Create entity from dictionary data.

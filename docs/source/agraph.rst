@@ -12,9 +12,13 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   agraph.cli
+   agraph.base
+   agraph.clusters
    agraph.config
    agraph.entities
+   agraph.graph
+   agraph.mixins
    agraph.relations
    agraph.text
    agraph.types
+   agraph.utils

@@ -4,7 +4,7 @@ Test cases for the types module.
 
 import unittest
 
-from agraph.types import EntityType, RelationType
+from agraph.base.types import EntityType, RelationType
 
 
 class TestEntityType(unittest.TestCase):
