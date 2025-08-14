@@ -45,6 +45,7 @@ dev = [
 docs = [
     "sphinx>=8.0.0",
     "sphinx-rtd-theme>=3.0",
+    "myst-parser>=2.0.0",
 ]
 
 [project.urls]

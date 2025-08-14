@@ -90,9 +90,9 @@ Basic usage:
    :maxdepth: 2
    :caption: Tutorials:
 
-   ../agraph_tutorial.md
-   ../vectordb_tutorial.md
-   ../import_export_tutorial.md
-   ../quick_start_import_export.md
-   ../graphml_integration_guide.md
-   ../custom_vectordb_guide.md
+   agraph_tutorial.md
+   vectordb_tutorial.md
+   import_export_tutorial.md
+   quick_start_import_export.md
+   graphml_integration_guide.md
+   custom_vectordb_guide.md

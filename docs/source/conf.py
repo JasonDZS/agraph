@@ -23,10 +23,33 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
+    'myst_parser',
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = [
+    'IMPORT_EXPORT_FEATURES.md',
+    'README_import_export.md',
+]
+
+# MyST parser settings
+source_suffix = {
+    '.rst': None,
+    '.md': None,
+}
+
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "html_admonition",
+    "html_image",
+    "replacements",
+    "smartquotes",
+    "substitution",
+    "tasklist",
+]
+
+myst_heading_anchors = 3
 
 language = 'en'
 
