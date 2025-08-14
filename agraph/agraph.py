@@ -68,6 +68,7 @@ class AGraph:
         self.builder: Optional[KnowledgeGraphBuilder] = None
         self.knowledge_graph: Optional[KnowledgeGraph] = None
         self._is_initialized = False
+        self._background_tasks: List[asyncio.Task] = []
 
         logger.info(
             f"AGraph initialization completed, collection: {collection_name}, persist_dir: {self.persist_directory}"
@@ -234,7 +235,8 @@ class AGraph:
 
             # Asynchronously save to vector store
             if save_to_vector_store:
-                asyncio.create_task(self._save_to_vector_store())
+                task = asyncio.create_task(self._save_to_vector_store())
+                self._background_tasks.append(task)
 
             logger.info(
                 f"Knowledge graph construction completed: {len(self.knowledge_graph.entities)} entities, "
@@ -292,6 +294,13 @@ class AGraph:
         except Exception as e:
             logger.error(f"Saving to vector store failed: {e}")
             raise
+        finally:
+            # Clean up completed tasks
+            self._cleanup_completed_tasks()
+
+    def _cleanup_completed_tasks(self) -> None:
+        """Clean up completed background tasks."""
+        self._background_tasks = [task for task in self._background_tasks if not task.done()]
 
     async def save_knowledge_graph(self) -> None:
         """Explicitly save knowledge graph to vector store."""
@@ -534,7 +543,7 @@ class AGraph:
                 model=self.settings.llm.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.settings.llm.temperature,
-                max_tokens=self.settings.llm.max_tokens,
+                max_tokens=4096,
                 stream=True,
             )
 
@@ -584,7 +593,7 @@ class AGraph:
                 model=self.settings.llm.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.settings.llm.temperature,
-                max_tokens=self.settings.llm.max_tokens,
+                max_tokens=4096,
             )
 
             content = response.choices[0].message.content
@@ -694,6 +703,15 @@ class AGraph:
     async def close(self) -> None:
         """Close AGraph system."""
         try:
+            # Wait for all background tasks to complete
+            if self._background_tasks:
+                logger.info(
+                    f"Waiting for {len(self._background_tasks)} background tasks to complete..."
+                )
+                await asyncio.gather(*self._background_tasks, return_exceptions=True)
+                self._background_tasks.clear()
+                logger.info("All background tasks completed")
+
             if self.vector_store:
                 await self.vector_store.close()
 
