@@ -42,6 +42,7 @@ class KnowledgeGraphBuilder:
         entity_extractor: Optional[EntityExtractor] = None,
         relation_extractor: Optional[RelationExtractor] = None,
         cluster_algorithm: Optional[ClusterAlgorithm] = None,
+        enable_knowledge_graph: bool = True,
     ):
         """Initialize KnowledgeGraph Builder.
 
@@ -52,11 +53,15 @@ class KnowledgeGraphBuilder:
             entity_extractor: Entity extractor instance
             relation_extractor: Relation extractor instance
             cluster_algorithm: Clustering algorithm instance
+            enable_knowledge_graph: Whether to enable knowledge graph construction
         """
         # Initialize configuration
         self.config = config or BuilderConfig()
         if cache_dir is not None:
             self.config.cache_dir = str(cache_dir)
+
+        # Store knowledge graph toggle
+        self.enable_knowledge_graph = enable_knowledge_graph
 
         # Initialize cache manager
         self.cache_manager = CacheManager(self.config)
@@ -99,6 +104,7 @@ class KnowledgeGraphBuilder:
 
         logger.info(
             f"KnowledgeGraphBuilder initialized - "
+            f"Enable KG: {enable_knowledge_graph}, "
             f"LLM Provider: {self.config.llm_provider}, "
             f"LLM Model: {self.config.llm_model}, "
             f"Cache Dir: {self.config.cache_dir}, "
@@ -171,58 +177,83 @@ class KnowledgeGraphBuilder:
                 logger.info("Step 2: Using cached text chunking results")
                 chunks = self._get_cached_step_result(BuildSteps.TEXT_CHUNKING, texts, list) or []
 
-            # Step 3: Extract entities
-            if self._should_execute_step(BuildSteps.ENTITY_EXTRACTION, from_step):
-                logger.info(f"Step 3: Extracting entities from {len(chunks)} chunks")
-                self.cache_manager.update_build_status(current_step=BuildSteps.ENTITY_EXTRACTION)
-                entities = await self.entity_handler.extract_entities_from_chunks(chunks, use_cache)
-                logger.info(f"Entity extraction completed - found {len(entities)} entities")
-                self.cache_manager.update_build_status(completed_step=BuildSteps.ENTITY_EXTRACTION)
-            else:
-                logger.info("Step 3: Using cached entity extraction results")
-                entities = (
-                    self._get_cached_step_result(BuildSteps.ENTITY_EXTRACTION, chunks, list) or []
-                )
-
-            # Step 4: Extract relations
-            if self._should_execute_step(BuildSteps.RELATION_EXTRACTION, from_step):
-                logger.info(
-                    f"Step 4: Extracting relations from {len(chunks)} chunks and {len(entities)} entities"
-                )
-                self.cache_manager.update_build_status(current_step=BuildSteps.RELATION_EXTRACTION)
-                relations = await self.relation_handler.extract_relations_from_chunks(
-                    chunks, entities, use_cache
-                )
-                logger.info(f"Relation extraction completed - found {len(relations)} relations")
-                self.cache_manager.update_build_status(
-                    completed_step=BuildSteps.RELATION_EXTRACTION
-                )
-            else:
-                logger.info("Step 4: Using cached relation extraction results")
-                relations = (
-                    self._get_cached_step_result(
-                        BuildSteps.RELATION_EXTRACTION, (chunks, entities), list
+            # Step 3: Extract entities (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.ENTITY_EXTRACTION, from_step):
+                    logger.info(f"Step 3: Extracting entities from {len(chunks)} chunks")
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.ENTITY_EXTRACTION
                     )
-                    or []
-                )
-
-            # Step 5: Form clusters
-            if self._should_execute_step(BuildSteps.CLUSTER_FORMATION, from_step):
-                logger.info(
-                    f"Step 5: Forming clusters from {len(entities)} entities and {len(relations)} relations"
-                )
-                self.cache_manager.update_build_status(current_step=BuildSteps.CLUSTER_FORMATION)
-                clusters = self.cluster_handler.form_clusters(entities, relations, use_cache)
-                logger.info(f"Cluster formation completed - created {len(clusters)} clusters")
-                self.cache_manager.update_build_status(completed_step=BuildSteps.CLUSTER_FORMATION)
-            else:
-                logger.info("Step 5: Using cached cluster formation results")
-                clusters = (
-                    self._get_cached_step_result(
-                        BuildSteps.CLUSTER_FORMATION, (entities, relations), list
+                    entities = await self.entity_handler.extract_entities_from_chunks(
+                        chunks, use_cache
                     )
-                    or []
-                )
+                    logger.info(f"Entity extraction completed - found {len(entities)} entities")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.ENTITY_EXTRACTION
+                    )
+                else:
+                    logger.info("Step 3: Using cached entity extraction results")
+                    entities = (
+                        self._get_cached_step_result(BuildSteps.ENTITY_EXTRACTION, chunks, list)
+                        or []
+                    )
+            else:
+                logger.info("Step 3: Skipping entity extraction (knowledge graph disabled)")
+                entities = []
+
+            # Step 4: Extract relations (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.RELATION_EXTRACTION, from_step):
+                    logger.info(
+                        f"Step 4: Extracting relations from {len(chunks)} chunks and {len(entities)} entities"
+                    )
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.RELATION_EXTRACTION
+                    )
+                    relations = await self.relation_handler.extract_relations_from_chunks(
+                        chunks, entities, use_cache
+                    )
+                    logger.info(f"Relation extraction completed - found {len(relations)} relations")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.RELATION_EXTRACTION
+                    )
+                else:
+                    logger.info("Step 4: Using cached relation extraction results")
+                    relations = (
+                        self._get_cached_step_result(
+                            BuildSteps.RELATION_EXTRACTION, (chunks, entities), list
+                        )
+                        or []
+                    )
+            else:
+                logger.info("Step 4: Skipping relation extraction (knowledge graph disabled)")
+                relations = []
+
+            # Step 5: Form clusters (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.CLUSTER_FORMATION, from_step):
+                    logger.info(
+                        f"Step 5: Forming clusters from {len(entities)} entities and {len(relations)} relations"
+                    )
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.CLUSTER_FORMATION
+                    )
+                    clusters = self.cluster_handler.form_clusters(entities, relations, use_cache)
+                    logger.info(f"Cluster formation completed - created {len(clusters)} clusters")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.CLUSTER_FORMATION
+                    )
+                else:
+                    logger.info("Step 5: Using cached cluster formation results")
+                    clusters = (
+                        self._get_cached_step_result(
+                            BuildSteps.CLUSTER_FORMATION, (entities, relations), list
+                        )
+                        or []
+                    )
+            else:
+                logger.info("Step 5: Skipping cluster formation (knowledge graph disabled)")
+                clusters = []
 
             # Step 6: Assemble knowledge graph
             if self._should_execute_step(BuildSteps.GRAPH_ASSEMBLY, from_step):
@@ -321,56 +352,81 @@ class KnowledgeGraphBuilder:
                 chunks = self._get_cached_step_result(BuildSteps.TEXT_CHUNKING, texts, list) or []
 
             # Continue with remaining steps (same as build_from_documents)
-            # Step 3: Extract entities
-            if self._should_execute_step(BuildSteps.ENTITY_EXTRACTION, actual_from_step):
-                logger.info(f"Step 3: Extracting entities from {len(chunks)} chunks")
-                self.cache_manager.update_build_status(current_step=BuildSteps.ENTITY_EXTRACTION)
-                entities = await self.entity_handler.extract_entities_from_chunks(chunks, use_cache)
-                logger.info(f"Entity extraction completed - found {len(entities)} entities")
-                self.cache_manager.update_build_status(completed_step=BuildSteps.ENTITY_EXTRACTION)
-            else:
-                logger.info("Step 3: Using cached entity extraction results")
-                entities = (
-                    self._get_cached_step_result(BuildSteps.ENTITY_EXTRACTION, chunks, list) or []
-                )
-
-            # Step 4: Extract relations
-            if self._should_execute_step(BuildSteps.RELATION_EXTRACTION, actual_from_step):
-                logger.info(
-                    f"Step 4: Extracting relations from {len(chunks)} chunks and {len(entities)} entities"
-                )
-                self.cache_manager.update_build_status(current_step=BuildSteps.RELATION_EXTRACTION)
-                relations = await self.relation_handler.extract_relations_from_chunks(
-                    chunks, entities, use_cache
-                )
-                logger.info(f"Relation extraction completed - found {len(relations)} relations")
-                self.cache_manager.update_build_status(
-                    completed_step=BuildSteps.RELATION_EXTRACTION
-                )
-            else:
-                logger.info("Step 4: Using cached relation extraction results")
-                relations = (
-                    self._get_cached_step_result(
-                        BuildSteps.RELATION_EXTRACTION, (chunks, entities), list
+            # Step 3: Extract entities (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.ENTITY_EXTRACTION, actual_from_step):
+                    logger.info(f"Step 3: Extracting entities from {len(chunks)} chunks")
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.ENTITY_EXTRACTION
                     )
-                    or []
-                )
-
-            # Step 5: Form clusters
-            if self._should_execute_step(BuildSteps.CLUSTER_FORMATION, actual_from_step):
-                logger.info(
-                    f"Step 5: Forming clusters from {len(entities)} entities and {len(relations)} relations"
-                )
-                self.cache_manager.update_build_status(current_step=BuildSteps.CLUSTER_FORMATION)
-                clusters = self.cluster_handler.form_clusters(entities, relations, use_cache)
-                logger.info(f"Cluster formation completed - created {len(clusters)} clusters")
-                self.cache_manager.update_build_status(completed_step=BuildSteps.CLUSTER_FORMATION)
+                    entities = await self.entity_handler.extract_entities_from_chunks(
+                        chunks, use_cache
+                    )
+                    logger.info(f"Entity extraction completed - found {len(entities)} entities")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.ENTITY_EXTRACTION
+                    )
+                else:
+                    logger.info("Step 3: Using cached entity extraction results")
+                    entities = (
+                        self._get_cached_step_result(BuildSteps.ENTITY_EXTRACTION, chunks, list)
+                        or []
+                    )
             else:
-                logger.info("Step 5: Using cached cluster formation results")
-                cached_clusters = self._get_cached_step_result(
-                    BuildSteps.CLUSTER_FORMATION, (entities, relations), list
-                )
-                clusters = cached_clusters or []
+                logger.info("Step 3: Skipping entity extraction (knowledge graph disabled)")
+                entities = []
+
+            # Step 4: Extract relations (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.RELATION_EXTRACTION, actual_from_step):
+                    logger.info(
+                        f"Step 4: Extracting relations from {len(chunks)} chunks and {len(entities)} entities"
+                    )
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.RELATION_EXTRACTION
+                    )
+                    relations = await self.relation_handler.extract_relations_from_chunks(
+                        chunks, entities, use_cache
+                    )
+                    logger.info(f"Relation extraction completed - found {len(relations)} relations")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.RELATION_EXTRACTION
+                    )
+                else:
+                    logger.info("Step 4: Using cached relation extraction results")
+                    relations = (
+                        self._get_cached_step_result(
+                            BuildSteps.RELATION_EXTRACTION, (chunks, entities), list
+                        )
+                        or []
+                    )
+            else:
+                logger.info("Step 4: Skipping relation extraction (knowledge graph disabled)")
+                relations = []
+
+            # Step 5: Form clusters (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if self._should_execute_step(BuildSteps.CLUSTER_FORMATION, actual_from_step):
+                    logger.info(
+                        f"Step 5: Forming clusters from {len(entities)} entities and {len(relations)} relations"
+                    )
+                    self.cache_manager.update_build_status(
+                        current_step=BuildSteps.CLUSTER_FORMATION
+                    )
+                    clusters = self.cluster_handler.form_clusters(entities, relations, use_cache)
+                    logger.info(f"Cluster formation completed - created {len(clusters)} clusters")
+                    self.cache_manager.update_build_status(
+                        completed_step=BuildSteps.CLUSTER_FORMATION
+                    )
+                else:
+                    logger.info("Step 5: Using cached cluster formation results")
+                    cached_clusters = self._get_cached_step_result(
+                        BuildSteps.CLUSTER_FORMATION, (entities, relations), list
+                    )
+                    clusters = cached_clusters or []
+            else:
+                logger.info("Step 5: Skipping cluster formation (knowledge graph disabled)")
+                clusters = []
 
             # Step 6: Assemble knowledge graph
             if self._should_execute_step(BuildSteps.GRAPH_ASSEMBLY, actual_from_step):

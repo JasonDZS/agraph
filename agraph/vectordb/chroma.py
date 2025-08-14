@@ -233,8 +233,8 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             "title": text_chunk.title,
             "content": text_chunk.content[:MAX_CONTENT_LENGTH_IN_METADATA],
             "source": text_chunk.source,
-            "start_index": text_chunk.start_index,
-            "end_index": text_chunk.end_index,
+            "start_index": text_chunk.start_index if text_chunk.start_index is not None else -1,
+            "end_index": text_chunk.end_index if text_chunk.end_index is not None else -1,
             "chunk_type": text_chunk.chunk_type,
             "language": text_chunk.language,
             "confidence": text_chunk.confidence,
@@ -696,13 +696,21 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         self, chunk_id: str, metadata: Dict[str, Any]
     ) -> TextChunk:
         """Reconstruct TextChunk object from ChromaDB metadata."""
+        # Convert -1 back to None for start_index and end_index
+        start_index = metadata.get("start_index")
+        if start_index == -1:
+            start_index = None
+        end_index = metadata.get("end_index")
+        if end_index == -1:
+            end_index = None
+
         return TextChunk(
             id=chunk_id,
             content=metadata.get("content", ""),
             title=metadata.get("title", ""),
             source=metadata.get("source", ""),
-            start_index=metadata.get("start_index"),
-            end_index=metadata.get("end_index"),
+            start_index=start_index,
+            end_index=end_index,
             chunk_type=metadata.get("chunk_type", "par."),
             language=metadata.get("language", "zh"),
             confidence=metadata.get("confidence", 1.0),

@@ -207,7 +207,7 @@ Requirements:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=self.settings.llm.temperature,
-                max_tokens=self.settings.llm.max_tokens,
+                max_tokens=4096,
             )
 
             return response.choices[0].message.content or ""
@@ -456,7 +456,7 @@ Requirements:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=self.settings.llm.temperature,
-                max_tokens=self.settings.llm.max_tokens,
+                max_tokens=4096,
             )
 
             return response.choices[0].message.content or ""

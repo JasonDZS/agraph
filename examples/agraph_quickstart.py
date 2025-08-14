@@ -71,7 +71,8 @@ async def quickstart_demo():
         collection_name="quickstart_demo",
         persist_directory=settings.workdir,  # 使用工作目录下的向量存储
         vector_store_type="chroma",
-        use_openai_embeddings=True
+        use_openai_embeddings=True,
+        enable_knowledge_graph=True,  # 启用知识图谱功能
     ) as agraph:
         await agraph.initialize()
         print("✅ AGraph初始化成功")

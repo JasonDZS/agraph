@@ -16,8 +16,10 @@ from .base.graph import KnowledgeGraph
 from .base.relations import Relation
 from .base.text import TextChunk
 from .builder.builder import KnowledgeGraphBuilder
+from .chunker import TokenChunker
 from .config import BuilderConfig, get_settings
 from .logger import logger
+from .processor import DocumentProcessorFactory
 from .vectordb.factory import VectorStoreFactory, create_chroma_store
 from .vectordb.interfaces import VectorStore
 
@@ -32,6 +34,7 @@ class AGraph:
         vector_store_type: str = "chroma",
         config: Optional[BuilderConfig] = None,
         use_openai_embeddings: bool = True,
+        enable_knowledge_graph: bool = True,
         **_kwargs: Any,
     ) -> None:
         """Initialize AGraph system.
@@ -42,12 +45,14 @@ class AGraph:
             vector_store_type: Vector store type ('chroma', 'memory').
             config: Builder configuration.
             use_openai_embeddings: Whether to use OpenAI embeddings.
+            enable_knowledge_graph: Whether to enable knowledge graph construction.
             **kwargs: Other parameters.
         """
         self.collection_name = collection_name
         self.persist_directory = persist_directory or "./agraph_vectordb"
         self.vector_store_type = vector_store_type
         self.use_openai_embeddings = use_openai_embeddings
+        self.enable_knowledge_graph = enable_knowledge_graph
         self.settings = get_settings()
 
         # Initialize configuration
@@ -71,7 +76,7 @@ class AGraph:
         self._background_tasks: List[asyncio.Task] = []
 
         logger.info(
-            f"AGraph initialization completed, collection: {collection_name}, persist_dir: {self.persist_directory}"
+            f"AGraph initialization completed, collection: {collection_name}, persist_dir: {self.persist_directory}, enable_kg: {enable_knowledge_graph}"
         )
 
     async def initialize(self) -> None:
@@ -86,8 +91,9 @@ class AGraph:
             # 1. Initialize vector store
             await self._initialize_vector_store()
 
-            # 2. Initialize knowledge graph builder
-            self._initialize_builder()
+            # 2. Initialize knowledge graph builder (if enabled)
+            if self.enable_knowledge_graph:
+                self._initialize_builder()
 
             self._is_initialized = True
             logger.info("AGraph initialization successful")
@@ -122,7 +128,9 @@ class AGraph:
     def _initialize_builder(self) -> None:
         """Initialize knowledge graph builder."""
         try:
-            self.builder = KnowledgeGraphBuilder(config=self.config)
+            self.builder = KnowledgeGraphBuilder(
+                config=self.config, enable_knowledge_graph=self.enable_knowledge_graph
+            )
             logger.info("Knowledge graph builder initialization successful")
         except Exception as e:
             logger.error(f"Knowledge graph builder initialization failed: {e}")
@@ -152,6 +160,12 @@ class AGraph:
         """
         if not self._is_initialized:
             raise RuntimeError("AGraph not initialized, please call initialize() first")
+
+        if not self.enable_knowledge_graph:
+            # When KG is disabled, process documents for text chunks only
+            return await self._build_text_chunks_from_documents(
+                documents, graph_name, graph_description, use_cache, save_to_vector_store
+            )
 
         if not self.builder:
             raise RuntimeError("Knowledge graph builder not initialized")
@@ -219,6 +233,12 @@ class AGraph:
         if not self._is_initialized:
             raise RuntimeError("AGraph not initialized, please call initialize() first")
 
+        if not self.enable_knowledge_graph:
+            # When KG is disabled, process texts for text chunks only
+            return await self._build_text_chunks_from_texts(
+                texts, graph_name, graph_description, use_cache, save_to_vector_store
+            )
+
         if not self.builder:
             raise RuntimeError("Knowledge graph builder not initialized")
 
@@ -250,6 +270,148 @@ class AGraph:
             logger.error(f"Building knowledge graph from texts failed: {e}")
             raise
 
+    # =============== Text-Only Processing Functions (KG Disabled) ===============
+
+    async def _build_text_chunks_from_documents(
+        self,
+        documents: Union[List[Union[str, Path]], str, Path],
+        graph_name: str,
+        graph_description: str,
+        use_cache: bool,
+        save_to_vector_store: bool,
+    ) -> KnowledgeGraph:
+        """Build knowledge graph with text chunks only from documents (no entities/relations/clusters)."""
+        # Process document path parameters
+        if isinstance(documents, (str, Path)):
+            documents = [Path(documents)]
+        elif isinstance(documents, list):
+            documents = [Path(doc) if isinstance(doc, str) else doc for doc in documents]
+
+        # Convert to Union[str, Path] list
+        documents_list: List[Union[str, Path]] = [str(doc) for doc in documents]
+
+        logger.info(
+            f"Starting text-only processing from {len(documents_list)} documents: {graph_name}"
+        )
+
+        try:
+            # Initialize components we need
+            processor_factory = DocumentProcessorFactory()
+            chunker = TokenChunker(
+                chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
+            )
+
+            # Step 1: Process documents
+            logger.info(f"Step 1: Processing {len(documents_list)} documents")
+            texts = []
+            for doc_path in documents_list:
+                try:
+                    processor = processor_factory.get_processor(doc_path)
+                    text = processor.process(doc_path)
+                    texts.append(text)
+                except Exception as e:
+                    logger.warning(f"Failed to process document {doc_path}: {e}")
+
+            logger.info(f"Document processing completed - extracted {len(texts)} texts")
+
+            # Step 2: Chunk texts
+            logger.info(f"Step 2: Chunking {len(texts)} texts")
+            chunks = []
+            for i, text in enumerate(texts):
+                chunks_with_positions = chunker.split_text_with_positions(text)
+                for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
+
+                    chunk = TextChunk(
+                        id=f"chunk_{i}_{j}",
+                        content=chunk_text,
+                        title=f"Document {i} Chunk {j}",
+                        start_index=start_idx,
+                        end_index=end_idx,
+                        source=str(documents_list[i]),
+                    )
+                    chunks.append(chunk)
+
+            logger.info(f"Text chunking completed - created {len(chunks)} chunks")
+
+            # Step 3: Create knowledge graph with only text chunks
+            kg = KnowledgeGraph(
+                name=graph_name,
+                description=graph_description,
+                entities={},  # Empty
+                relations={},  # Empty
+                clusters={},  # Empty
+                text_chunks={chunk.id: chunk for chunk in chunks},
+            )
+
+            # Step 4: Save to vector store if requested
+            if save_to_vector_store and chunks:
+                self.knowledge_graph = kg  # Set temporarily for saving
+                asyncio.create_task(self._save_to_vector_store())
+
+            logger.info(f"Text-only processing completed: {len(chunks)} text chunks")
+            return kg
+
+        except Exception as e:
+            logger.error(f"Text-only processing failed: {e}")
+            raise
+
+    async def _build_text_chunks_from_texts(
+        self,
+        texts: List[str],
+        graph_name: str,
+        graph_description: str,
+        use_cache: bool,
+        save_to_vector_store: bool,
+    ) -> KnowledgeGraph:
+        """Build knowledge graph with text chunks only from texts (no entities/relations/clusters)."""
+        logger.info(f"Starting text-only processing from {len(texts)} texts: {graph_name}")
+
+        try:
+            # Initialize chunker
+            chunker = TokenChunker(
+                chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
+            )
+
+            # Step 1: Chunk texts
+            logger.info(f"Step 1: Chunking {len(texts)} texts")
+            chunks = []
+            for i, text in enumerate(texts):
+                chunks_with_positions = chunker.split_text_with_positions(text)
+                for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
+                    chunk = TextChunk(
+                        id=f"chunk_{i}_{j}",
+                        content=chunk_text,
+                        title=f"Text {i} Chunk {j}",
+                        start_index=start_idx,
+                        end_index=end_idx,
+                        source=f"text_{i}",
+                    )
+                    chunks.append(chunk)
+
+            logger.info(f"Text chunking completed - created {len(chunks)} chunks")
+
+            # Step 2: Create knowledge graph with only text chunks
+            kg = KnowledgeGraph(
+                name=graph_name,
+                description=graph_description,
+                entities={},  # Empty
+                relations={},  # Empty
+                clusters={},  # Empty
+                text_chunks={chunk.id: chunk for chunk in chunks},
+            )
+
+            # Step 3: Save to vector store if requested
+            if save_to_vector_store and chunks:
+                self.knowledge_graph = kg  # Set temporarily for saving
+                asyncio.create_task(self._save_to_vector_store())
+
+            logger.info(f"Text-only processing completed: {len(chunks)} text chunks")
+            return kg
+
+        except Exception as e:
+            logger.error(f"Text-only processing failed: {e}")
+            raise
+
     # =============== Vector Storage Functions ===============
 
     async def _save_to_vector_store(self) -> None:
@@ -261,22 +423,22 @@ class AGraph:
         try:
             logger.info("Starting to save knowledge graph to vector store...")
 
-            # Batch save entities
-            if self.knowledge_graph.entities:
+            # Batch save entities (if knowledge graph is enabled)
+            if self.enable_knowledge_graph and self.knowledge_graph.entities:
                 await self.vector_store.batch_add_entities(
                     list(self.knowledge_graph.entities.values())
                 )
                 logger.info(f"Saved {len(self.knowledge_graph.entities)} entities")
 
-            # Batch save relations
-            if self.knowledge_graph.relations:
+            # Batch save relations (if knowledge graph is enabled)
+            if self.enable_knowledge_graph and self.knowledge_graph.relations:
                 await self.vector_store.batch_add_relations(
                     list(self.knowledge_graph.relations.values())
                 )
                 logger.info(f"Saved {len(self.knowledge_graph.relations)} relations")
 
-            # Batch save clusters
-            if self.knowledge_graph.clusters:
+            # Batch save clusters (if knowledge graph is enabled)
+            if self.enable_knowledge_graph and self.knowledge_graph.clusters:
                 await self.vector_store.batch_add_clusters(
                     list(self.knowledge_graph.clusters.values())
                 )
@@ -432,31 +594,51 @@ class AGraph:
 
         try:
             # Concurrent retrieval of different types of information
-            tasks = [
-                self.search_entities(query, entity_top_k),
-                self.search_relations(query, relation_top_k),
-                self.search_text_chunks(query, text_chunk_top_k),
-            ]
+            tasks = []
+
+            # Only add entity and relation search tasks if knowledge graph is enabled
+            if self.enable_knowledge_graph:
+                tasks.extend(
+                    [
+                        self.search_entities(query, entity_top_k),
+                        self.search_relations(query, relation_top_k),
+                    ]
+                )
+
+            # Always add text chunks search
+            tasks.append(self.search_text_chunks(query, text_chunk_top_k))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Process entity results
-            if isinstance(results[0], list):
-                context["entities"] = [
-                    {"entity": entity, "score": score} for entity, score in results[0]
-                ]
+            result_index = 0
 
-            # Process relation results
-            if isinstance(results[1], list):
-                context["relations"] = [
-                    {"relation": relation, "score": score} for relation, score in results[1]
-                ]
+            # Process entity results (if knowledge graph is enabled)
+            if self.enable_knowledge_graph:
+                if result_index < len(results) and isinstance(results[result_index], list):
+                    entity_results = results[result_index]
+                    if isinstance(entity_results, list):  # Type guard for mypy
+                        context["entities"] = [
+                            {"entity": entity, "score": score} for entity, score in entity_results
+                        ]
+                result_index += 1
 
-            # Process text chunk results
-            if isinstance(results[2], list):
-                context["text_chunks"] = [
-                    {"text_chunk": chunk, "score": score} for chunk, score in results[2]
-                ]
+                # Process relation results (if knowledge graph is enabled)
+                if result_index < len(results) and isinstance(results[result_index], list):
+                    relation_results = results[result_index]
+                    if isinstance(relation_results, list):  # Type guard for mypy
+                        context["relations"] = [
+                            {"relation": relation, "score": score}
+                            for relation, score in relation_results
+                        ]
+                result_index += 1
+
+            # Process text chunk results (always present)
+            if result_index < len(results) and isinstance(results[result_index], list):
+                chunk_results = results[result_index]
+                if isinstance(chunk_results, list):  # Type guard for mypy
+                    context["text_chunks"] = [
+                        {"text_chunk": chunk, "score": score} for chunk, score in chunk_results
+                    ]
 
         except Exception as e:
             logger.error(f"Context retrieval failed: {e}")
@@ -485,8 +667,8 @@ class AGraph:
         # Build knowledge graph context
         kg_context_parts = []
 
-        # Add entity information
-        if context_info.get("entities"):
+        # Add entity information (if knowledge graph is enabled)
+        if self.enable_knowledge_graph and context_info.get("entities"):
             kg_context_parts.append("相关实体:")
             for item in context_info["entities"][:3]:
                 entity = item["entity"]
@@ -494,8 +676,8 @@ class AGraph:
                     f"- {entity.name} ({entity.entity_type}): {entity.description or 'N/A'}"
                 )
 
-        # Add relation information
-        if context_info.get("relations"):
+        # Add relation information (if knowledge graph is enabled)
+        if self.enable_knowledge_graph and context_info.get("relations"):
             kg_context_parts.append("\n相关关系:")
             for item in context_info["relations"][:3]:
                 relation = item["relation"]
@@ -662,8 +844,8 @@ class AGraph:
                 logger.warning(f"Getting vector store statistics failed: {e}")
                 stats["vector_store"] = {"error": str(e)}
 
-        # Knowledge graph statistics
-        if self.knowledge_graph:
+        # Knowledge graph statistics (if enabled)
+        if self.enable_knowledge_graph and self.knowledge_graph:
             stats["knowledge_graph"] = {
                 "entities": len(self.knowledge_graph.entities),
                 "relations": len(self.knowledge_graph.relations),
@@ -724,7 +906,8 @@ class AGraph:
 
     async def __aenter__(self) -> "AGraph":
         """Async context manager entry."""
-        await self.initialize()
+        if not self._is_initialized:
+            await self.initialize()
         return self
 
     async def __aexit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
@@ -749,5 +932,6 @@ class AGraph:
             f"AGraph(collection='{self.collection_name}', "
             f"store_type='{self.vector_store_type}', "
             f"initialized={self.is_initialized}, "
+            f"enable_kg={self.enable_knowledge_graph}, "
             f"has_kg={self.has_knowledge_graph})"
         )
