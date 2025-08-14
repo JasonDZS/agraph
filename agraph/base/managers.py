@@ -7,11 +7,11 @@ operations, reducing the complexity of the main KnowledgeGraph class.
 
 from typing import Callable, Dict, List, Optional, Union
 
-from agraph.base.clusters import Cluster
-from agraph.base.entities import Entity
-from agraph.base.relations import Relation
-from agraph.base.text import TextChunk
-from agraph.base.types import ClusterType, EntityType, RelationType
+from .clusters import Cluster
+from .entities import Entity
+from .relations import Relation
+from .text import TextChunk
+from .types import ClusterType, EntityType, RelationType
 
 
 class EntityManager:

@@ -5,25 +5,27 @@ This module defines the KnowledgeGraph class for managing entities, relations,
 clusters, and text chunks in a comprehensive knowledge graph system.
 """
 
+import ast
 import uuid
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
+import networkx as nx
 from pydantic import BaseModel, Field
 
-from agraph.base.clusters import Cluster
-from agraph.base.entities import Entity
-from agraph.base.types import ClusterType, EntityType, RelationType
-
+from .clusters import Cluster
+from .entities import Entity
 from .managers import ClusterManager, EntityManager, RelationManager, TextChunkManager
-from .mixins import SerializableMixin
+from .mixins import ImportExportMixin, SerializableMixin
 from .relations import Relation
 from .text import TextChunk
+from .types import ClusterType, EntityType, RelationType
 
 
 # pylint: disable=too-many-public-methods
-class KnowledgeGraph(BaseModel, SerializableMixin):
+class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
     """Comprehensive knowledge graph containing entities, relations, clusters, and text chunks.
 
     The KnowledgeGraph serves as the main container for all knowledge graph components,
@@ -401,3 +403,245 @@ class KnowledgeGraph(BaseModel, SerializableMixin):
         self.metadata.update(other.metadata)
 
         self.touch()
+
+    # ImportExportMixin implementation
+    def _export_data(self) -> Dict[str, Any]:
+        """Export data to dictionary format (backup method for ImportExportMixin)."""
+        return self.to_dict()
+
+    @classmethod
+    def _import_data(cls, data: Dict[str, Any], **kwargs: Any) -> "KnowledgeGraph":
+        """Import data from dictionary format (backup method for ImportExportMixin)."""
+        return cls.from_dict(data, **kwargs)
+
+    # GraphML Format Support
+    def export_to_graphml(self, file_path: Union[str, Path], **kwargs: Any) -> None:
+        """Export the knowledge graph to GraphML format.
+
+        Args:
+            file_path: Path where the GraphML file will be saved
+            **kwargs: Additional arguments (currently unused)
+        """
+        file_path = Path(file_path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create NetworkX graph
+        G = nx.MultiDiGraph()
+
+        # Add nodes (entities)
+        for entity_id, entity in self.entities.items():
+            G.add_node(
+                entity_id,
+                # Basic attributes
+                name=entity.name,
+                type=str(entity.entity_type),
+                description=entity.description or "",
+                confidence=entity.confidence,
+                # Metadata
+                created_at=entity.created_at.isoformat(),
+                updated_at=entity.updated_at.isoformat(),
+                # Additional properties as string representation
+                properties=str(entity.properties) if entity.properties else "",
+                # Text chunks as comma-separated string
+                text_chunks=",".join(entity.text_chunks) if entity.text_chunks else "",
+            )
+
+        # Add edges (relations)
+        for relation_id, relation in self.relations.items():
+            if relation.head_entity and relation.tail_entity:
+                G.add_edge(
+                    relation.head_entity.id,
+                    relation.tail_entity.id,
+                    key=relation_id,  # Use relation ID as edge key for MultiDiGraph
+                    # Basic attributes
+                    relation_id=relation_id,
+                    type=str(relation.relation_type),
+                    description=relation.description or "",
+                    confidence=relation.confidence,
+                    weight=relation.properties.get("weight", 1.0),  # Get weight from properties
+                    # Metadata
+                    created_at=relation.created_at.isoformat(),
+                    updated_at=relation.updated_at.isoformat(),
+                    # Additional properties as string representation
+                    properties=str(relation.properties) if relation.properties else "",
+                    # Text chunks as comma-separated string
+                    text_chunks=",".join(relation.text_chunks) if relation.text_chunks else "",
+                )
+
+        # Add graph-level metadata as graph attributes
+        G.graph.update(
+            {
+                "id": self.id,
+                "name": self.name,
+                "description": self.description,
+                "created_at": self.created_at.isoformat(),
+                "updated_at": self.updated_at.isoformat(),
+                "metadata": str(self.metadata) if self.metadata else "",
+                # Statistics
+                "total_entities": len(self.entities),
+                "total_relations": len(self.relations),
+                "total_clusters": len(self.clusters),
+                "total_text_chunks": len(self.text_chunks),
+            }
+        )
+
+        # Write to GraphML file
+        nx.write_graphml(G, file_path, encoding="utf-8", prettyprint=True)
+
+    @classmethod
+    def import_from_graphml(cls, file_path: Union[str, Path], **kwargs: Any) -> "KnowledgeGraph":
+        """Import a knowledge graph from GraphML format.
+
+        Args:
+            file_path: Path to the GraphML file to import
+            **kwargs: Additional arguments for graph creation
+
+        Returns:
+            KnowledgeGraph instance created from the GraphML data
+        """
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"GraphML file not found: {file_path}")
+
+        # Read GraphML file
+        G = nx.read_graphml(file_path)
+
+        # Create entities from nodes
+        entities = {}
+        for node_id, node_data in G.nodes(data=True):
+            # Parse entity type
+            entity_type_str = node_data.get("type", "concept")
+            try:
+                entity_type = EntityType(entity_type_str)
+            except ValueError:
+                entity_type = EntityType.CONCEPT  # Default fallback
+
+            # Parse properties from string representation
+            properties = {}
+            if node_data.get("properties"):
+                try:
+                    properties = ast.literal_eval(node_data["properties"])
+                except (ValueError, SyntaxError):
+                    properties = {}
+
+            # Parse text chunks from comma-separated string
+            text_chunks = set()
+            if node_data.get("text_chunks"):
+                text_chunks = set(
+                    chunk.strip() for chunk in node_data["text_chunks"].split(",") if chunk.strip()
+                )
+
+            entity = Entity(
+                id=node_id,
+                name=node_data.get("name", ""),
+                entity_type=entity_type,
+                description=node_data.get("description", ""),
+                confidence=float(node_data.get("confidence", 1.0)),
+                properties=properties,
+                text_chunks=text_chunks,
+            )
+
+            # Set timestamps if available
+            if node_data.get("created_at"):
+                try:
+                    entity.created_at = datetime.fromisoformat(node_data["created_at"])
+                except ValueError:
+                    pass
+            if node_data.get("updated_at"):
+                try:
+                    entity.updated_at = datetime.fromisoformat(node_data["updated_at"])
+                except ValueError:
+                    pass
+
+            entities[node_id] = entity
+
+        # Create relations from edges
+        relations = {}
+        for head, tail, edge_data in G.edges(data=True):
+            relation_id = edge_data.get("relation_id", str(uuid.uuid4()))
+
+            # Parse relation type
+            relation_type_str = edge_data.get("type", "references")
+            try:
+                relation_type = RelationType(relation_type_str)
+            except ValueError:
+                relation_type = RelationType.REFERENCES  # Default fallback
+
+            # Parse properties from string representation
+            properties = {}
+            if edge_data.get("properties"):
+                try:
+                    properties = ast.literal_eval(edge_data["properties"])
+                except (ValueError, SyntaxError):
+                    properties = {}
+
+            # Store weight in properties if present
+            if edge_data.get("weight") and float(edge_data["weight"]) != 1.0:
+                properties["weight"] = float(edge_data["weight"])
+
+            # Parse text chunks from comma-separated string
+            text_chunks = set()
+            if edge_data.get("text_chunks"):
+                text_chunks = set(
+                    chunk.strip() for chunk in edge_data["text_chunks"].split(",") if chunk.strip()
+                )
+
+            relation = Relation(
+                id=relation_id,
+                head_entity=entities.get(head),
+                tail_entity=entities.get(tail),
+                relation_type=relation_type,
+                description=edge_data.get("description", ""),
+                confidence=float(edge_data.get("confidence", 1.0)),
+                # Note: weight is stored in properties since Relation doesn't have weight attribute
+                properties=properties,
+                text_chunks=text_chunks,
+            )
+
+            # Set timestamps if available
+            if edge_data.get("created_at"):
+                try:
+                    relation.created_at = datetime.fromisoformat(edge_data["created_at"])
+                except ValueError:
+                    pass
+            if edge_data.get("updated_at"):
+                try:
+                    relation.updated_at = datetime.fromisoformat(edge_data["updated_at"])
+                except ValueError:
+                    pass
+
+            relations[relation_id] = relation
+
+        # Extract graph metadata
+        graph_data = G.graph
+        kg = cls(
+            id=graph_data.get("id", str(uuid.uuid4())),
+            name=graph_data.get("name", ""),
+            description=graph_data.get("description", ""),
+            entities=entities,
+            relations=relations,
+            # Note: Clusters and text_chunks are not preserved in GraphML format
+            # They could be added as separate nodes with special types if needed
+            clusters={},
+            text_chunks={},
+            metadata=(
+                ast.literal_eval(graph_data.get("metadata", "{}"))
+                if graph_data.get("metadata")
+                else {}
+            ),
+        )
+
+        # Set timestamps if available
+        if graph_data.get("created_at"):
+            try:
+                kg.created_at = datetime.fromisoformat(graph_data["created_at"])
+            except ValueError:
+                pass
+        if graph_data.get("updated_at"):
+            try:
+                kg.updated_at = datetime.fromisoformat(graph_data["updated_at"])
+            except ValueError:
+                pass
+
+        return kg

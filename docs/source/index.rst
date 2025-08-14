@@ -14,6 +14,7 @@ Features
 
 * **Entity Management**: Create and manage entities with types and properties
 * **Relation Management**: Define and handle relationships between entities
+* **Vector Database**: Vector-based storage and similarity search capabilities
 * **Text Processing**: Advanced text analysis and processing capabilities
 * **Configuration**: Flexible configuration system
 * **CLI Interface**: Command-line tools for common operations
@@ -49,3 +50,13 @@ Basic usage:
    :caption: Contents:
 
    agraph
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials:
+
+   ../quick_start_import_export.md
+   ../import_export_tutorial.md
+   ../graphml_integration_guide.md
+   ../vectordb_tutorial.md
+   ../custom_vectordb_guide.md

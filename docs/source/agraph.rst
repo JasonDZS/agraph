@@ -6,19 +6,21 @@ agraph package
    :show-inheritance:
    :undoc-members:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   agraph.base
+   agraph.vectordb
+
 Submodules
 ----------
 
 .. toctree::
    :maxdepth: 4
 
-   agraph.base
-   agraph.clusters
    agraph.config
-   agraph.entities
-   agraph.graph
-   agraph.mixins
-   agraph.relations
-   agraph.text
-   agraph.types
+   agraph.logger
    agraph.utils

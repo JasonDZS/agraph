@@ -1,7 +1,7 @@
-agraph.mixins module
+agraph.logger module
 ====================
 
-.. automodule:: agraph.mixins
+.. automodule:: agraph.logger
    :members:
    :show-inheritance:
    :undoc-members:

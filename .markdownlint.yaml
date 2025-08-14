@@ -1,0 +1,29 @@
+# Markdownlint configuration file
+# Reference: https://github.com/DavidAnson/markdownlint/blob/main/schema/.markdownlint.yaml
+
+# Enable all rules by default
+default: true
+
+# Line length limit
+MD013:
+  # Set line length to 100 characters
+  line_length: 100
+  # Don't ignore code blocks
+  code_blocks: false
+  # Don't ignore tables
+  tables: false
+  # Don't ignore headings
+  headings: false
+
+# Allow duplicate headings
+MD024:
+  allow_different_nesting: true
+
+# Allow inline HTML
+MD033: false
+
+# Allow emphasis markers with spaces
+MD036: false
+
+# Ignore first line heading rule (allow non-H1 first heading)
+MD041: false

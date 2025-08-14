@@ -1,0 +1,436 @@
+"""Factory classes for creating and managing document processors.
+
+This module implements the Factory pattern for document processing, providing
+a centralized way to create appropriate processors for different file types
+and manage the processing workflow.
+
+The factory automatically registers all available processors and routes
+documents to the appropriate processor based on file extension.
+"""
+
+import threading
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Type, Union
+
+from ..logger import logger
+from .base import DependencyError, DocumentProcessor, ProcessingError
+from .html_processor import HTMLProcessor
+from .image_processor import ImageProcessor
+from .json_processor import JSONProcessor
+from .pdf_processor import PDFProcessor
+from .spreadsheet_processor import SpreadsheetProcessor
+from .text_processor import TextProcessor
+from .word_processor import WordProcessor
+
+
+class DocumentProcessorFactory:
+    """Factory class for creating and managing document processors.
+
+    This factory maintains a registry of all available document processors
+    and creates appropriate processor instances based on file extensions.
+    It supports both built-in processors and custom processor registration.
+
+    The factory uses lazy instantiation - processors are created only when needed,
+    which helps with memory efficiency and dependency management.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the factory and register default processors.
+
+        Creates an empty processor registry and registers all built-in
+        processors for immediate use.
+        """
+        self._processors: Dict[str, Type[DocumentProcessor]] = {}
+        self._processor_instances: Dict[str, DocumentProcessor] = {}
+        self._lock = threading.RLock()
+        logger.debug("Initializing DocumentProcessorFactory")
+        self._register_default_processors()
+
+    def _register_default_processors(self) -> None:
+        """Register all default document processors.
+
+        This method registers built-in processors for all supported file types.
+        Each processor is associated with its supported file extensions.
+        """
+        processors_to_register = [
+            PDFProcessor,
+            WordProcessor,
+            TextProcessor,
+            HTMLProcessor,
+            SpreadsheetProcessor,
+            JSONProcessor,
+            ImageProcessor,
+        ]
+
+        registered_count = 0
+        for processor_class in processors_to_register:
+            try:
+                self.register_processor(processor_class)  # type: ignore[arg-type]
+                registered_count += 1
+            except DependencyError as e:
+                logger.warning(
+                    f"Skipping {processor_class.__name__} due to missing dependencies: {e}"
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.error(f"Failed to register {processor_class.__name__}: {e}")
+
+        logger.info(
+            f"Successfully registered {registered_count}/{len(processors_to_register)} processors"
+        )
+
+    def register_processor(self, processor_class: Type[DocumentProcessor]) -> None:
+        """Register a document processor for specific file extensions.
+
+        This method allows registration of both built-in and custom processors.
+        The processor's supported extensions are automatically detected and
+        registered in the factory's routing table.
+
+        Args:
+            processor_class: The processor class to register. Must inherit
+                           from DocumentProcessor.
+
+        Raises:
+            ValueError: If the processor class doesn't inherit from DocumentProcessor.
+            DependencyError: If the processor has missing dependencies.
+        """
+        if not issubclass(processor_class, DocumentProcessor):
+            error_msg = f"Processor must inherit from DocumentProcessor: {processor_class}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        try:
+            # Test instantiate to check for dependency issues
+            processor_instance = processor_class()
+            extensions = processor_instance.supported_extensions
+
+            with self._lock:
+                for ext in extensions:
+                    ext_lower = ext.lower()
+                    if ext_lower in self._processors:
+                        logger.warning(f"Overriding existing processor for extension {ext_lower}")
+                    self._processors[ext_lower] = processor_class
+
+            logger.debug(f"Registered {processor_class.__name__} for extensions: {extensions}")
+
+        except ImportError as e:
+            error_msg = f"Missing dependencies for {processor_class.__name__}: {e}"
+            logger.error(error_msg)
+            raise DependencyError(error_msg) from e
+        except Exception as e:
+            error_msg = f"Failed to register {processor_class.__name__}: {e}"
+            logger.error(error_msg)
+            raise
+
+    def get_processor(self, file_path: Union[str, Path]) -> DocumentProcessor:
+        """Get the appropriate processor instance for a file.
+
+        Returns a cached processor instance if available, or creates a new one.
+        The processor type is determined by file extension.
+
+        Args:
+            file_path: Path to the file that needs processing.
+
+        Returns:
+            DocumentProcessor instance appropriate for the file type.
+
+        Raises:
+            ProcessingError: If no processor is available for the file type.
+        """
+        file_path = Path(file_path)
+        extension = file_path.suffix.lower()
+
+        logger.debug(f"Getting processor for file: {file_path} (extension: {extension})")
+
+        if extension not in self._processors:
+            supported_extensions = list(self._processors.keys())
+            error_msg = (
+                f"No processor available for file type: {extension}. "
+                f"Supported: {supported_extensions}"
+            )
+            logger.error(error_msg)
+            raise ProcessingError(error_msg)
+
+        with self._lock:
+            # Check if we have a cached instance
+            if extension in self._processor_instances:
+                logger.debug(f"Using cached processor for {extension}")
+                return self._processor_instances[extension]
+
+            # Create new instance and cache it
+            processor_class = self._processors[extension]
+            try:
+                processor_instance = processor_class()
+                self._processor_instances[extension] = processor_instance
+                logger.debug(f"Created new processor instance for {extension}")
+                return processor_instance
+            except Exception as e:
+                error_msg = f"Failed to create processor for {extension}: {e}"
+                logger.error(error_msg)
+                raise ProcessingError(error_msg) from e
+
+    def can_process(self, file_path: Union[str, Path]) -> bool:
+        """Check if a file can be processed by any registered processor.
+
+        Args:
+            file_path: Path to the file to check.
+
+        Returns:
+            True if a processor is available for this file type.
+        """
+        file_path = Path(file_path)
+        extension = file_path.suffix.lower()
+        return extension in self._processors
+
+    def get_supported_extensions(self) -> List[str]:
+        """Get all supported file extensions across all registered processors.
+
+        Returns:
+            List of supported file extensions (including dots).
+        """
+        return list(self._processors.keys())
+
+    def process_document(self, file_path: Union[str, Path], **kwargs: Any) -> str:
+        """Process a document using the appropriate processor.
+
+        This is a convenience method that automatically selects the correct
+        processor and processes the document in one call.
+
+        Args:
+            file_path: Path to the document to process.
+            **kwargs: Additional processing parameters passed to the processor.
+
+        Returns:
+            Extracted text content from the document.
+
+        Raises:
+            ProcessingError: If no processor is available or processing fails.
+        """
+        processor = self.get_processor(file_path)
+        return processor.process(file_path, **kwargs)
+
+    def extract_metadata(self, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Extract metadata from a document using the appropriate processor.
+
+        Args:
+            file_path: Path to the document.
+
+        Returns:
+            Dictionary containing document metadata.
+
+        Raises:
+            ProcessingError: If no processor is available for the file type.
+        """
+        processor = self.get_processor(file_path)
+        return processor.extract_metadata(file_path)
+
+
+class DocumentProcessorManager:
+    """High-level document processing interface.
+
+    This class provides a simplified interface for document processing operations.
+    It manages a factory instance and provides convenient methods for processing
+    single documents, multiple documents, and extracting metadata.
+
+    This is the recommended entry point for most document processing tasks.
+    """
+
+    def __init__(self, factory: Optional[DocumentProcessorFactory] = None):
+        """Initialize the document processor manager.
+
+        Args:
+            factory: Optional custom factory instance. If None, creates a new
+                    factory with default processors registered.
+        """
+        self.factory = factory or DocumentProcessorFactory()
+
+    def process(self, file_path: Union[str, Path], **kwargs: Any) -> str:
+        """Process a document and return its text content.
+
+        Args:
+            file_path: Path to the document to process.
+            **kwargs: Additional processing parameters specific to the file type.
+
+        Returns:
+            Extracted text content from the document.
+        """
+        return self.factory.process_document(file_path, **kwargs)
+
+    def extract_metadata(self, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Extract metadata from a document.
+
+        Args:
+            file_path: Path to the document.
+
+        Returns:
+            Dictionary containing document metadata.
+        """
+        return self.factory.extract_metadata(file_path)
+
+    def can_process(self, file_path: Union[str, Path]) -> bool:
+        """Check if a file can be processed.
+
+        Args:
+            file_path: Path to the file to check.
+
+        Returns:
+            True if the file type is supported.
+        """
+        return self.factory.can_process(file_path)
+
+    def get_supported_extensions(self) -> List[str]:
+        """Get all supported file extensions.
+
+        Returns:
+            List of supported file extensions.
+        """
+        return self.factory.get_supported_extensions()
+
+    def process_multiple(
+        self, file_paths: List[Union[str, Path]], **kwargs: Any
+    ) -> Dict[str, Union[str, Exception]]:
+        """Process multiple documents in batch.
+
+        This method processes multiple files and returns results for each file.
+        If processing fails for a specific file, the exception is captured
+        and returned instead of the content.
+
+        Args:
+            file_paths: List of file paths to process.
+            **kwargs: Additional processing parameters applied to all files.
+
+        Returns:
+            Dictionary mapping file paths to either extracted content (str)
+            or exceptions that occurred during processing.
+        """
+        logger.info(f"Starting batch processing of {len(file_paths)} files")
+        results: Dict[str, Union[str, Exception]] = {}
+        success_count = 0
+
+        for i, file_path in enumerate(file_paths, 1):
+            logger.debug(f"Processing file {i}/{len(file_paths)}: {file_path}")
+            try:
+                results[str(file_path)] = self.process(file_path, **kwargs)
+                success_count += 1
+                logger.debug(f"Successfully processed: {file_path}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                results[str(file_path)] = e
+                logger.error(f"Failed to process {file_path}: {e}")
+
+        logger.info(
+            f"Batch processing completed: {success_count}/{len(file_paths)} "
+            f"files processed successfully"
+        )
+        return results
+
+    def batch_extract_metadata(
+        self, file_paths: List[Union[str, Path]]
+    ) -> Dict[str, Union[Dict[str, Any], Exception]]:
+        """Extract metadata from multiple documents in batch.
+
+        Args:
+            file_paths: List of file paths to process.
+
+        Returns:
+            Dictionary mapping file paths to either metadata dictionaries
+            or exceptions that occurred during extraction.
+        """
+        logger.info(f"Starting batch metadata extraction for {len(file_paths)} files")
+        results: Dict[str, Union[Dict[str, Any], Exception]] = {}
+        success_count = 0
+
+        for i, file_path in enumerate(file_paths, 1):
+            logger.debug(f"Extracting metadata from file {i}/{len(file_paths)}: {file_path}")
+            try:
+                results[str(file_path)] = self.extract_metadata(file_path)
+                success_count += 1
+                logger.debug(f"Successfully extracted metadata from: {file_path}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                results[str(file_path)] = e
+                logger.error(f"Failed to extract metadata from {file_path}: {e}")
+
+        logger.info(
+            f"Batch metadata extraction completed: {success_count}/{len(file_paths)} "
+            f"files processed successfully"
+        )
+        return results
+
+
+# Global factory instance for convenience functions
+# This implements the singleton pattern for the default factory
+_DEFAULT_FACTORY = None  # pylint: disable=invalid-name
+
+
+def _get_default_factory() -> DocumentProcessorFactory:
+    """Get or create the default factory instance.
+
+    Returns:
+        The singleton default factory instance.
+    """
+    global _DEFAULT_FACTORY  # pylint: disable=global-statement
+    if _DEFAULT_FACTORY is None:
+        _DEFAULT_FACTORY = DocumentProcessorFactory()
+    return _DEFAULT_FACTORY
+
+
+def get_processor(file_path: Union[str, Path]) -> DocumentProcessor:
+    """Get a processor for the specified file using the default factory.
+
+    This is a convenience function that uses the global default factory
+    to create processor instances.
+
+    Args:
+        file_path: Path to the file.
+
+    Returns:
+        DocumentProcessor instance appropriate for the file type.
+    """
+    return _get_default_factory().get_processor(file_path)
+
+
+def process_document(file_path: Union[str, Path], **kwargs: Any) -> str:
+    """Process a document using the default factory.
+
+    This is a convenience function for quick document processing without
+    needing to create factory or manager instances.
+
+    Args:
+        file_path: Path to the document.
+        **kwargs: Additional processing parameters.
+
+    Returns:
+        Extracted text content from the document.
+    """
+    return _get_default_factory().process_document(file_path, **kwargs)
+
+
+def extract_metadata(file_path: Union[str, Path]) -> Dict[str, Any]:
+    """Extract metadata from a document using the default factory.
+
+    Args:
+        file_path: Path to the document.
+
+    Returns:
+        Dictionary containing document metadata.
+    """
+    return _get_default_factory().extract_metadata(file_path)
+
+
+def can_process(file_path: Union[str, Path]) -> bool:
+    """Check if a file can be processed using the default factory.
+
+    Args:
+        file_path: Path to the file.
+
+    Returns:
+        True if the file type is supported.
+    """
+    return _get_default_factory().can_process(file_path)
+
+
+def get_supported_extensions() -> List[str]:
+    """Get all supported file extensions from the default factory.
+
+    Returns:
+        List of supported file extensions.
+    """
+    return _get_default_factory().get_supported_extensions()

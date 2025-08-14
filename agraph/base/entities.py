@@ -8,10 +8,10 @@ from typing import Any, Dict, List
 
 from pydantic import Field, field_validator
 
-from agraph.base.base import GraphNodeBase, TextChunkMixin
-from agraph.base.mixins import PropertyMixin
-from agraph.base.types import EntityType, EntityTypeType
-from agraph.utils import get_type_value
+from ..utils import get_type_value
+from .base import GraphNodeBase, TextChunkMixin
+from .mixins import PropertyMixin
+from .types import EntityType, EntityTypeType
 
 
 class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin):

@@ -20,12 +20,18 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+    "chromadb<1.0",
+    "loguru>=0.7.3",
+    "networkx>=3.2",
     "openai>=1.99.9",
     "pydantic>=2.11.7",
     "python-dotenv>=1.0.0",
+    "tiktoken>=0.11.0",
 ]
 
 [project.optional-dependencies]
+vectordb = ["chromadb>=0.5.0"]
+jupyter = ["nest-asyncio>=1.5.0"]
 dev = [
     "coverage>=7.4.0",
     "black>=24.0.0",
@@ -34,6 +40,7 @@ dev = [
     "pylint>=3.0.0",
     "mypy>=1.8.0",
     "pre-commit>=3.6.0",
+    "nest-asyncio>=1.5.0",
 ]
 docs = [
     "sphinx>=8.0.0",

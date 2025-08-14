@@ -1,7 +1,7 @@
-agraph.relations module
+agraph.base.base module
 =======================
 
-.. automodule:: agraph.relations
+.. automodule:: agraph.base.base
    :members:
    :show-inheritance:
    :undoc-members:

@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any, Dict, Set
 
 from pydantic import Field, field_validator
 
-from agraph.base.base import GraphNodeBase, TextChunkMixin
-from agraph.base.mixins import PropertyMixin
-from agraph.base.types import ClusterType, ClusterTypeType
-from agraph.utils import get_type_value
+from ..utils import get_type_value
+from .base import GraphNodeBase, TextChunkMixin
+from .mixins import PropertyMixin
+from .types import ClusterType, ClusterTypeType
 
 if TYPE_CHECKING:
     pass  # No actual imports needed at runtime

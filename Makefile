@@ -14,7 +14,7 @@ help:
 	@echo "  test-cov     - Run tests with coverage report"
 	@echo "  check        - Run all code quality checks"
 	@echo "  fix          - Auto-fix code formatting issues"
-	@echo "  format       - Format code (black + isort)"
+	@echo "  format       - Format code (black + isort + trailing whitespace removal)"
 	@echo "  lint         - Run linting tools"
 	@echo ""
 	@echo "Documentation & Publishing:"
@@ -55,13 +55,17 @@ fix:
 
 format:
 	@echo "📝 Formatting code..."
+	@echo "🔧 Removing trailing whitespace..."
+	find agraph/ tests/ -name "*.py" -type f -exec sed -i '' 's/[[:space:]]*$$//' {} +
+	find . -name "*.md" -type f -exec sed -i '' 's/[[:space:]]*$$//' {} +
+	find . -name "*.yaml" -name "*.yml" -type f -exec sed -i '' 's/[[:space:]]*$$//' {} +
 	black agraph/
-	isort agraph/
+	isort agraph/ --line-length=100
 
 lint:
 	@echo "📋 Running code linting tools..."
-	flake8 agraph/  --max-line-length=100
-	pylint agraph/ --exit-zero
+	flake8 agraph/ --ignore=E501,E203,W503
+	pylint agraph/ --rcfile=.pylintrc --exit-zero
 	mypy agraph/ --ignore-missing-imports
 
 # Documentation
