@@ -390,6 +390,7 @@ class AGraph:
             context_info = await self._retrieve_context(
                 question, entity_top_k, relation_top_k, text_chunk_top_k
             )
+            logger.info(f"Retrieved context information: {context_info}")
 
             # 2. Build prompt
             prompt = self._build_chat_prompt(

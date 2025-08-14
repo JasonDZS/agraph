@@ -13,6 +13,8 @@ Subpackages
    :maxdepth: 4
 
    agraph.base
+   agraph.builder
+   agraph.processor
    agraph.vectordb
 
 Submodules
@@ -21,6 +23,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   agraph.agraph
+   agraph.chunker
    agraph.config
    agraph.logger
    agraph.utils

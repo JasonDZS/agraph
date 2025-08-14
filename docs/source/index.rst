@@ -3,21 +3,24 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Knowledge Graph Toolkit documentation
-=====================================
+AGraph - Knowledge Graph Toolkit Documentation
+=============================================
 
-Welcome to the Knowledge Graph Toolkit documentation! This package provides tools for creating,
-managing, and analyzing knowledge graphs with focus on entities, relations, and text processing capabilities.
+Welcome to AGraph documentation! AGraph is a powerful knowledge graph toolkit that enables you to build,
+manage, and analyze knowledge graphs from text documents with advanced AI capabilities including semantic search,
+intelligent Q&A, and vector-based storage.
 
 Features
 --------
 
-* **Entity Management**: Create and manage entities with types and properties
-* **Relation Management**: Define and handle relationships between entities
-* **Vector Database**: Vector-based storage and similarity search capabilities
-* **Text Processing**: Advanced text analysis and processing capabilities
-* **Configuration**: Flexible configuration system
-* **CLI Interface**: Command-line tools for common operations
+* **Intelligent Knowledge Graph Construction**: Automatically build knowledge graphs from text using LLMs
+* **Semantic Search**: Advanced vector-based search for entities and text chunks
+* **Smart Q&A System**: Ask questions and get contextual answers from your knowledge graph
+* **Multiple Vector Store Support**: Support for Chroma, in-memory, and custom vector databases
+* **Document Processing**: Handle various document formats (txt, md, json, csv, pdf, docx, html)
+* **Caching System**: Intelligent caching for improved performance
+* **Streaming Responses**: Real-time streaming for chat interactions
+* **Persistent Storage**: Save and load knowledge graphs across sessions
 
 Quick Start
 -----------
@@ -26,24 +29,56 @@ Install the package:
 
 .. code-block:: bash
 
-   pip install agraph
+   pip install -e .
+
+Set up environment:
+
+.. code-block:: bash
+
+   export OPENAI_API_KEY=your_api_key_here
 
 Basic usage:
 
 .. code-block:: python
 
-   from agraph import Entity, Relation, EntityType, RelationType
+   import asyncio
+   from agraph import AGraph, get_settings
 
-   # Create entities
-   person = Entity(name="Alice", entity_type=EntityType.PERSON)
-   company = Entity(name="TechCorp", entity_type=EntityType.ORGANIZATION)
+   async def main():
+       # Configure settings
+       settings = get_settings()
+       settings.workdir = "workdir/my_project"
 
-   # Create relation
-   relation = Relation(
-       source=person,
-       target=company,
-       relation_type=RelationType.WORKS_FOR
-   )
+       # Initialize AGraph
+       async with AGraph(
+           collection_name="my_knowledge_graph",
+           persist_directory=settings.workdir,
+           vector_store_type="chroma",
+           use_openai_embeddings=True
+       ) as agraph:
+           await agraph.initialize()
+
+           # Build knowledge graph from texts
+           texts = [
+               "AI company focused on machine learning.",
+               "Team of 50 engineers in Beijing office."
+           ]
+
+           graph = await agraph.build_from_texts(
+               texts=texts,
+               graph_name="Company Graph",
+               use_cache=True,
+               save_to_vector_store=True
+           )
+
+           # Search entities
+           entities = await agraph.search_entities("company", top_k=3)
+
+           # Ask questions
+           response = await agraph.chat("What does the company do?")
+           print(response)
+
+   asyncio.run(main())
 
 .. toctree::
    :maxdepth: 2
@@ -55,8 +90,9 @@ Basic usage:
    :maxdepth: 2
    :caption: Tutorials:
 
-   ../quick_start_import_export.md
-   ../import_export_tutorial.md
-   ../graphml_integration_guide.md
+   ../agraph_tutorial.md
    ../vectordb_tutorial.md
+   ../import_export_tutorial.md
+   ../quick_start_import_export.md
+   ../graphml_integration_guide.md
    ../custom_vectordb_guide.md
