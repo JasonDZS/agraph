@@ -1,6 +1,6 @@
 [project]
 name = "agraph"
-version = "0.2.0rc0"
+version = "0.2.0rc1"
 description = "A knowledge graph toolkit for entity and relation management"
 readme = "README.md"
 requires-python = ">=3.11"
