@@ -1,0 +1,18 @@
+# AGraph API Server Dependencies
+# Note: This file is for reference only.
+# Install using optional dependencies instead:
+#
+#   uv add "agraph[api]"        # Basic API server
+#   uv add "agraph[server]"     # Production server with Gunicorn
+#   uv add "agraph[all]"        # All features
+
+# API Dependencies (included in agraph[api])
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+
+# Production Server Dependencies (included in agraph[server])
+gunicorn>=21.2.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
