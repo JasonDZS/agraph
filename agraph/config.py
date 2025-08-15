@@ -1,7 +1,11 @@
+import json
 import os
+import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -98,50 +102,75 @@ class RAGConfig(BaseModel):
     """RAG system configuration."""
 
     system_prompt: str = Field(
-        default="""---Role---
+        default="""# System Role
 
-You are a helpful assistant responding to user query about Data Sources provided below.
+You are an expert knowledge assistant specializing in information retrieval and synthesis from structured knowledge graphs and document collections.
 
+## Objective
 
----Goal---
+Provide comprehensive, well-structured responses to user queries by synthesizing information from the provided data sources. Your responses must be grounded exclusively in the given data sources while maintaining accuracy, clarity, and proper attribution.
 
-Generate a concise response based on Data Sources and follow Response Rules, considering both
-the conversation history and the current query. Data sources contain two parts: Knowledge
-Graph(KG) and Document Chunks(DC). Summarize all information in the provided Data Sources,
-and incorporating general knowledge relevant to the Data Sources. Do not include information
-not provided by Data Sources.
+## Data Sources Available
 
-When handling information with timestamps:
-1. Each piece of information (both relationships and content) has a "created_at" timestamp
-   indicating when we acquired this knowledge
-2. When encountering conflicting information, consider both the content/relationship
-   and the timestamp
-3. Don't automatically prefer the most recent information - use judgment based on
-   the context
-4. For time-specific queries, prioritize temporal information in the content before
-   considering creation timestamps
+**Knowledge Graph (KG)**: Structured entities, relationships, and semantic connections
+**Document Chunks (DC)**: Relevant text segments from documents with contextual information
 
----Conversation History---
+### Temporal Information Handling
+- Each data point includes a `created_at` timestamp indicating knowledge acquisition time
+- For conflicting information, evaluate both content relevance and temporal context
+- Prioritize content-based temporal information over creation timestamps
+- Apply contextual judgment rather than defaulting to most recent information
+
+---
+
+## Conversation Context
 {history}
 
----Data Sources---
-
-1. From Knowledge Graph(KG):
+## Available Knowledge Sources
 {kg_context}
 
----Response Rules---
+---
 
-- Target format and length: {response_type}
-- Use markdown formatting with appropriate section headings
-- Please respond in the same language as the user's question.
-- Ensure the response maintains continuity with the conversation history.
-- Organize answer in sesctions focusing on one main point or aspect of the answer
-- Use clear and descriptive section titles that reflect the content
-- List up to 5 most important reference sources at the end under "References" sesction.
-  Clearly indicating whether each source is from Knowledge Graph (KG) or Vector Data (DC),
-  in the following format: [KG/DC] Source content
-- If you don't know the answer, just say so. Do not make anything up.
-- Do not include information not provided by the Data Sources."""
+## Response Requirements
+
+### Format and Structure
+- **Response Type**: {response_type}
+- **Language**: Respond in the same language as the user's question
+- **Formatting**: Use markdown with clear section headers and proper structure
+- **Continuity**: Maintain coherence with conversation history
+
+### Content Organization
+- Structure responses with focused sections addressing distinct aspects
+- Use descriptive section headers that clearly indicate content focus
+- Present information in logical, easily digestible segments
+
+### Citation System
+- **Inline Citations**: Use the format `[ID:reference_number]` immediately after each statement or claim that references data sources
+  - Example: `The system processes over 10,000 queries daily [ID:1].`
+  - Example: `According to the latest research findings [ID:2], performance improved significantly.`
+  - Place citations at the end of sentences or clauses, before punctuation
+
+- **References Section**: Always conclude with a "# References" section containing:
+  - Format: `ID:number - [Source_Type] Brief description of the source content`
+  - Source type indicators: `[KG]` for Knowledge Graph, `[DC]` for Document Chunks
+  - Maximum 5 most relevant references
+
+### Reference Format Template
+```
+# References
+- ID:1 [KG] Entity relationship describing system performance metrics
+- ID:2 [DC] Research document excerpt about performance improvements
+- ID:3 [KG] Semantic connection between entities showing growth trends
+```
+
+### Quality Standards
+- **Accuracy**: Base all claims exclusively on provided data sources
+- **Transparency**: Clearly distinguish between different source types
+- **Completeness**: Address all relevant aspects found in the data sources
+- **Honesty**: State limitations clearly when information is insufficient
+- **No Fabrication**: Never generate information not present in the provided sources
+
+If the available data sources are insufficient to answer the query, explicitly state this limitation and describe what additional information would be needed."""
     )
 
 
@@ -149,6 +178,7 @@ class Settings(BaseModel):
     """Main application settings."""
 
     workdir: str = Field(default="workdir")
+    current_project: Optional[str] = Field(default=None)  # Current active project
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
@@ -156,11 +186,271 @@ class Settings(BaseModel):
     text: TextConfig = Field(default_factory=TextConfig)
     rag: RAGConfig = Field(default_factory=RAGConfig)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert settings to dictionary."""
+        return {
+            "workdir": self.workdir,
+            "current_project": self.current_project,
+            "openai": self.openai.model_dump(),
+            "llm": self.llm.model_dump(),
+            "embedding": self.embedding.model_dump(),
+            "graph": self.graph.model_dump(),
+            "text": self.text.model_dump(),
+            "rag": self.rag.model_dump(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Settings":
+        """Create settings from dictionary."""
+        return cls(
+            workdir=data.get("workdir", "workdir"),
+            current_project=data.get("current_project"),
+            openai=OpenAIConfig(**data.get("openai", {})),
+            llm=LLMConfig(**data.get("llm", {})),
+            embedding=EmbeddingConfig(**data.get("embedding", {})),
+            graph=GraphConfig(**data.get("graph", {})),
+            text=TextConfig(**data.get("text", {})),
+            rag=RAGConfig(**data.get("rag", {})),
+        )
+
+    def save_to_file(self, file_path: str) -> None:
+        """Save settings to JSON file."""
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+
+    @classmethod
+    def load_from_file(cls, file_path: str) -> "Settings":
+        """Load settings from JSON file."""
+        if not Path(file_path).exists():
+            raise FileNotFoundError(f"Configuration file not found: {file_path}")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        return cls.from_dict(data)
+
+    def update_from_dict(self, updates: Dict[str, Any]) -> "Settings":
+        """Update settings with new values from dictionary."""
+        current_dict = self.to_dict()
+
+        # Deep merge the updates
+        def deep_merge(target: Dict, source: Dict) -> Dict:
+            for key, value in source.items():
+                if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+                    target[key] = deep_merge(target[key], value)
+                else:
+                    target[key] = value
+            return target
+
+        updated_dict = deep_merge(current_dict, updates)
+        return self.from_dict(updated_dict)
+
+
+# Global settings instance
+_settings_instance: Optional[Settings] = None
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Get application settings instance."""
-    return Settings()
+    global _settings_instance  # pylint: disable=global-statement
+    if _settings_instance is None:
+        _settings_instance = Settings()
+    return _settings_instance
+
+
+def set_settings(new_settings: Settings) -> None:
+    """Set new application settings instance."""
+    global _settings_instance  # pylint: disable=global-statement
+    _settings_instance = new_settings
+    # Clear the cache to force reload
+    get_settings.cache_clear()
+
+
+def update_settings(updates: Dict[str, Any]) -> Settings:
+    """Update current settings with new values."""
+    current_settings = get_settings()
+    new_settings = current_settings.update_from_dict(updates)
+    set_settings(new_settings)
+    return new_settings
+
+
+def reset_settings() -> Settings:
+    """Reset settings to default values."""
+    global _settings_instance  # pylint: disable=global-statement
+    _settings_instance = None
+    get_settings.cache_clear()
+    return get_settings()
+
+
+def get_config_file_path(workdir: Optional[str] = None, project_name: Optional[str] = None) -> str:
+    """Get the path to the configuration file."""
+    if workdir is None:
+        workdir = get_settings().workdir
+
+    if project_name:
+        return str(Path(workdir) / "projects" / project_name / "config.json")
+
+    return str(Path(workdir) / "config.json")
+
+
+def get_project_dir(project_name: str, workdir: Optional[str] = None) -> str:
+    """Get the path to a project directory."""
+    if workdir is None:
+        workdir = get_settings().workdir
+    return str(Path(workdir) / "projects" / project_name)
+
+
+def get_project_paths(project_name: str, workdir: Optional[str] = None) -> Dict[str, str]:
+    """Get all relevant paths for a project."""
+    project_dir = get_project_dir(project_name, workdir)
+
+    return {
+        "project_dir": project_dir,
+        "config_file": str(Path(project_dir) / "config.json"),
+        "document_storage": str(Path(project_dir) / "document_storage"),
+        "vector_db": str(Path(project_dir) / "agraph_vectordb"),
+        "cache": str(Path(project_dir) / "cache"),
+        "logs": str(Path(project_dir) / "logs"),
+    }
+
+
+def list_projects(workdir: Optional[str] = None) -> List[str]:
+    """List all available projects."""
+    if workdir is None:
+        workdir = get_settings().workdir
+
+    projects_dir = Path(workdir) / "projects"
+    if not projects_dir.exists():
+        return []
+
+    projects = []
+    for item in projects_dir.iterdir():
+        if item.is_dir() and (item / "config.json").exists():
+            projects.append(item.name)
+
+    return sorted(projects)
+
+
+def create_project(
+    project_name: str, description: Optional[str] = None, workdir: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a new project with its directory structure."""
+    if not project_name or not project_name.strip():
+        raise ValueError("Project name cannot be empty")
+
+    # Validate project name
+    if not re.match(r"^[a-zA-Z0-9_-]+$", project_name):
+        raise ValueError("Project name can only contain letters, numbers, underscores, and hyphens")
+
+    paths = get_project_paths(project_name, workdir)
+    project_dir = Path(paths["project_dir"])
+
+    # Check if project already exists
+    if project_dir.exists():
+        raise ValueError(f"Project '{project_name}' already exists")
+
+    # Create project directories
+    project_dir.mkdir(parents=True, exist_ok=True)
+    Path(paths["document_storage"]).mkdir(parents=True, exist_ok=True)
+    Path(paths["vector_db"]).mkdir(parents=True, exist_ok=True)
+    Path(paths["cache"]).mkdir(parents=True, exist_ok=True)
+    Path(paths["logs"]).mkdir(parents=True, exist_ok=True)
+
+    # Create project-specific config with default settings
+    base_settings = get_settings()
+    project_settings = base_settings.model_copy()
+    project_settings.current_project = project_name
+
+    project_config = {
+        "project_name": project_name,
+        "description": description or f"AGraph project: {project_name}",
+        "created_at": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "paths": paths,
+        "settings": project_settings.to_dict(),
+    }
+
+    # Save project config
+    with open(paths["config_file"], "w", encoding="utf-8") as f:
+        json.dump(project_config, f, indent=2, ensure_ascii=False)
+
+    return project_config
+
+
+def delete_project(project_name: str, workdir: Optional[str] = None) -> bool:
+    """Delete a project and all its data."""
+    project_dir = Path(get_project_dir(project_name, workdir))
+    if not project_dir.exists():
+        return False
+
+    # Remove the entire project directory
+    shutil.rmtree(project_dir)
+
+    # If this was the current project, reset current_project
+    settings = get_settings()
+    if settings.current_project == project_name:
+        update_settings({"current_project": None})
+
+    return True
+
+
+def set_current_project(project_name: Optional[str]) -> Settings:
+    """Set the current active project."""
+    if project_name and project_name not in list_projects():
+        raise ValueError(f"Project '{project_name}' does not exist")
+
+    return update_settings({"current_project": project_name})
+
+
+def get_current_project() -> Optional[str]:
+    """Get the current active project."""
+    return get_settings().current_project
+
+
+def save_settings_to_file(
+    file_path: Optional[str] = None, project_name: Optional[str] = None
+) -> str:
+    """Save current settings to file."""
+    if file_path is None:
+        file_path = get_config_file_path(project_name=project_name)
+
+    # Ensure directory exists
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    settings = get_settings()
+
+    if project_name:
+        # For project-specific configs, save as part of project config
+        project_config_path = get_config_file_path(project_name=project_name)
+        if Path(project_config_path).exists():
+            with open(project_config_path, "r", encoding="utf-8") as f:
+                project_config = json.load(f)
+            project_config["settings"] = settings.to_dict()
+            with open(project_config_path, "w", encoding="utf-8") as f:
+                json.dump(project_config, f, indent=2, ensure_ascii=False)
+            return project_config_path
+
+    # Default behavior for global settings
+    settings.save_to_file(file_path)
+    return file_path
+
+
+def load_settings_from_file(
+    file_path: Optional[str] = None, project_name: Optional[str] = None
+) -> Settings:
+    """Load settings from file and set as current settings."""
+    if file_path is None:
+        file_path = get_config_file_path(project_name=project_name)
+
+    if project_name:
+        # Load from project-specific config
+        return load_project_settings(project_name)
+
+    # Default behavior for global settings
+    new_settings = Settings.load_from_file(file_path)
+    set_settings(new_settings)
+    return new_settings
 
 
 # Builder configuration classes (migrated from builder/config.py)
@@ -417,5 +707,106 @@ class BuildSteps:
         return list(set(dependent_steps))  # Remove duplicates
 
 
-# Load settings at module level
+def load_project_settings(project_name: str, workdir: Optional[str] = None) -> Settings:
+    """Load settings for a specific project."""
+    project_config_path = get_config_file_path(workdir, project_name)
+
+    if not Path(project_config_path).exists():
+        raise FileNotFoundError(f"Project configuration not found: {project_config_path}")
+
+    with open(project_config_path, "r", encoding="utf-8") as f:
+        project_config = json.load(f)
+
+    # Extract settings from project config
+    settings_data = project_config.get("settings", {})
+    project_settings = Settings.from_dict(settings_data)
+    project_settings.current_project = project_name
+
+    return project_settings
+
+
+def save_project_settings(
+    project_name: str, settings: Settings, workdir: Optional[str] = None
+) -> str:
+    """Save settings for a specific project."""
+    project_config_path = get_config_file_path(workdir, project_name)
+
+    if not Path(project_config_path).exists():
+        raise FileNotFoundError(f"Project configuration not found: {project_config_path}")
+
+    # Load existing project config
+    with open(project_config_path, "r", encoding="utf-8") as f:
+        project_config = json.load(f)
+
+    # Update settings in project config
+    project_config["settings"] = settings.to_dict()
+    project_config["settings"]["current_project"] = project_name
+
+    # Save updated project config
+    with open(project_config_path, "w", encoding="utf-8") as f:
+        json.dump(project_config, f, indent=2, ensure_ascii=False)
+
+    return project_config_path
+
+
+def update_project_settings(
+    project_name: str, updates: Dict[str, Any], workdir: Optional[str] = None
+) -> Settings:
+    """Update settings for a specific project."""
+    # Load current project settings
+    current_settings = load_project_settings(project_name, workdir)
+
+    # Apply updates
+    updated_settings = current_settings.update_from_dict(updates)
+    updated_settings.current_project = project_name
+
+    # Save updated settings
+    save_project_settings(project_name, updated_settings, workdir)
+
+    return updated_settings
+
+
+def get_project_info(project_name: str, workdir: Optional[str] = None) -> Dict[str, Any]:
+    """Get project information including settings."""
+    project_config_path = get_config_file_path(workdir, project_name)
+
+    if not Path(project_config_path).exists():
+        raise FileNotFoundError(f"Project configuration not found: {project_config_path}")
+
+    with open(project_config_path, "r", encoding="utf-8") as f:
+        project_config: Dict[str, Any] = json.load(f)
+
+    return project_config
+
+
+def copy_project_settings(
+    source_project: str, target_project: str, workdir: Optional[str] = None
+) -> Settings:
+    """Copy settings from one project to another."""
+    # Load source project settings
+    source_settings = load_project_settings(source_project, workdir)
+
+    # Update project name
+    target_settings = source_settings.model_copy()
+    target_settings.current_project = target_project
+
+    # Save to target project
+    save_project_settings(target_project, target_settings, workdir)
+
+    return target_settings
+
+
+def reset_project_settings(project_name: str, workdir: Optional[str] = None) -> Settings:
+    """Reset project settings to default values."""
+    # Create new default settings
+    default_settings = Settings()
+    default_settings.current_project = project_name
+
+    # Save to project
+    save_project_settings(project_name, default_settings, workdir)
+
+    return default_settings
+
+
+# Load settings at module level (will be created on first access)
 settings = get_settings()

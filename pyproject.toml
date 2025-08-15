@@ -32,7 +32,23 @@ dependencies = [
 [project.optional-dependencies]
 vectordb = ["chromadb>=0.5.0"]
 jupyter = ["nest-asyncio>=1.5.0"]
+api = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    "httpx>=0.25.0",
+]
+server = [
+    "agraph[api]",
+    "gunicorn>=21.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+]
+all = [
+    "agraph[vectordb,jupyter,api,server]",
+]
 dev = [
+    "agraph[all]",
     "coverage>=7.4.0",
     "black>=24.0.0",
     "isort>=5.13.0",
@@ -56,6 +72,7 @@ Issues = "https://github.com/your-org/agraph/issues"
 
 [project.scripts]
 agraph = "agraph.cli:main"
+agraph-server = "agraph.api.server:main"
 
 [build-system]
 requires = ["hatchling>=1.21.0"]

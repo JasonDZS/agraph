@@ -19,7 +19,7 @@ T = TypeVar("T")
 
 
 class FileCacheBackend(CacheBackend):
-    """File-based cache backend."""
+    """File-based cache backend with grouped storage for similar data types."""
 
     def __init__(self, cache_dir: str):
         """Initialize file cache backend.
@@ -35,12 +35,27 @@ class FileCacheBackend(CacheBackend):
         self.steps_dir = self.cache_path / "steps"
         self.metadata_dir = self.cache_path / "metadata"
         self.user_edits_dir = self.cache_path / "user_edits"
+        self.grouped_dir = self.cache_path / "grouped"
 
-        for directory in [self.steps_dir, self.metadata_dir, self.user_edits_dir]:
+        for directory in [self.steps_dir, self.metadata_dir, self.user_edits_dir, self.grouped_dir]:
             directory.mkdir(exist_ok=True)
+
+        # Define data types that should be grouped together
+        self.grouped_types = {
+            "TextChunk": "text_chunks",
+            "Entity": "entities",
+            "Relation": "relations",
+            "Cluster": "clusters",
+            "DocumentText": "document_texts",
+        }
 
     def get(self, key: str, expected_type: Type[T]) -> Optional[T]:
         """Get cached value by key."""
+        # Check if this is a grouped data type
+        if self._should_use_grouped_storage(key):
+            return self._get_from_grouped_cache(key, expected_type)
+
+        # Fall back to individual file storage
         cache_file = self._get_cache_file(key)
         if not cache_file.exists():
             return None
@@ -57,6 +72,12 @@ class FileCacheBackend(CacheBackend):
 
     def set(self, key: str, value: Any, metadata: Optional[CacheMetadata] = None) -> None:
         """Set cached value."""
+        # Check if this should use grouped storage
+        if self._should_use_grouped_storage(key):
+            self._set_in_grouped_cache(key, value, metadata)
+            return
+
+        # Fall back to individual file storage
         cache_file = self._get_cache_file(key)
         cache_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -74,10 +95,15 @@ class FileCacheBackend(CacheBackend):
 
     def has(self, key: str) -> bool:
         """Check if key exists in cache."""
+        if self._should_use_grouped_storage(key):
+            return self._has_in_grouped_cache(key)
         return self._get_cache_file(key).exists()
 
     def delete(self, key: str) -> bool:
         """Delete cached value."""
+        if self._should_use_grouped_storage(key):
+            return self._delete_from_grouped_cache(key)
+
         cache_file = self._get_cache_file(key)
         metadata_file = self._get_metadata_file(key)
 
@@ -103,10 +129,43 @@ class FileCacheBackend(CacheBackend):
 
         # Clear files matching pattern
         deleted_count = 0
+
+        # Clear individual files
         for cache_file in self.cache_path.rglob("*.json"):
+            if cache_file.parent.name == "grouped":
+                continue  # Handle grouped files separately
+
             if pattern in cache_file.name:
                 cache_file.unlink()
                 deleted_count += 1
+
+        # Clear items from grouped files
+        if self.grouped_dir.exists():
+            for grouped_file in self.grouped_dir.glob("*.json"):
+                try:
+                    with open(grouped_file, "r", encoding="utf-8") as f:
+                        grouped_data = json.load(f)
+
+                    # Remove items matching pattern
+                    keys_to_remove = [key for key in grouped_data.keys() if pattern in key]
+                    for key in keys_to_remove:
+                        del grouped_data[key]
+                        deleted_count += 1
+
+                        # Delete metadata
+                        metadata_file = self._get_metadata_file(key)
+                        if metadata_file.exists():
+                            metadata_file.unlink()
+
+                    # Update grouped file or remove if empty
+                    if grouped_data:
+                        with open(grouped_file, "w", encoding="utf-8") as f:
+                            json.dump(grouped_data, f, indent=2, ensure_ascii=False)
+                    else:
+                        grouped_file.unlink()
+
+                except Exception:
+                    continue
 
         return deleted_count
 
@@ -127,8 +186,13 @@ class FileCacheBackend(CacheBackend):
         """List cache keys."""
         keys = []
 
+        # Get keys from individual files
         for cache_file in self.cache_path.rglob("*.json"):
             if cache_file.name.endswith(".metadata.json"):
+                continue
+
+            # Skip grouped files, handle them separately
+            if cache_file.parent.name == "grouped":
                 continue
 
             # Extract key from file path
@@ -137,6 +201,19 @@ class FileCacheBackend(CacheBackend):
 
             if pattern is None or pattern in key:
                 keys.append(key)
+
+        # Get keys from grouped files
+        if self.grouped_dir.exists():
+            for grouped_file in self.grouped_dir.glob("*.json"):
+                try:
+                    with open(grouped_file, "r", encoding="utf-8") as f:
+                        grouped_data = json.load(f)
+
+                    for key in grouped_data.keys():
+                        if pattern is None or pattern in key:
+                            keys.append(key)
+                except Exception:
+                    continue
 
         return keys
 
@@ -256,3 +333,153 @@ class FileCacheBackend(CacheBackend):
 
         # Deserialize relations with entities context
         return self._deserialize_data(relations_data, expected_type, entities_map)
+
+    def _should_use_grouped_storage(self, key: str) -> bool:
+        """Check if key should use grouped storage based on data type."""
+        # Define patterns that should use grouped storage
+        grouped_patterns = [
+            "text_chunk",
+            "entity_extraction",
+            "relation_extraction",
+            "cluster_formation",
+            "document_text_",
+        ]
+
+        # Check if key contains any grouped patterns
+        for pattern in grouped_patterns:
+            if pattern in key:
+                return True
+        return False
+
+    def _get_data_type_from_key(self, key: str) -> Optional[str]:
+        """Extract data type from cache key."""
+        if "text_chunk" in key or "chunk" in key:
+            return "TextChunk"
+        if "entity" in key:
+            return "Entity"
+        if "relation" in key:
+            return "Relation"
+        if "cluster" in key:
+            return "Cluster"
+        if "document_text_" in key:
+            return "DocumentText"
+        return None
+
+    def _get_grouped_file_path(self, data_type: str) -> Path:
+        """Get file path for grouped data storage."""
+        filename = self.grouped_types.get(data_type, f"{data_type.lower()}s")
+        return self.grouped_dir / f"{filename}.json"
+
+    def _get_from_grouped_cache(self, key: str, expected_type: Type[T]) -> Optional[T]:
+        """Get item from grouped cache file."""
+        data_type = self._get_data_type_from_key(key)
+        if not data_type:
+            return None
+
+        grouped_file = self._get_grouped_file_path(data_type)
+        if not grouped_file.exists():
+            return None
+
+        try:
+            with open(grouped_file, "r", encoding="utf-8") as f:
+                grouped_data = json.load(f)
+
+            if key in grouped_data:
+                return self._deserialize_data(grouped_data[key], expected_type)
+        except Exception:
+            # If deserialization fails, remove invalid cache
+            grouped_file.unlink(missing_ok=True)
+
+        return None
+
+    def _set_in_grouped_cache(
+        self, key: str, value: Any, metadata: Optional[CacheMetadata] = None
+    ) -> None:
+        """Set item in grouped cache file."""
+        data_type = self._get_data_type_from_key(key)
+        if not data_type:
+            # Fall back to individual file storage
+            cache_file = self._get_cache_file(key)
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            serialized_data = self._serialize_data(value)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(serialized_data, f, indent=2, ensure_ascii=False)
+            return
+
+        grouped_file = self._get_grouped_file_path(data_type)
+
+        # Load existing data or create new
+        grouped_data = {}
+        if grouped_file.exists():
+            try:
+                with open(grouped_file, "r", encoding="utf-8") as f:
+                    grouped_data = json.load(f)
+            except Exception:
+                grouped_data = {}
+
+        # Add/update the item
+        grouped_data[key] = self._serialize_data(value)
+
+        # Save updated data
+        with open(grouped_file, "w", encoding="utf-8") as f:
+            json.dump(grouped_data, f, indent=2, ensure_ascii=False)
+
+        # Save metadata if provided
+        if metadata:
+            metadata_file = self._get_metadata_file(key)
+            metadata_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(metadata_file, "w", encoding="utf-8") as f:
+                json.dump(metadata.to_dict(), f, indent=2)
+
+    def _has_in_grouped_cache(self, key: str) -> bool:
+        """Check if key exists in grouped cache."""
+        data_type = self._get_data_type_from_key(key)
+        if not data_type:
+            return False
+
+        grouped_file = self._get_grouped_file_path(data_type)
+        if not grouped_file.exists():
+            return False
+
+        try:
+            with open(grouped_file, "r", encoding="utf-8") as f:
+                grouped_data = json.load(f)
+            return key in grouped_data
+        except Exception:
+            return False
+
+    def _delete_from_grouped_cache(self, key: str) -> bool:
+        """Delete item from grouped cache."""
+        data_type = self._get_data_type_from_key(key)
+        if not data_type:
+            return False
+
+        grouped_file = self._get_grouped_file_path(data_type)
+        if not grouped_file.exists():
+            return False
+
+        try:
+            with open(grouped_file, "r", encoding="utf-8") as f:
+                grouped_data = json.load(f)
+
+            if key not in grouped_data:
+                return False
+
+            del grouped_data[key]
+
+            # Save updated data
+            if grouped_data:
+                with open(grouped_file, "w", encoding="utf-8") as f:
+                    json.dump(grouped_data, f, indent=2, ensure_ascii=False)
+            else:
+                # Remove empty file
+                grouped_file.unlink()
+
+            # Delete metadata
+            metadata_file = self._get_metadata_file(key)
+            if metadata_file.exists():
+                metadata_file.unlink()
+
+            return True
+        except Exception:
+            return False

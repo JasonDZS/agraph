@@ -20,7 +20,7 @@ from agraph import AGraph, get_settings
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 settings = get_settings()
-settings.workdir = str(project_root / "workdir" / "agraph_quickstart")
+settings.workdir = str(project_root / "workdir" / "agraph_quickstart-cache")
 
 async def quickstart_demo():
     """AGraph快速开始演示"""

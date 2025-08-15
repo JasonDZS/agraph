@@ -119,10 +119,18 @@ class OpenAIEmbeddingFunction:
             if loop.is_running():
                 # If loop is already running (like in Jupyter/PyCharm),
                 # use nest_asyncio or run in thread
-                if NEST_ASYNCIO_AVAILABLE:
-                    nest_asyncio.apply()
-                    return loop.run_until_complete(self.aembed_texts(texts))
-                # If nest_asyncio is not available, run in a separate thread
+                # Check if we're using uvloop, which isn't compatible with nest_asyncio
+                is_uvloop = hasattr(loop, "__class__") and "uvloop" in str(loop.__class__)
+
+                if NEST_ASYNCIO_AVAILABLE and not is_uvloop:
+                    try:
+                        nest_asyncio.apply()
+                        return loop.run_until_complete(self.aembed_texts(texts))
+                    except Exception:
+                        # If nest_asyncio fails, fall back to thread pool
+                        pass
+
+                # If nest_asyncio is not available or failed, run in a separate thread
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(asyncio.run, self.aembed_texts(texts))
                     return future.result()

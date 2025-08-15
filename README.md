@@ -19,7 +19,26 @@ for semantic search and intelligent Q&A.
 ### Basic Installation
 
 ```bash
+# Basic installation with core functionality
 pip install agraph
+
+# Or with uv (recommended)
+uv add agraph
+```
+
+### Optional Dependencies
+
+AGraph provides optional dependency groups for specific use cases:
+
+```bash
+# API Server Dependencies
+uv add "agraph[api]"        # FastAPI web server
+uv add "agraph[server]"     # Production server with Gunicorn
+uv add "agraph[all]"        # All optional dependencies
+
+# Individual components
+uv add "agraph[vectordb]"   # Enhanced vector database support
+uv add "agraph[jupyter]"    # Jupyter notebook support
 ```
 
 ### Development Installation
@@ -32,8 +51,20 @@ cd agraph
 # Install with development dependencies
 make install-dev
 # or
-pip install -e .[dev,docs]
+uv add -e ".[dev]"
 ```
+
+### Installation Options Summary
+
+| Option | Dependencies | Use Case |
+|--------|-------------|----------|
+| `agraph` | Core only | Basic knowledge graph functionality |
+| `agraph[api]` | + FastAPI, Uvicorn | REST API development |
+| `agraph[server]` | + API + Gunicorn | Production deployment |
+| `agraph[vectordb]` | + ChromaDB | Enhanced vector operations |
+| `agraph[jupyter]` | + Jupyter support | Notebook development |
+| `agraph[all]` | All above | Complete installation |
+| `agraph[dev]` | All + dev tools | Development environment |
 
 ## Quick Start
 
@@ -86,6 +117,65 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+```
+
+### REST API Server
+
+AGraph provides a comprehensive REST API server for web applications:
+
+```bash
+# Install API dependencies
+uv add "agraph[api]"
+
+# Start development server
+agraph-server --host 0.0.0.0 --port 8000 --reload
+
+# Start production server
+agraph-server --host 0.0.0.0 --port 8000 --workers 4
+```
+
+#### API Server Features
+
+- **FastAPI-based**: Modern, fast, and auto-documented REST API
+- **Modular Architecture**: Router-based design for maintainability
+- **Auto-documentation**: Swagger UI at `/docs` and ReDoc at `/redoc`
+- **Streaming Support**: Real-time streaming chat responses
+- **Cache Inspection**: View cached entities, relations, and clusters
+- **Production Ready**: Gunicorn support for production deployment
+
+#### API Endpoints
+
+- **Configuration**: `GET/POST /config` - Manage system configuration
+- **Document Processing**: `POST /documents/upload`, `POST /documents/from-text`
+- **Knowledge Graph**: `POST /knowledge-graph/build` - Build graphs from data
+- **Search**: `POST /search` - Search entities, relations, and text chunks
+- **Chat**: `POST /chat`, `POST /chat/stream` - RAG-based conversations
+- **Cache**: `GET /cache/{type}` - View cached data with pagination
+- **System**: `GET /system/stats`, `POST /system/clear-all` - System management
+
+#### Server Options
+
+```bash
+agraph-server --help                    # Show all options
+agraph-server --host 0.0.0.0           # Bind to all interfaces
+agraph-server --port 8080              # Custom port
+agraph-server --reload                 # Auto-reload for development
+agraph-server --workers 4              # Multiple workers for production
+agraph-server --log-level debug        # Set logging level
+agraph-server --env-file .env          # Load environment variables
+```
+
+#### Production Deployment
+
+```bash
+# Install production dependencies
+uv add "agraph[server]"
+
+# Run with Gunicorn (production)
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 agraph.api.app:app
+
+# Or use the built-in production command
+python -c "from agraph.api.server import run_with_gunicorn; run_with_gunicorn()"
 ```
 
 ### Environment Configuration
@@ -157,7 +247,7 @@ The project follows strict code quality standards:
 - `loguru`: Logging management
 - `tiktoken`: Text tokenization
 
-### Optional Dependencies
+### Optional Dependency Groups
 
 - `vectordb`: ChromaDB vector database support
 - `jupyter`: Jupyter environment support
