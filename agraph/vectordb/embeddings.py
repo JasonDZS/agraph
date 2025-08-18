@@ -40,7 +40,6 @@ class OpenAIEmbeddingFunction:
     Compatible with OpenAI and other compatible API services (e.g., Azure OpenAI, local deployment).
     """
 
-    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         api_key: Optional[str] = None,

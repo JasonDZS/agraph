@@ -172,7 +172,6 @@ class ConfigBuilder:
         use_openai_embeddings: bool = False,
         embedding_config: Optional[EmbeddingConfig] = None,
     ) -> ChromaStoreConfig:
-        # pylint: disable=too-many-positional-arguments
         """Create ChromaDB store configuration.
 
         Args:
