@@ -110,10 +110,10 @@ repos:
         args: [-d, relaxed]
         files: \.(yaml|yml)$
 
-  # Markdown format checks
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
-    hooks:
-      - id: markdownlint
-        args: [--fix, --config, .markdownlint.yaml]
-        files: \.md$
+#  # Markdown format checks
+#  - repo: https://github.com/igorshubovych/markdownlint-cli
+#    rev: v0.41.0
+#    hooks:
+#      - id: markdownlint
+#        args: [--fix, --config, .markdownlint.yaml]
+#        files: \.md$

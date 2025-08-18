@@ -7,6 +7,7 @@
 ## 技术栈
 
 ### 核心技术栈
+
 ```typescript
 // 前端框架
 - React 18 + TypeScript
@@ -23,9 +24,8 @@
 - Axios (API请求)
 
 // 可视化技术栈
+- ECharts (知识图谱可视化、统计图表)
 - D3.js (数据可视化)
-- Cytoscape.js (知识图谱可视化)
-- ECharts (统计图表)
 - React-Flow (流程图)
 ```
 
@@ -111,6 +111,7 @@ src/
 ## 路由设计
 
 ### 主要页面路由
+
 ```typescript
 interface RouteConfig {
   path: string;
@@ -122,137 +123,138 @@ interface RouteConfig {
 
 const routes: RouteConfig[] = [
   // 工作台总览
-  { 
-    path: '/', 
-    component: Dashboard, 
-    title: '工作台', 
-    icon: 'DashboardOutlined' 
+  {
+    path: '/',
+    component: Dashboard,
+    title: '工作台',
+    icon: 'DashboardOutlined'
   },
-  
+
   // 项目管理
-  { 
-    path: '/projects', 
-    component: ProjectList, 
-    title: '项目管理', 
-    icon: 'FolderOutlined' 
+  {
+    path: '/projects',
+    component: ProjectList,
+    title: '项目管理',
+    icon: 'FolderOutlined'
   },
-  { 
-    path: '/projects/:id', 
-    component: ProjectDetail, 
-    title: '项目详情' 
+  {
+    path: '/projects/:id',
+    component: ProjectDetail,
+    title: '项目详情'
   },
-  { 
-    path: '/projects/:id/settings', 
-    component: ProjectSettings, 
-    title: '项目设置' 
+  {
+    path: '/projects/:id/settings',
+    component: ProjectSettings,
+    title: '项目设置'
   },
-  
+
   // 文档管理
-  { 
-    path: '/documents', 
-    component: DocumentList, 
-    title: '文档管理', 
-    icon: 'FileTextOutlined' 
+  {
+    path: '/documents',
+    component: DocumentList,
+    title: '文档管理',
+    icon: 'FileTextOutlined'
   },
-  { 
-    path: '/documents/upload', 
-    component: DocumentUpload, 
-    title: '上传文档' 
+  {
+    path: '/documents/upload',
+    component: DocumentUpload,
+    title: '上传文档'
   },
-  { 
-    path: '/documents/:id', 
-    component: DocumentViewer, 
-    title: '文档详情' 
+  {
+    path: '/documents/:id',
+    component: DocumentViewer,
+    title: '文档详情'
   },
-  
+
   // 知识图谱
-  { 
-    path: '/knowledge-graph', 
-    component: KnowledgeGraphOverview, 
-    title: '知识图谱', 
-    icon: 'NodeIndexOutlined' 
+  {
+    path: '/knowledge-graph',
+    component: KnowledgeGraphOverview,
+    title: '知识图谱',
+    icon: 'NodeIndexOutlined'
   },
-  { 
-    path: '/knowledge-graph/build', 
-    component: GraphBuilder, 
-    title: '构建图谱' 
+  {
+    path: '/knowledge-graph/build',
+    component: GraphBuilder,
+    title: '构建图谱'
   },
-  { 
-    path: '/knowledge-graph/visualize', 
-    component: GraphVisualizer, 
-    title: '图谱可视化' 
+  {
+    path: '/knowledge-graph/visualize',
+    component: GraphVisualizer,
+    title: '图谱可视化'
   },
-  { 
-    path: '/knowledge-graph/entities', 
-    component: EntityExplorer, 
-    title: '实体管理' 
+  {
+    path: '/knowledge-graph/entities',
+    component: EntityExplorer,
+    title: '实体管理'
   },
-  { 
-    path: '/knowledge-graph/relations', 
-    component: RelationExplorer, 
-    title: '关系管理' 
+  {
+    path: '/knowledge-graph/relations',
+    component: RelationExplorer,
+    title: '关系管理'
   },
-  
+
   // 搜索与查询
-  { 
-    path: '/search', 
-    component: SearchInterface, 
-    title: '智能搜索', 
-    icon: 'SearchOutlined' 
+  {
+    path: '/search',
+    component: SearchInterface,
+    title: '智能搜索',
+    icon: 'SearchOutlined'
   },
-  { 
-    path: '/search/advanced', 
-    component: AdvancedSearch, 
-    title: '高级搜索' 
+  {
+    path: '/search/advanced',
+    component: AdvancedSearch,
+    title: '高级搜索'
   },
-  
+
   // 对话系统
-  { 
-    path: '/chat', 
-    component: ChatInterface, 
-    title: '知识问答', 
-    icon: 'MessageOutlined' 
+  {
+    path: '/chat',
+    component: ChatInterface,
+    title: '知识问答',
+    icon: 'MessageOutlined'
   },
-  { 
-    path: '/chat/:conversationId', 
-    component: ChatConversation, 
-    title: '对话详情' 
+  {
+    path: '/chat/:conversationId',
+    component: ChatConversation,
+    title: '对话详情'
   },
-  
+
   // 可视化配置
-  { 
-    path: '/visualization', 
-    component: VisualizationConfig, 
-    title: '可视化配置', 
-    icon: 'BarChartOutlined' 
+  {
+    path: '/visualization',
+    component: VisualizationConfig,
+    title: '可视化配置',
+    icon: 'BarChartOutlined'
   },
-  { 
-    path: '/visualization/dashboard', 
-    component: CustomDashboard, 
-    title: '自定义仪表板' 
+  {
+    path: '/visualization/dashboard',
+    component: CustomDashboard,
+    title: '自定义仪表板'
   },
-  
+
   // 系统设置
-  { 
-    path: '/settings', 
-    component: Settings, 
-    title: '系统设置', 
-    icon: 'SettingOutlined' 
+  {
+    path: '/settings',
+    component: Settings,
+    title: '系统设置',
+    icon: 'SettingOutlined'
   },
-  { 
-    path: '/settings/config', 
-    component: ConfigManagement, 
-    title: '配置管理' 
+  {
+    path: '/settings/config',
+    component: ConfigManagement,
+    title: '配置管理'
   },
-  { 
-    path: '/settings/cache', 
-    component: CacheManagement, 
-    title: '缓存管理' 
+  {
+    path: '/settings/cache',
+    component: CacheManagement,
+    title: '缓存管理'
   },
 ];
 ```
 
 ### 路由守卫
+
 ```typescript
 // components/RouteGuard.tsx
 interface RouteGuardProps {
@@ -269,23 +271,23 @@ const RouteGuard: React.FC<RouteGuardProps> = ({
   const { currentProject } = useAppStore();
   const { graphBuilt } = useKnowledgeGraphStore();
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     if (requiresProject && !currentProject) {
-      navigate('/projects', { 
-        state: { message: '请先选择或创建一个项目' } 
+      navigate('/projects', {
+        state: { message: '请先选择或创建一个项目' }
       });
       return;
     }
-    
+
     if (requiresKnowledgeGraph && !graphBuilt) {
-      navigate('/knowledge-graph/build', { 
-        state: { message: '请先构建知识图谱' } 
+      navigate('/knowledge-graph/build', {
+        state: { message: '请先构建知识图谱' }
       });
       return;
     }
   }, [currentProject, graphBuilt, requiresProject, requiresKnowledgeGraph]);
-  
+
   return <>{children}</>;
 };
 ```
@@ -293,31 +295,32 @@ const RouteGuard: React.FC<RouteGuardProps> = ({
 ## 状态管理设计
 
 ### 全局应用状态
+
 ```typescript
 // stores/appStore.ts
 interface AppState {
   // 当前项目
   currentProject: string | null;
   setCurrentProject: (projectId: string | null) => void;
-  
+
   // 应用配置
   config: AppConfig;
   updateConfig: (config: Partial<AppConfig>) => void;
-  
+
   // 主题设置
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
-  
+
   // 通知系统
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
-  
+
   // 加载状态管理
   loading: Record<string, boolean>;
   setLoading: (key: string, loading: boolean) => void;
-  
+
   // 错误状态管理
   errors: Record<string, string | null>;
   setError: (key: string, error: string | null) => void;
@@ -334,27 +337,27 @@ export const useAppStore = create<AppState>()(
         notifications: [],
         loading: {},
         errors: {},
-        
+
         setCurrentProject: (projectId) => {
           set({ currentProject: projectId }, false, 'setCurrentProject');
           // 触发项目切换时的清理工作
           useKnowledgeGraphStore.getState().resetState();
           useChatStore.getState().clearCurrentConversation();
         },
-        
+
         updateConfig: (newConfig) =>
           set(
             (state) => ({ config: { ...state.config, ...newConfig } }),
             false,
             'updateConfig'
           ),
-        
+
         setTheme: (theme) => {
           set({ theme }, false, 'setTheme');
           // 应用主题到DOM
           document.documentElement.setAttribute('data-theme', theme);
         },
-        
+
         addNotification: (notification) => {
           const id = generateId();
           set(
@@ -367,7 +370,7 @@ export const useAppStore = create<AppState>()(
             false,
             'addNotification'
           );
-          
+
           // 自动移除通知
           if (notification.duration !== 0) {
             setTimeout(() => {
@@ -375,7 +378,7 @@ export const useAppStore = create<AppState>()(
             }, notification.duration || 4500);
           }
         },
-        
+
         removeNotification: (id) =>
           set(
             (state) => ({
@@ -384,10 +387,10 @@ export const useAppStore = create<AppState>()(
             false,
             'removeNotification'
           ),
-        
+
         clearNotifications: () =>
           set({ notifications: [] }, false, 'clearNotifications'),
-        
+
         setLoading: (key, loading) =>
           set(
             (state) => ({
@@ -396,7 +399,7 @@ export const useAppStore = create<AppState>()(
             false,
             'setLoading'
           ),
-        
+
         setError: (key, error) =>
           set(
             (state) => ({
@@ -405,7 +408,7 @@ export const useAppStore = create<AppState>()(
             false,
             'setError'
           ),
-        
+
         clearErrors: () =>
           set({ errors: {} }, false, 'clearErrors'),
       }),
@@ -425,6 +428,7 @@ export const useAppStore = create<AppState>()(
 ## API服务层设计
 
 ### API客户端配置
+
 ```typescript
 // services/api.ts
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
@@ -450,13 +454,13 @@ apiClient.interceptors.request.use(
     if (currentProject && config.method !== 'get') {
       config.params = { ...config.params, project_name: currentProject };
     }
-    
+
     // 添加加载状态
     const loadingKey = getLoadingKey(config);
     if (loadingKey) {
       useAppStore.getState().setLoading(loadingKey, true);
     }
-    
+
     return config;
   },
   (error) => {
@@ -472,7 +476,7 @@ apiClient.interceptors.response.use(
     if (loadingKey) {
       useAppStore.getState().setLoading(loadingKey, false);
     }
-    
+
     return response;
   },
   (error) => {
@@ -481,7 +485,7 @@ apiClient.interceptors.response.use(
     if (loadingKey) {
       useAppStore.getState().setLoading(loadingKey, false);
     }
-    
+
     // 统一错误处理
     handleApiError(error);
     return Promise.reject(error);
@@ -497,14 +501,14 @@ function getLoadingKey(config: AxiosRequestConfig): string | null {
 // 统一错误处理
 function handleApiError(error: any) {
   const { addNotification } = useAppStore.getState();
-  
+
   let message = '请求失败';
-  
+
   if (error.response) {
     // 服务器响应错误
     const { status, data } = error.response;
     message = data?.message || `请求失败 (${status})`;
-    
+
     if (status === 401) {
       message = '认证失败，请重新登录';
     } else if (status === 403) {
@@ -518,7 +522,7 @@ function handleApiError(error: any) {
     // 网络错误
     message = '网络连接失败，请检查网络状态';
   }
-  
+
   addNotification({
     type: 'error',
     title: '请求错误',
@@ -528,6 +532,7 @@ function handleApiError(error: any) {
 ```
 
 ### 项目服务
+
 ```typescript
 // services/projectService.ts
 import { apiClient } from './api';
@@ -547,31 +552,31 @@ export const projectService = {
     });
     return response.data;
   },
-  
+
   // 创建项目
   create: async (data: ProjectCreateRequest): Promise<ProjectResponse> => {
     const response = await apiClient.post('/projects/create', data);
     return response.data;
   },
-  
+
   // 获取项目详情
   get: async (projectName: string): Promise<ProjectResponse> => {
     const response = await apiClient.get(`/projects/${projectName}`);
     return response.data;
   },
-  
+
   // 获取当前项目
   getCurrent: async (): Promise<ProjectResponse> => {
     const response = await apiClient.get('/projects/current');
     return response.data;
   },
-  
+
   // 切换项目
   switch: async (data: ProjectSwitchRequest): Promise<ProjectResponse> => {
     const response = await apiClient.post('/projects/switch', data);
     return response.data;
   },
-  
+
   // 删除项目
   delete: async (data: ProjectDeleteRequest): Promise<ProjectResponse> => {
     const response = await apiClient.post('/projects/delete', data);
@@ -581,6 +586,7 @@ export const projectService = {
 ```
 
 ### 知识图谱服务
+
 ```typescript
 // services/knowledgeGraphService.ts
 import { apiClient } from './api';
@@ -598,13 +604,13 @@ export const knowledgeGraphService = {
     const response = await apiClient.post('/knowledge-graph/build', data);
     return response.data;
   },
-  
+
   // 更新知识图谱
   update: async (data: KnowledgeGraphUpdateRequest): Promise<KnowledgeGraphUpdateResponse> => {
     const response = await apiClient.post('/knowledge-graph/update', data);
     return response.data;
   },
-  
+
   // 获取知识图谱状态
   getStatus: async (): Promise<KnowledgeGraphStatusResponse> => {
     const response = await apiClient.get('/knowledge-graph/status');
@@ -616,6 +622,7 @@ export const knowledgeGraphService = {
 ## 组件设计模式
 
 ### 复合组件模式
+
 ```typescript
 // components/DocumentUploader/index.tsx
 interface DocumentUploaderProps {
@@ -631,7 +638,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> & {
   Progress: typeof Progress;
 } = ({ onUploadComplete, acceptedTypes, maxFileSize, multiple = true }) => {
   const { uploadDocuments, uploading, progress, files } = useDocumentUpload();
-  
+
   return (
     <div className="document-uploader">
       <DocumentUploader.DropZone
@@ -641,9 +648,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> & {
         onFilesSelected={uploadDocuments}
       />
       <DocumentUploader.FileList files={files} />
-      <DocumentUploader.Progress 
-        visible={uploading} 
-        progress={progress} 
+      <DocumentUploader.Progress
+        visible={uploading}
+        progress={progress}
       />
     </div>
   );
@@ -658,6 +665,7 @@ export default DocumentUploader;
 ```
 
 ### Render Props模式
+
 ```typescript
 // components/DataProvider/index.tsx
 interface DataProviderProps<T> {
@@ -674,11 +682,11 @@ function DataProvider<T>({ fetcher, children }: DataProviderProps<T>) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  
+
   const refetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await fetcher();
       setData(result);
@@ -688,11 +696,11 @@ function DataProvider<T>({ fetcher, children }: DataProviderProps<T>) {
       setLoading(false);
     }
   }, [fetcher]);
-  
+
   useEffect(() => {
     refetch();
   }, [refetch]);
-  
+
   return (
     <>
       {children({ data, loading, error, refetch })}
@@ -715,6 +723,7 @@ function DataProvider<T>({ fetcher, children }: DataProviderProps<T>) {
 ## 性能优化策略
 
 ### 代码分割
+
 ```typescript
 // utils/lazyLoad.ts
 import { lazy, ComponentType } from 'react';
@@ -725,7 +734,7 @@ export function lazyLoad<T extends ComponentType<any>>(
   fallback: React.ComponentType = LoadingSpinner
 ) {
   const LazyComponent = lazy(importFunc);
-  
+
   return (props: React.ComponentProps<T>) => (
     <Suspense fallback={<fallback />}>
       <LazyComponent {...props} />
@@ -739,6 +748,7 @@ const KnowledgeGraphVisualizer = lazyLoad(() => import('../modules/KnowledgeGrap
 ```
 
 ### 虚拟滚动
+
 ```typescript
 // components/VirtualList/index.tsx
 interface VirtualListProps<T> {
@@ -757,15 +767,15 @@ function VirtualList<T>({
   overscan = 5,
 }: VirtualListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
-  
+
   const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
   const endIndex = Math.min(
     items.length,
     Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
   );
-  
+
   const visibleItems = items.slice(startIndex, endIndex);
-  
+
   return (
     <div
       style={{ height: containerHeight, overflow: 'auto' }}
@@ -792,6 +802,7 @@ function VirtualList<T>({
 ```
 
 ### 记忆化优化
+
 ```typescript
 // hooks/useMemoizedData.ts
 export function useMemoizedData<T, P extends any[]>(
@@ -804,25 +815,25 @@ export function useMemoizedData<T, P extends any[]>(
   } = {}
 ) {
   const { enabled = true, staleTime = 5 * 60 * 1000, cacheTime = 10 * 60 * 1000 } = options;
-  
+
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const lastFetchTime = useRef<number>(0);
-  
+
   const cacheKey = useMemo(() => JSON.stringify(deps), deps);
-  
+
   const fetchData = useCallback(async () => {
     if (!enabled) return;
-    
+
     const now = Date.now();
     if (now - lastFetchTime.current < staleTime && data !== null) {
       return; // 数据仍然新鲜
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await fetcher(...deps);
       setData(result);
@@ -833,11 +844,11 @@ export function useMemoizedData<T, P extends any[]>(
       setLoading(false);
     }
   }, [fetcher, enabled, staleTime, cacheKey]);
-  
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  
+
   // 缓存清理
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -845,10 +856,10 @@ export function useMemoizedData<T, P extends any[]>(
         setData(null);
       }
     }, cacheTime);
-    
+
     return () => clearTimeout(timer);
   }, [cacheTime, data]);
-  
+
   return { data, loading, error, refetch: fetchData };
 }
 ```
@@ -856,6 +867,7 @@ export function useMemoizedData<T, P extends any[]>(
 ## 测试策略
 
 ### 单元测试
+
 ```typescript
 // __tests__/components/ProjectCard.test.tsx
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -880,17 +892,17 @@ const mockProject: Project = {
 describe('ProjectCard', () => {
   it('renders project information correctly', () => {
     render(<ProjectCard project={mockProject} />);
-    
+
     expect(screen.getByText('Test Project')).toBeInTheDocument();
     expect(screen.getByText('A test project')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument(); // document count
     expect(screen.getByText('已构建')).toBeInTheDocument(); // knowledge graph status
   });
-  
+
   it('calls onSelect when clicked', () => {
     const onSelect = jest.fn();
     render(<ProjectCard project={mockProject} onSelect={onSelect} />);
-    
+
     fireEvent.click(screen.getByRole('button'));
     expect(onSelect).toHaveBeenCalledWith(mockProject);
   });
@@ -898,6 +910,7 @@ describe('ProjectCard', () => {
 ```
 
 ### 集成测试
+
 ```typescript
 // __tests__/integration/ProjectManagement.test.tsx
 import { renderWithProviders } from '../utils/test-utils';
@@ -910,34 +923,34 @@ describe('Project Management Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
-  
+
   it('creates a new project successfully', async () => {
     const mockCreate = jest.spyOn(projectService, 'create');
     mockCreate.mockResolvedValue({
       status: 'success',
       data: mockProject,
     });
-    
+
     render(<ProjectManagement />);
-    
+
     // 点击创建项目按钮
     fireEvent.click(screen.getByText('创建项目'));
-    
+
     // 填写表单
     fireEvent.change(screen.getByLabelText('项目名称'), {
       target: { value: 'New Project' }
     });
-    
+
     // 提交表单
     fireEvent.click(screen.getByText('确定'));
-    
+
     // 验证API调用
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith({
         name: 'New Project',
       });
     });
-    
+
     // 验证成功通知
     expect(screen.getByText('项目创建成功')).toBeInTheDocument();
   });
@@ -947,6 +960,7 @@ describe('Project Management Integration', () => {
 ## 部署配置
 
 ### Docker配置
+
 ```dockerfile
 # Dockerfile
 FROM node:18-alpine as builder
@@ -983,6 +997,7 @@ CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ### Nginx配置
+
 ```nginx
 # nginx.conf
 events {
@@ -992,7 +1007,7 @@ events {
 http {
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
-    
+
     # Gzip压缩
     gzip on;
     gzip_vary on;
@@ -1005,24 +1020,24 @@ http {
         application/javascript
         application/xml+rss
         application/json;
-    
+
     server {
         listen 80;
         server_name localhost;
-        
+
         # 静态文件
         location / {
             root /usr/share/nginx/html;
             index index.html index.htm;
             try_files $uri $uri/ /index.html;
-            
+
             # 缓存设置
             location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
                 expires 1y;
                 add_header Cache-Control "public, immutable";
             }
         }
-        
+
         # API代理
         location /api/ {
             proxy_pass http://agraph-api:8000/;
@@ -1030,13 +1045,13 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+
             # WebSocket支持
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
         }
-        
+
         # 健康检查
         location /health {
             access_log off;
@@ -1048,6 +1063,7 @@ http {
 ```
 
 ### Docker Compose
+
 ```yaml
 # docker-compose.yml
 version: '3.8'
@@ -1080,6 +1096,7 @@ networks:
 ## 安全考虑
 
 ### 内容安全策略
+
 ```typescript
 // public/index.html
 <meta http-equiv="Content-Security-Policy" content="
@@ -1094,6 +1111,7 @@ networks:
 ```
 
 ### 输入验证
+
 ```typescript
 // utils/validation.ts
 import { z } from 'zod';
@@ -1126,6 +1144,7 @@ export function validateProject(data: unknown) {
 ```
 
 ### XSS防护
+
 ```typescript
 // utils/sanitize.ts
 import DOMPurify from 'dompurify';
@@ -1149,6 +1168,7 @@ export function escapeText(text: string): string {
 本设计方案提供了一个完整、现代化、可扩展的前端架构，具有以下特点：
 
 ### 核心优势
+
 1. **模块化架构** - 清晰的功能模块划分，便于开发和维护
 2. **类型安全** - 完整的TypeScript类型定义，提高代码质量
 3. **性能优化** - 代码分割、虚拟滚动、记忆化等优化策略
@@ -1157,10 +1177,11 @@ export function escapeText(text: string): string {
 6. **安全性** - 输入验证、XSS防护、CSP等安全措施
 
 ### 技术特色
+
 - 使用最新的React 18和TypeScript
 - Zustand轻量级状态管理
 - Ant Design企业级UI组件
-- Cytoscape.js专业知识图谱可视化
+- ECharts高性能知识图谱可视化
 - 完善的测试策略
 - 容器化部署方案
 

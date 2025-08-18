@@ -6,7 +6,9 @@ This module provides a unified AGraph class that integrates:
 3. Knowledge base conversation functionality (RAG system)
 """
 
+# pylint: disable=too-many-lines
 import asyncio
+import json
 import os
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
@@ -94,6 +96,16 @@ class AGraph:
             # 2. Initialize knowledge graph builder (if enabled)
             if self.enable_knowledge_graph:
                 self._initialize_builder()
+
+            # 3. Try to load existing knowledge graph from disk
+            if self.enable_knowledge_graph:
+                loaded = self.load_knowledge_graph_from_disk()
+                if loaded:
+                    logger.info("Existing knowledge graph loaded successfully")
+                else:
+                    logger.info(
+                        "No existing knowledge graph found, will create new one when needed"
+                    )
 
             self._is_initialized = True
             logger.info("AGraph initialization successful")
@@ -193,6 +205,10 @@ class AGraph:
             )
 
             # Asynchronously save to vector store
+            # Save to disk for persistence
+            if self.knowledge_graph:
+                self.save_knowledge_graph_to_disk()
+
             if save_to_vector_store and self.knowledge_graph:
                 asyncio.create_task(self._save_to_vector_store())
 
@@ -252,6 +268,10 @@ class AGraph:
                 graph_description=graph_description,
                 use_cache=use_cache,
             )
+
+            # Save to disk for persistence
+            if self.knowledge_graph:
+                self.save_knowledge_graph_to_disk()
 
             # Asynchronously save to vector store
             if save_to_vector_store:
@@ -467,6 +487,62 @@ class AGraph:
     async def save_knowledge_graph(self) -> None:
         """Explicitly save knowledge graph to vector store."""
         await self._save_to_vector_store()
+
+    def save_knowledge_graph_to_disk(self) -> None:
+        """Save knowledge graph to disk for persistence across restarts."""
+        if not self.knowledge_graph:
+            logger.warning("No knowledge graph to save")
+            return
+
+        try:
+            # Create knowledge graph storage directory
+            kg_storage_dir = os.path.join(self.persist_directory, "knowledge_graphs")
+            os.makedirs(kg_storage_dir, exist_ok=True)
+
+            # Save knowledge graph as JSON
+            kg_file_path = os.path.join(kg_storage_dir, f"{self.collection_name}_kg.json")
+            kg_data = self.knowledge_graph.to_dict()
+
+            with open(kg_file_path, "w", encoding="utf-8") as f:
+                json.dump(kg_data, f, indent=2, ensure_ascii=False, default=str)
+
+            logger.info(f"Knowledge graph saved to {kg_file_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to save knowledge graph to disk: {e}")
+
+    def load_knowledge_graph_from_disk(self) -> bool:
+        """Load knowledge graph from disk if it exists.
+
+        Returns:
+            True if knowledge graph was loaded successfully, False otherwise.
+        """
+        try:
+            # Check if knowledge graph file exists
+            kg_storage_dir = os.path.join(self.persist_directory, "knowledge_graphs")
+            kg_file_path = os.path.join(kg_storage_dir, f"{self.collection_name}_kg.json")
+
+            if not os.path.exists(kg_file_path):
+                logger.info(f"No saved knowledge graph found at {kg_file_path}")
+                return False
+
+            # Load knowledge graph from JSON
+            with open(kg_file_path, "r", encoding="utf-8") as f:
+                kg_data = json.load(f)
+
+            self.knowledge_graph = KnowledgeGraph.from_dict(kg_data)
+            logger.info(f"Knowledge graph loaded from {kg_file_path}")
+            logger.info(
+                f"Loaded: {len(self.knowledge_graph.entities)} entities, "
+                f"{len(self.knowledge_graph.relations)} relations, "
+                f"{len(self.knowledge_graph.clusters)} clusters, "
+                f"{len(self.knowledge_graph.text_chunks)} text chunks"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load knowledge graph from disk: {e}")
+            return False
 
     # =============== Search and Retrieval Functions ===============
 

@@ -2,9 +2,10 @@
 
 import time
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Awaitable, Callable
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -45,28 +46,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # Add request logging middleware
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_requests(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     """Log HTTP requests."""
     start_time = time.time()
-    
+
     # Get client IP
     client_ip = request.client.host if request.client else "unknown"
-    
+
     # Process request
     response = await call_next(request)
-    
+
     # Calculate response time
     process_time = time.time() - start_time
-    
+
     # Log request
     logger.info(
-        f"{client_ip} - \"{request.method} {request.url.path}\" "
+        f'{client_ip} - "{request.method} {request.url.path}" '
         f"{response.status_code} - {process_time:.3f}s"
     )
-    
+
     return response
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -101,7 +106,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     error_response = ErrorResponse(
         status=ResponseStatus.ERROR, message=exc.detail, error_code=str(exc.status_code)
     )
-    return JSONResponse(status_code=exc.status_code, content=error_response.dict())
+    return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(error_response))
 
 
 @app.exception_handler(Exception)
@@ -113,4 +118,4 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         message="An unexpected error occurred",
         error_details={"exception": str(exc)},
     )
-    return JSONResponse(status_code=500, content=error_response.dict())
+    return JSONResponse(status_code=500, content=jsonable_encoder(error_response))

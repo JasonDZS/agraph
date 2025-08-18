@@ -5,6 +5,7 @@
 ### 1. 项目管理组件
 
 #### ProjectCard 组件
+
 ```typescript
 // modules/Projects/components/ProjectCard.tsx
 
@@ -43,24 +44,24 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   actions,
 }) => {
   const [loading, setLoading] = useState(false);
-  
+
   const handleSelect = () => {
     if (onSelect && !loading) {
       onSelect(project);
     }
   };
-  
+
   const renderStatusBadge = () => {
     const statusConfig = {
       active: { color: 'green', text: '正常' },
       building: { color: 'orange', text: '构建中' },
       error: { color: 'red', text: '错误' },
     };
-    
+
     const config = statusConfig[project.status];
     return <Badge color={config.color} text={config.text} />;
   };
-  
+
   return (
     <Card
       className={`project-card ${selected ? 'selected' : ''}`}
@@ -111,7 +112,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             {project.description}
           </Typography.Paragraph>
         )}
-        
+
         <Row gutter={[16, 16]} className="project-stats">
           <Col span={12}>
             <Statistic
@@ -143,7 +144,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             />
           </Col>
         </Row>
-        
+
         <div className="project-footer">
           <Space>
             <Typography.Text type="secondary" className="project-date">
@@ -163,6 +164,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 ```
 
 #### ProjectCreateModal 组件
+
 ```typescript
 // modules/Projects/components/ProjectCreateModal.tsx
 
@@ -187,7 +189,7 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
   const [form] = Form.useForm<CreateProjectFormData>();
   const [loading, setLoading] = useState(false);
   const { projects } = useProjectStore();
-  
+
   const handleSubmit = async (values: CreateProjectFormData) => {
     setLoading(true);
     try {
@@ -195,12 +197,12 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
         name: values.name,
         description: values.description,
       });
-      
+
       // 如果选择了复制源项目
       if (values.copyFrom) {
         await configService.copyProjectConfig(values.copyFrom, values.name);
       }
-      
+
       onSuccess(project.data);
       form.resetFields();
     } catch (error) {
@@ -209,21 +211,21 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
       setLoading(false);
     }
   };
-  
+
   const validateProjectName = async (rule: any, value: string) => {
     if (!value) {
       throw new Error('请输入项目名称');
     }
-    
+
     if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
       throw new Error('项目名称只能包含字母、数字、下划线和连字符');
     }
-    
+
     if (projects.some(p => p.name === value)) {
       throw new Error('项目名称已存在');
     }
   };
-  
+
   return (
     <Modal
       title="创建新项目"
@@ -253,7 +255,7 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
             maxLength={50}
           />
         </Form.Item>
-        
+
         <Form.Item
           name="description"
           label="项目描述"
@@ -268,7 +270,7 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
             maxLength={500}
           />
         </Form.Item>
-        
+
         <Form.Item
           name="template"
           label="项目模板"
@@ -280,7 +282,7 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
             <Select.Option value="technical">技术文档</Select.Option>
           </Select>
         </Form.Item>
-        
+
         <Form.Item
           name="copyFrom"
           label="复制配置"
@@ -302,6 +304,7 @@ const ProjectCreateModal: React.FC<ProjectCreateModalProps> = ({
 ### 2. 文档管理组件
 
 #### DocumentUploader 组件
+
 ```typescript
 // modules/Documents/components/DocumentUploader.tsx
 
@@ -334,11 +337,11 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 }) => {
   const [files, setFiles] = useState<UploadedDocument[]>([]);
   const [uploading, setUploading] = useState(false);
-  
+
   const uploadFile = async (file: File): Promise<UploadedDocument> => {
     const formData = new FormData();
     formData.append('files', file);
-    
+
     const uploadDoc: UploadedDocument = {
       id: generateId(),
       filename: file.name,
@@ -347,35 +350,35 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       uploadProgress: 0,
       status: 'uploading',
     };
-    
+
     setFiles(prev => [...prev, uploadDoc]);
-    
+
     try {
       const response = await documentService.upload(formData, {
         onUploadProgress: (progressEvent) => {
           const progress = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
-          
-          setFiles(prev => prev.map(f => 
-            f.id === uploadDoc.id 
+
+          setFiles(prev => prev.map(f =>
+            f.id === uploadDoc.id
               ? { ...f, uploadProgress: progress }
               : f
           ));
         },
       });
-      
+
       const successDoc: UploadedDocument = {
         ...uploadDoc,
         id: response.data.uploaded_documents[0].id,
         status: 'success',
         uploadProgress: 100,
       };
-      
-      setFiles(prev => prev.map(f => 
+
+      setFiles(prev => prev.map(f =>
         f.id === uploadDoc.id ? successDoc : f
       ));
-      
+
       return successDoc;
     } catch (error) {
       const errorDoc: UploadedDocument = {
@@ -383,23 +386,23 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         status: 'error',
         error: error.message,
       };
-      
-      setFiles(prev => prev.map(f => 
+
+      setFiles(prev => prev.map(f =>
         f.id === uploadDoc.id ? errorDoc : f
       ));
-      
+
       throw error;
     }
   };
-  
+
   const handleFilesSelected = async (fileList: FileList) => {
     if (files.length + fileList.length > maxFiles) {
       message.error(`最多只能上传 ${maxFiles} 个文件`);
       return;
     }
-    
+
     setUploading(true);
-    
+
     const uploadPromises = Array.from(fileList).map(file => {
       // 文件类型验证
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -407,30 +410,30 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         message.error(`不支持的文件类型: ${file.name}`);
         return Promise.reject(new Error(`Unsupported file type: ${fileExtension}`));
       }
-      
+
       // 文件大小验证
       if (file.size > maxFileSize) {
         const sizeMB = Math.round(maxFileSize / (1024 * 1024));
         message.error(`文件 ${file.name} 超过大小限制 (${sizeMB}MB)`);
         return Promise.reject(new Error(`File too large: ${file.name}`));
       }
-      
+
       return uploadFile(file);
     });
-    
+
     try {
       const results = await Promise.allSettled(uploadPromises);
       const successful = results
-        .filter((result): result is PromiseFulfilledResult<UploadedDocument> => 
+        .filter((result): result is PromiseFulfilledResult<UploadedDocument> =>
           result.status === 'fulfilled'
         )
         .map(result => result.value);
-      
+
       if (successful.length > 0) {
         onUploadComplete?.(successful);
         message.success(`成功上传 ${successful.length} 个文件`);
       }
-      
+
       const failed = results.filter(result => result.status === 'rejected');
       if (failed.length > 0) {
         message.error(`${failed.length} 个文件上传失败`);
@@ -441,25 +444,25 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       setUploading(false);
     }
   };
-  
+
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
   };
-  
+
   const retryUpload = async (fileId: string) => {
     const file = files.find(f => f.id === fileId);
     if (!file) return;
-    
+
     // 重新创建File对象需要额外的处理，这里简化为重置状态
-    setFiles(prev => prev.map(f => 
-      f.id === fileId 
+    setFiles(prev => prev.map(f =>
+      f.id === fileId
         ? { ...f, status: 'uploading', uploadProgress: 0, error: undefined }
         : f
     ));
-    
+
     // 实际应用中需要保存原始File对象引用
   };
-  
+
   return (
     <div className="document-uploader">
       <Dragger
@@ -491,7 +494,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           支持 {acceptedTypes.join(', ')} 格式，单个文件不超过 {Math.round(maxFileSize / (1024 * 1024))}MB
         </p>
       </Dragger>
-      
+
       {files.length > 0 && (
         <div className="upload-list">
           <Divider>上传列表</Divider>
@@ -563,6 +566,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 ```
 
 #### DocumentList 组件
+
 ```typescript
 // modules/Documents/components/DocumentList.tsx
 
@@ -600,7 +604,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
     dateRange: null,
     fileType: [],
   });
-  
+
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
@@ -610,7 +614,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
         search_query: filters.search || undefined,
         tag_filter: filters.tags.length > 0 ? filters.tags : undefined,
       });
-      
+
       setDocuments(response.data.documents);
       setPagination(prev => ({
         ...prev,
@@ -622,16 +626,16 @@ const DocumentList: React.FC<DocumentListProps> = ({
       setLoading(false);
     }
   }, [pagination.current, pagination.pageSize, filters]);
-  
+
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
-  
+
   const handleSearch = useDebouncedCallback((value: string) => {
     setFilters(prev => ({ ...prev, search: value }));
     setPagination(prev => ({ ...prev, current: 1 }));
   }, 500);
-  
+
   const handleDelete = async (documentIds: string[]) => {
     try {
       await documentService.delete({ document_ids: documentIds });
@@ -644,7 +648,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
       message.error('删除文档失败');
     }
   };
-  
+
   const columns: ColumnsType<Document> = [
     {
       title: '文档名称',
@@ -737,7 +741,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
       ),
     }] : []),
   ];
-  
+
   const rowSelection = selectable ? {
     selectedRowKeys,
     onChange: setSelectedRowKeys,
@@ -745,7 +749,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
       console.log('Select all:', selected, selectedRows, changeRows);
     },
   } : undefined;
-  
+
   return (
     <div className="document-list">
       <Card>
@@ -787,7 +791,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
             </Col>
           </Row>
         </div>
-        
+
         <Table
           columns={columns}
           dataSource={documents}
@@ -800,7 +804,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
             total: pagination.total,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => 
+            showTotal: (total, range) =>
               `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
             onChange: (page, pageSize) => {
               setPagination(prev => ({
@@ -820,291 +824,571 @@ const DocumentList: React.FC<DocumentListProps> = ({
 ### 3. 知识图谱可视化组件
 
 #### GraphVisualizer 组件
+
 ```typescript
 // modules/KnowledgeGraph/components/GraphVisualizer.tsx
 
 interface GraphVisualizerProps {
-  entities: Entity[];
-  relations: Relation[];
-  width?: number;
+  data?: GraphData;
+  options?: GraphVisualizationOptions;
+  eventHandlers?: GraphEventHandlers;
   height?: number;
-  onNodeClick?: (entity: Entity) => void;
-  onEdgeClick?: (relation: Relation) => void;
-  onSelectionChange?: (selection: GraphSelection) => void;
-  layout?: LayoutOptions;
-  theme?: GraphTheme;
+  className?: string;
+  style?: React.CSSProperties;
+  showDataTable?: boolean;
 }
 
-interface GraphSelection {
-  nodes: string[];
-  edges: string[];
-}
-
-interface LayoutOptions {
-  name: 'cola' | 'cose' | 'grid' | 'circle' | 'concentric';
-  animate?: boolean;
-  fit?: boolean;
-  padding?: number;
-}
-
-interface GraphTheme {
-  nodeColors: Record<string, string>;
-  edgeColors: Record<string, string>;
-  backgroundColor: string;
-  textColor: string;
+interface EChartsGraphData {
+  nodes: Array<{
+    id: string;
+    name: string;
+    category: number;
+    symbolSize: number;
+    value: number;
+    entityType?: string;
+    confidence?: number;
+    properties?: any;
+  }>;
+  links: Array<{
+    source: string;
+    target: string;
+    relationshipType?: string;
+    confidence?: number;
+    properties?: any;
+  }>;
+  categories: Array<{
+    name: string;
+    itemStyle?: {
+      color?: string;
+    };
+  }>;
 }
 
 const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
-  entities,
-  relations,
-  width = 800,
+  data,
+  options = {},
+  eventHandlers = {},
   height = 600,
-  onNodeClick,
-  onEdgeClick,
-  onSelectionChange,
-  layout = { name: 'cose', animate: true, fit: true },
-  theme = defaultGraphTheme,
+  className,
+  style,
+  showDataTable = true,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cyRef = useRef<cytoscape.Core>();
-  const [selectedElements, setSelectedElements] = useState<GraphSelection>({
-    nodes: [],
-    edges: [],
-  });
-  
-  // 初始化Cytoscape实例
-  useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const cy = cytoscape({
-      container: containerRef.current,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': (ele) => {
-              const entityType = ele.data('entity_type');
-              return theme.nodeColors[entityType] || '#666';
-            },
-            'label': 'data(name)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'color': theme.textColor,
-            'font-size': '12px',
-            'width': (ele) => Math.max(30, ele.data('name').length * 8),
-            'height': (ele) => Math.max(30, ele.data('name').length * 8),
-            'border-width': 2,
-            'border-color': '#fff',
-            'text-wrap': 'wrap',
-            'text-max-width': '100px',
-          },
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<echarts.ECharts | null>(null);
+
+  const [graphData, setGraphData] = useState<EChartsGraphData | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [selectedEdge, setSelectedEdge] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<string>('nodes');
+
+  // Store hooks
+  const {
+    entities,
+    relations,
+    currentLayout,
+    showNodeLabels,
+    edgeWidth,
+    getFilteredEntities,
+    getFilteredRelations,
+  } = useKnowledgeGraphStore();
+
+  const { theme } = useAppStore();
+
+  // Helper function to get node name by ID
+  const getNodeNameById = useCallback((nodeId: string) => {
+    const node = graphData?.nodes?.find(n => n.id === nodeId);
+    return node?.name || nodeId;
+  }, [graphData]);
+
+  // Initialize ECharts
+  const initializeChart = useCallback(() => {
+    if (!chartRef.current || chartInstance.current) return;
+
+    try {
+      chartInstance.current = echarts.init(chartRef.current);
+
+      // Setup event handlers
+      chartInstance.current.on('click', function (params: any) {
+        if (params.dataType === 'node') {
+          const node = params.data;
+          setSelectedNode(node);
+          setSelectedEdge(null);
+          setActiveTab('nodes');
+          eventHandlers.onNodeSelect?.(node);
+        } else if (params.dataType === 'edge') {
+          const edge = params.data;
+          setSelectedEdge(edge);
+          setSelectedNode(null);
+          setActiveTab('edges');
+          eventHandlers.onEdgeSelect?.(edge);
+        }
+      });
+
+      // Resize chart when window resizes
+      const handleResize = () => {
+        if (chartInstance.current) {
+          chartInstance.current.resize();
+        }
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
+    } catch (err) {
+      console.error('Failed to initialize ECharts:', err);
+    }
+  }, [eventHandlers]);
+
+  // Convert data to ECharts format
+  const convertToEChartsData = useCallback(() => {
+    const entitiesToUse = data ? data.nodes.map(node => ({
+      id: node.id,
+      name: node.label,
+      entity_type: node.entityType || 'concept',
+      confidence: node.confidence || 1.0,
+      properties: node.properties || {},
+      description: '',
+      aliases: [],
+    })) : getFilteredEntities();
+
+    const relationsToUse = data ? data.edges.map(edge => ({
+      id: edge.id,
+      head_entity_id: edge.source,
+      tail_entity_id: edge.target,
+      relation_type: edge.relationType || 'related',
+      confidence: edge.confidence || 1.0,
+      properties: edge.properties || {},
+      description: '',
+    })) : getFilteredRelations();
+
+    if (entitiesToUse.length === 0) {
+      return null;
+    }
+
+    // Get unique entity types for categories
+    const entityTypes = [...new Set(entitiesToUse.map(e => e.entity_type))];
+    const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'];
+
+    const categories = entityTypes.map((type, index) => ({
+      name: type,
+      itemStyle: { color: colors[index % colors.length] }
+    }));
+
+    // Create nodes
+    const nodes = entitiesToUse.map(entity => {
+      const categoryIndex = entityTypes.indexOf(entity.entity_type);
+      return {
+        id: entity.id,
+        name: entity.name,
+        category: categoryIndex,
+        symbolSize: Math.min(Math.max((entity.confidence || 0.5) * 30, 15), 50),
+        value: entity.confidence || 0.5,
+        entityType: entity.entity_type,
+        confidence: entity.confidence,
+        properties: entity.properties,
+      };
+    });
+
+    // Create links
+    const links = relationsToUse.map(relation => ({
+      source: relation.head_entity_id,
+      target: relation.tail_entity_id,
+      relationshipType: relation.relation_type,
+      confidence: relation.confidence,
+      properties: relation.properties,
+    }));
+
+    return { nodes, links, categories };
+  }, [data, getFilteredEntities, getFilteredRelations]);
+
+  // Render graph
+  const renderGraph = useCallback(() => {
+    if (!chartInstance.current || !graphData) return;
+
+    const option = {
+      title: {
+        text: '知识图谱',
+        left: 'center',
+        textStyle: {
+          fontSize: 16,
+          fontWeight: 'bold',
+          color: theme === 'dark' ? '#ffffff' : '#1e293b',
         },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-color': '#007bff',
-            'border-width': 3,
-          },
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: function (params: any) {
+          if (params.dataType === 'node') {
+            return `<strong>${params.data.name}</strong><br/>
+                    类别: ${graphData.categories[params.data.category]?.name || 'Unknown'}<br/>
+                    置信度: ${(params.data.confidence || 0).toFixed(2)}`;
+          } else if (params.dataType === 'edge') {
+            return `${getNodeNameById(params.data.source)} → ${getNodeNameById(params.data.target)}<br/>
+                    关系类型: ${params.data.relationshipType || '关系'}<br/>
+                    置信度: ${(params.data.confidence || 0).toFixed(2)}`;
+          }
+          return params.name;
         },
-        {
-          selector: 'edge',
-          style: {
-            'width': 2,
-            'line-color': (ele) => {
-              const relationType = ele.data('relation_type');
-              return theme.edgeColors[relationType] || '#ccc';
-            },
-            'target-arrow-color': (ele) => {
-              const relationType = ele.data('relation_type');
-              return theme.edgeColors[relationType] || '#ccc';
-            },
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            'label': 'data(relation_type)',
-            'font-size': '10px',
-            'color': theme.textColor,
-            'text-rotation': 'autorotate',
-            'text-margin-y': -10,
-          },
+      },
+      legend: {
+        data: graphData.categories.map(cat => cat.name),
+        top: 'bottom',
+        left: 'center',
+        textStyle: {
+          color: theme === 'dark' ? '#ffffff' : '#374151',
         },
+      },
+      series: [
         {
-          selector: 'edge:selected',
-          style: {
-            'line-color': '#007bff',
-            'target-arrow-color': '#007bff',
-            'width': 3,
+          name: '知识图谱',
+          type: 'graph',
+          layout: 'force',
+          data: graphData.nodes,
+          links: graphData.links,
+          categories: graphData.categories,
+          roam: true,
+          focusNodeAdjacency: true,
+          force: {
+            repulsion: 200,
+            gravity: 0.05,
+            edgeLength: 80,
+            layoutAnimation: true,
+          },
+          label: {
+            show: showNodeLabels !== false,
+            position: 'right',
+            formatter: '{b}',
+            color: theme === 'dark' ? '#ffffff' : '#374151',
+          },
+          labelLayout: {
+            hideOverlap: true,
+          },
+          lineStyle: {
+            color: 'source',
+            curveness: 0.3,
+            opacity: 0.7,
+            width: edgeWidth || 2,
+          },
+          emphasis: {
+            focus: 'adjacency',
+            lineStyle: {
+              width: 4,
+            },
           },
         },
       ],
-      layout,
-      minZoom: 0.1,
-      maxZoom: 3,
-      wheelSensitivity: 0.2,
-    });
-    
-    cyRef.current = cy;
-    
-    // 添加事件监听器
-    cy.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      const entityId = node.data('id');
-      const entity = entities.find(e => e.id === entityId);
-      if (entity && onNodeClick) {
-        onNodeClick(entity);
-      }
-    });
-    
-    cy.on('tap', 'edge', (evt) => {
-      const edge = evt.target;
-      const relationId = edge.data('id');
-      const relation = relations.find(r => r.id === relationId);
-      if (relation && onEdgeClick) {
-        onEdgeClick(relation);
-      }
-    });
-    
-    cy.on('select unselect', () => {
-      const selectedNodes = cy.$('node:selected').map(node => node.data('id'));
-      const selectedEdges = cy.$('edge:selected').map(edge => edge.data('id'));
-      
-      const selection = {
-        nodes: selectedNodes,
-        edges: selectedEdges,
-      };
-      
-      setSelectedElements(selection);
-      onSelectionChange?.(selection);
-    });
-    
-    return () => {
-      cy.destroy();
+      backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+      animation: true,
     };
-  }, []);
-  
-  // 更新图数据
+
+    try {
+      chartInstance.current.clear();
+      chartInstance.current.setOption(option, true);
+
+      setTimeout(() => {
+        if (chartInstance.current) {
+          chartInstance.current.resize();
+        }
+      }, 200);
+    } catch (error) {
+      console.error('Error setting ECharts option:', error);
+    }
+  }, [graphData, theme, showNodeLabels, edgeWidth, getNodeNameById]);
+
+  // Effects
   useEffect(() => {
-    if (!cyRef.current) return;
-    
-    const cy = cyRef.current;
-    
-    // 转换实体为节点
-    const nodes = entities.map(entity => ({
-      data: {
-        id: entity.id,
-        name: entity.name,
-        entity_type: entity.entity_type,
-        description: entity.description,
-        confidence: entity.confidence,
-      },
-    }));
-    
-    // 转换关系为边
-    const edges = relations.map(relation => ({
-      data: {
-        id: relation.id,
-        source: relation.head_entity_id,
-        target: relation.tail_entity_id,
-        relation_type: relation.relation_type,
-        description: relation.description,
-        confidence: relation.confidence,
-      },
-    }));
-    
-    // 更新图数据
-    cy.json({ elements: { nodes, edges } });
-    
-    // 重新应用布局
-    cy.layout(layout).run();
-  }, [entities, relations, layout]);
-  
-  // 工具栏功能
-  const handleZoomIn = () => {
-    cyRef.current?.zoom(cyRef.current.zoom() * 1.25);
-  };
-  
-  const handleZoomOut = () => {
-    cyRef.current?.zoom(cyRef.current.zoom() * 0.8);
-  };
-  
-  const handleFit = () => {
-    cyRef.current?.fit();
-  };
-  
-  const handleCenter = () => {
-    cyRef.current?.center();
-  };
-  
-  const handleExportPNG = () => {
-    if (!cyRef.current) return;
-    
-    const png = cyRef.current.png({
-      output: 'blob',
-      bg: theme.backgroundColor,
-      full: true,
-    });
-    
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(png);
-    link.download = 'knowledge-graph.png';
-    link.click();
-  };
-  
-  const handleLayoutChange = (layoutName: string) => {
-    if (!cyRef.current) return;
-    
-    const newLayout = { ...layout, name: layoutName as any };
-    cyRef.current.layout(newLayout).run();
-  };
-  
-  return (
-    <div className="graph-visualizer">
-      <div className="graph-toolbar">
-        <Space>
-          <Button.Group>
-            <Button icon={<ZoomInOutlined />} onClick={handleZoomIn} title="放大" />
-            <Button icon={<ZoomOutOutlined />} onClick={handleZoomOut} title="缩小" />
-            <Button icon={<BorderOutlined />} onClick={handleFit} title="适应窗口" />
-            <Button icon={<AimOutlined />} onClick={handleCenter} title="居中" />
-          </Button.Group>
-          
-          <Select
-            defaultValue={layout.name}
-            style={{ width: 120 }}
-            onChange={handleLayoutChange}
-          >
-            <Select.Option value="cose">力导向</Select.Option>
-            <Select.Option value="cola">约束布局</Select.Option>
-            <Select.Option value="grid">网格布局</Select.Option>
-            <Select.Option value="circle">环形布局</Select.Option>
-            <Select.Option value="concentric">同心圆</Select.Option>
-          </Select>
-          
-          <Button icon={<DownloadOutlined />} onClick={handleExportPNG}>
-            导出图片
-          </Button>
-        </Space>
-      </div>
-      
-      <div
-        ref={containerRef}
-        className="cytoscape-container"
-        style={{
-          width,
-          height,
-          backgroundColor: theme.backgroundColor,
-          border: '1px solid #d9d9d9',
-          borderRadius: '6px',
-        }}
-      />
-      
-      {selectedElements.nodes.length > 0 || selectedElements.edges.length > 0 ? (
-        <div className="selection-info">
-          <Typography.Text>
-            已选择: {selectedElements.nodes.length} 个节点, {selectedElements.edges.length} 条边
-          </Typography.Text>
+    const timer = setTimeout(() => {
+      if (chartRef.current && !chartInstance.current) {
+        const cleanup = initializeChart();
+        return cleanup;
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      if (chartInstance.current) {
+        try {
+          chartInstance.current.dispose();
+        } catch (err) {
+          console.warn('Error during ECharts cleanup:', err);
+        } finally {
+          chartInstance.current = null;
+        }
+      }
+    };
+  }, [initializeChart]);
+
+  // Update graph when data changes
+  useEffect(() => {
+    const newGraphData = convertToEChartsData();
+    setGraphData(newGraphData);
+  }, [entities, relations, data, convertToEChartsData]);
+
+  // Render graph when chart is ready and data is available
+  useEffect(() => {
+    if (chartInstance.current && graphData) {
+      setTimeout(() => {
+        renderGraph();
+      }, 100);
+    }
+  }, [graphData, renderGraph]);
+
+  // Data table columns
+  const nodeColumns = [
+    {
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
+      ellipsis: true,
+      width: '45%',
+    },
+    {
+      title: '类别',
+      dataIndex: 'entityType',
+      key: 'entityType',
+      width: '35%',
+      render: (type: string) => (
+        <Tag color="blue" size="small">
+          {type}
+        </Tag>
+      ),
+    },
+    {
+      title: '置信度',
+      dataIndex: 'confidence',
+      key: 'confidence',
+      width: '20%',
+      align: 'center' as const,
+      render: (confidence: number) => (
+        <span style={{ fontSize: '12px' }}>
+          {(confidence || 0).toFixed(2)}
+        </span>
+      ),
+    },
+  ];
+
+  const edgeColumns = [
+    {
+      title: '源节点',
+      dataIndex: 'source',
+      key: 'source',
+      ellipsis: true,
+      width: '35%',
+      render: (sourceId: string) => getNodeNameById(sourceId),
+    },
+    {
+      title: '目标节点',
+      dataIndex: 'target',
+      key: 'target',
+      ellipsis: true,
+      width: '35%',
+      render: (targetId: string) => getNodeNameById(targetId),
+    },
+    {
+      title: '关系',
+      dataIndex: 'relationshipType',
+      key: 'relationshipType',
+      width: '30%',
+      ellipsis: true,
+      render: (type: string) => (
+        <Tag size="small" color="blue">
+          {type || '关系'}
+        </Tag>
+      ),
+    },
+  ];
+
+  if (!showDataTable) {
+    // Render only the graph
+    return (
+      <Card
+        className={className}
+        style={style}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div
+          ref={chartRef}
+          style={{
+            width: '100%',
+            height,
+            backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+          }}
+        />
+      </Card>
+    );
+  }
+
+  // 右侧数据面板的标签项
+  const dataTabItems = [
+    {
+      key: 'nodes',
+      label: `节点 (${graphData?.nodes?.length || 0})`,
+      children: (
+        <div style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          <Table
+            columns={nodeColumns}
+            dataSource={graphData?.nodes || []}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            scroll={{
+              y: height - 180,
+              scrollToFirstRowOnChange: false
+            }}
+            onRow={(record) => ({
+              onClick: () => {
+                setSelectedNode(record);
+                setSelectedEdge(null);
+              },
+              style: {
+                backgroundColor: selectedNode?.id === record.id ? '#e6f7ff' : undefined,
+                cursor: 'pointer',
+              },
+            })}
+          />
         </div>
-      ) : null}
-    </div>
+      ),
+    },
+    {
+      key: 'edges',
+      label: `关系 (${graphData?.links?.length || 0})`,
+      children: (
+        <div style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          <Table
+            columns={edgeColumns}
+            dataSource={graphData?.links || []}
+            rowKey={(record, index) => `${record.source}-${record.target}-${index}`}
+            pagination={false}
+            size="small"
+            scroll={{
+              y: height - 180,
+              scrollToFirstRowOnChange: false
+            }}
+            onRow={(record) => ({
+              onClick: () => {
+                setSelectedEdge(record);
+                setSelectedNode(null);
+              },
+              style: {
+                backgroundColor:
+                  selectedEdge?.source === record.source &&
+                  selectedEdge?.target === record.target
+                    ? '#e6f7ff' : undefined,
+                cursor: 'pointer',
+              },
+            })}
+          />
+        </div>
+      ),
+    },
+  ];
+
+  // 主布局：左侧图谱 + 右侧数据面板
+  return (
+    <Card
+      className={className}
+      style={style}
+      styles={{ body: { padding: 0 } }}
+    >
+      <div style={{ display: 'flex', height }}>
+        {/* 左侧知识图谱区域 - 2/3宽度 */}
+        <div style={{ flex: 2, position: 'relative', borderRight: '1px solid #f0f0f0' }}>
+          <div style={{ padding: '16px 16px 0 16px' }}>
+            <div style={{ marginBottom: 16, textAlign: 'center' }}>
+              <Text strong style={{ fontSize: 16 }}>知识图谱</Text>
+            </div>
+            {graphData && (
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center', gap: 24 }}>
+                <span>节点: <Text strong>{graphData.nodes?.length || 0}</Text></span>
+                <span>关系: <Text strong>{graphData.links?.length || 0}</Text></span>
+                <span>类别: <Text strong>{graphData.categories?.length || 0}</Text></span>
+              </div>
+            )}
+          </div>
+          <div
+            ref={chartRef}
+            style={{
+              width: '100%',
+              height: 'calc(100% - 80px)',
+              minHeight: '400px',
+              backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+            }}
+          />
+
+          {/* 选中项显示 */}
+          {(selectedNode || selectedEdge) && (
+            <div style={{
+              position: 'absolute',
+              bottom: 16,
+              left: 16,
+              right: 16,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              padding: 12,
+              borderRadius: 6,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(4px)'
+            }}>
+              {selectedNode && (
+                <div>
+                  <Text strong>选中节点: </Text>
+                  <Text>{selectedNode.name}</Text>
+                  <Text type="secondary" style={{ marginLeft: 12 }}>
+                    类别: {selectedNode.entityType} | 置信度: {(selectedNode.confidence || 0).toFixed(2)}
+                  </Text>
+                </div>
+              )}
+              {selectedEdge && (
+                <div>
+                  <Text strong>选中关系: </Text>
+                  <Text>{getNodeNameById(selectedEdge.source)} → {getNodeNameById(selectedEdge.target)}</Text>
+                  <Text type="secondary" style={{ marginLeft: 12 }}>
+                    类型: {selectedEdge.relationshipType || '关系'} | 置信度: {(selectedEdge.confidence || 0).toFixed(2)}
+                  </Text>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 右侧数据面板 - 1/3宽度 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{
+            padding: '16px 16px 12px 16px',
+            textAlign: 'center',
+            borderBottom: '1px solid #f0f0f0',
+            flexShrink: 0
+          }}>
+            <Text strong style={{ fontSize: 16 }}>数据视图</Text>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={dataTabItems}
+              style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+              tabPosition="top"
+              size="small"
+              tabBarStyle={{
+                padding: '0 16px',
+                margin: 0,
+                flexShrink: 0
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 };
 ```
@@ -1112,6 +1396,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
 ### 4. 对话系统组件
 
 #### ChatInterface 组件
+
 ```typescript
 // modules/Chat/components/ChatInterface.tsx
 
@@ -1148,31 +1433,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [currentContext, setCurrentContext] = useState<ChatContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<Input.TextArea>(null);
-  
+
   // 自动滚动到底部
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  
+
   // 发送消息
   const handleSendMessage = async () => {
     if (!inputValue.trim() || streaming) return;
-    
+
     const userMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
       content: inputValue.trim(),
       timestamp: new Date(),
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setStreaming(true);
-    
+
     try {
       // 创建助手消息占位符
       const assistantMessageId = generateId();
@@ -1183,9 +1468,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         timestamp: new Date(),
         streaming: true,
       };
-      
+
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // 流式响应
       const response = await chatService.streamChat({
         question: userMessage.content,
@@ -1195,29 +1480,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         })),
         stream: true,
       });
-      
+
       let partialContent = '';
-      
+
       for await (const chunk of response) {
         if (chunk.chunk) {
           partialContent += chunk.chunk;
-          
+
           setMessages(prev => prev.map(msg =>
             msg.id === assistantMessageId
               ? { ...msg, content: partialContent }
               : msg
           ));
         }
-        
+
         if (chunk.context) {
           setCurrentContext(chunk.context);
         }
-        
+
         if (chunk.finished) {
           setMessages(prev => prev.map(msg =>
             msg.id === assistantMessageId
-              ? { 
-                  ...msg, 
+              ? {
+                  ...msg,
                   content: chunk.answer || partialContent,
                   streaming: false,
                   context: chunk.context,
@@ -1229,20 +1514,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     } catch (error) {
       console.error('Chat error:', error);
-      
+
       const errorMessage: ChatMessage = {
         id: generateId(),
         role: 'assistant',
         content: '抱歉，我现在无法回答您的问题。请稍后再试。',
         timestamp: new Date(),
       };
-      
+
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setStreaming(false);
     }
   };
-  
+
   // 处理键盘事件
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1250,7 +1535,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       handleSendMessage();
     }
   };
-  
+
   // 清空对话
   const handleClearConversation = () => {
     Modal.confirm({
@@ -1262,21 +1547,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       },
     });
   };
-  
+
   // 重新生成回答
   const handleRegenerateResponse = async (messageIndex: number) => {
     const userMessage = messages[messageIndex - 1];
     if (!userMessage || userMessage.role !== 'user') return;
-    
+
     // 移除当前助手回答
     const newMessages = messages.slice(0, messageIndex);
     setMessages(newMessages);
-    
+
     // 重新发送请求
     setInputValue(userMessage.content);
     await handleSendMessage();
   };
-  
+
   return (
     <div className="chat-interface" style={{ height }}>
       <div className="chat-header">
@@ -1305,7 +1590,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </Col>
         </Row>
       </div>
-      
+
       <div className="chat-messages" style={{ height: height - 120, overflow: 'auto' }}>
         {messages.length === 0 ? (
           <div className="chat-welcome">
@@ -1329,7 +1614,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
         <div ref={messagesEndRef} />
       </div>
-      
+
       <div className="chat-input">
         <Row gutter={8} align="bottom">
           <Col flex="auto">
@@ -1356,7 +1641,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </Col>
         </Row>
       </div>
-      
+
       {currentContext && (
         <ContextPanel
           context={currentContext}
@@ -1371,6 +1656,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 ## 通用工具组件
 
 ### LoadingSpinner 组件
+
 ```typescript
 // components/Common/LoadingSpinner.tsx
 
@@ -1394,7 +1680,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
       </Spin>
     );
   }
-  
+
   return (
     <div className="loading-spinner">
       <Spin size={size} tip={tip} />
@@ -1404,6 +1690,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 ```
 
 ### ErrorBoundary 组件
+
 ```typescript
 // components/Common/ErrorBoundary.tsx
 
@@ -1425,28 +1712,28 @@ class ErrorBoundary extends React.Component<
       errorInfo: null,
     };
   }
-  
+
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return {
       hasError: true,
       error,
     };
   }
-  
+
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({
       error,
       errorInfo,
     });
-    
+
     // 记录错误到日志服务
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
-  
+
   handleReload = () => {
     window.location.reload();
   };
-  
+
   handleReset = () => {
     this.setState({
       hasError: false,
@@ -1454,7 +1741,7 @@ class ErrorBoundary extends React.Component<
       errorInfo: null,
     });
   };
-  
+
   render() {
     if (this.state.hasError) {
       return (
@@ -1482,7 +1769,7 @@ class ErrorBoundary extends React.Component<
         </Result>
       );
     }
-    
+
     return this.props.children;
   }
 }
@@ -1493,6 +1780,7 @@ export default ErrorBoundary;
 ## 组件样式规范
 
 ### CSS Modules 规范
+
 ```scss
 // components/ProjectCard/ProjectCard.module.scss
 
@@ -1501,35 +1789,35 @@ export default ErrorBoundary;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
   }
-  
+
   .projectHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    
+
     .projectName {
       margin: 0;
       color: var(--text-color);
     }
   }
-  
+
   .projectContent {
     .projectDescription {
       color: var(--text-color-secondary);
       margin-bottom: 16px;
     }
-    
+
     .projectStats {
       margin-bottom: 16px;
     }
-    
+
     .projectFooter {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-top: 12px;
       border-top: 1px solid var(--border-color);
-      
+
       .projectDate {
         font-size: 12px;
       }
@@ -1539,6 +1827,7 @@ export default ErrorBoundary;
 ```
 
 ### 主题变量
+
 ```scss
 // styles/variables.scss
 
@@ -1548,31 +1837,31 @@ export default ErrorBoundary;
   --success-color: #52c41a;
   --warning-color: #faad14;
   --error-color: #ff4d4f;
-  
+
   // 文本颜色
   --text-color: rgba(0, 0, 0, 0.85);
   --text-color-secondary: rgba(0, 0, 0, 0.65);
   --text-color-disabled: rgba(0, 0, 0, 0.25);
-  
+
   // 背景颜色
   --background-color: #fff;
   --background-color-light: #fafafa;
   --background-color-dark: #f5f5f5;
-  
+
   // 边框颜色
   --border-color: #d9d9d9;
   --border-color-light: #f0f0f0;
-  
+
   // 阴影
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
-  
+
   // 圆角
   --border-radius: 6px;
   --border-radius-sm: 4px;
   --border-radius-lg: 8px;
-  
+
   // 间距
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -1586,11 +1875,11 @@ export default ErrorBoundary;
   --text-color: rgba(255, 255, 255, 0.85);
   --text-color-secondary: rgba(255, 255, 255, 0.65);
   --text-color-disabled: rgba(255, 255, 255, 0.25);
-  
+
   --background-color: #141414;
   --background-color-light: #1f1f1f;
   --background-color-dark: #0f0f0f;
-  
+
   --border-color: #434343;
   --border-color-light: #303030;
 }
@@ -1599,6 +1888,7 @@ export default ErrorBoundary;
 ## 性能优化最佳实践
 
 ### 组件懒加载
+
 ```typescript
 // utils/componentLoader.ts
 
@@ -1610,7 +1900,7 @@ export function lazyLoadComponent<T extends ComponentType<any>>(
   fallback: ComponentType = LoadingSpinner
 ) {
   const LazyComponent = lazy(importFunc);
-  
+
   return (props: React.ComponentProps<T>) => (
     <Suspense fallback={<fallback />}>
       <LazyComponent {...props} />
@@ -1629,6 +1919,7 @@ export const LazyGraphVisualizer = lazyLoadComponent(
 ```
 
 ### React.memo 优化
+
 ```typescript
 // 使用React.memo优化组件重渲染
 const ProjectCard = React.memo<ProjectCardProps>(({ project, onSelect }) => {
@@ -1645,11 +1936,12 @@ const ProjectCard = React.memo<ProjectCardProps>(({ project, onSelect }) => {
 ```
 
 ### useMemo 和 useCallback 优化
+
 ```typescript
 const DocumentList: React.FC<DocumentListProps> = ({ onDocumentSelect }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filters, setFilters] = useState<DocumentFilters>({});
-  
+
   // 缓存过滤后的文档列表
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
@@ -1662,12 +1954,12 @@ const DocumentList: React.FC<DocumentListProps> = ({ onDocumentSelect }) => {
       return true;
     });
   }, [documents, filters.search, filters.tags]);
-  
+
   // 缓存事件处理函数
   const handleDocumentClick = useCallback((document: Document) => {
     onDocumentSelect?.(document);
   }, [onDocumentSelect]);
-  
+
   return (
     <div>
       {filteredDocuments.map(doc => (

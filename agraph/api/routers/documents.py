@@ -80,19 +80,19 @@ async def upload_documents(
                             f"Supported extensions: {supported_extensions}",
                         )
 
-                    # Extract metadata and text content using the processor
+                    # Extract metadata using the processor for indexing purposes
                     file_metadata = processor_manager.extract_metadata(temp_file_path)
-                    text_content = processor_manager.process(temp_file_path)
 
-                    # Store document with extracted text content
+                    # Store document with original binary content preserved
                     doc_id = doc_manager.store_document(
-                        content=text_content,  # Store extracted text content
+                        content=content,  # Store original binary content as-is
                         filename=file.filename,
                         metadata={
                             **metadata_dict,
                             "content_type": file.content_type,
                             "file_size": len(content),
                             "extracted_metadata": file_metadata,
+                            "original_format": True,  # Flag to indicate original format preservation
                         },
                         tags=tags_list,
                     )
@@ -276,7 +276,7 @@ async def get_document(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.delete("/delete", response_model=DocumentDeleteResponse)
+@router.post("/delete", response_model=DocumentDeleteResponse)
 async def delete_documents(
     request: DocumentDeleteRequest,
     project_name: Optional[str] = Query(

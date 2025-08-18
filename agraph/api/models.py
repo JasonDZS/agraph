@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResponseStatus(str, Enum):
@@ -17,6 +17,8 @@ class ResponseStatus(str, Enum):
 
 class BaseResponse(BaseModel):
     """Base response model."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     status: ResponseStatus
     message: str
@@ -198,6 +200,56 @@ class KnowledgeGraphUpdateResponse(BaseResponse):
 
 class KnowledgeGraphStatusResponse(BaseResponse):
     """Knowledge graph status response."""
+
+    data: Optional[Dict[str, Any]] = None
+
+
+class KnowledgeGraphGetRequest(BaseModel):
+    """Knowledge graph get request."""
+
+    include_text_chunks: bool = Field(default=False, description="Include text chunks in response")
+    include_clusters: bool = Field(default=False, description="Include clusters in response")
+    entity_limit: Optional[int] = Field(default=None, description="Limit number of entities")
+    relation_limit: Optional[int] = Field(default=None, description="Limit number of relations")
+
+
+class KnowledgeGraphGetResponse(BaseResponse):
+    """Knowledge graph get response."""
+
+    data: Optional[Dict[str, Any]] = None
+
+
+class KnowledgeGraphVisualizationRequest(BaseModel):
+    """Knowledge graph visualization data request."""
+
+    include_clusters: bool = Field(default=True, description="Include cluster information")
+    max_entities: int = Field(default=500, description="Maximum number of entities to return")
+    max_relations: int = Field(default=1000, description="Maximum number of relations to return")
+    min_confidence: float = Field(default=0.0, description="Minimum confidence threshold")
+    entity_types: Optional[List[str]] = Field(default=None, description="Filter by entity types")
+    relation_types: Optional[List[str]] = Field(
+        default=None, description="Filter by relation types"
+    )
+    cluster_layout: bool = Field(default=False, description="Apply cluster-based layout")
+
+
+class KnowledgeGraphVisualizationResponse(BaseResponse):
+    """Knowledge graph visualization data response."""
+
+    data: Optional[Dict[str, Any]] = None
+
+
+class TextChunkSearchRequest(BaseModel):
+    """Text chunk search request."""
+
+    search: Optional[str] = Field(default=None, description="Search query for text chunks")
+    entity_id: Optional[str] = Field(default=None, description="Filter by entity ID")
+    limit: int = Field(default=20, description="Maximum number of text chunks to return")
+    offset: int = Field(default=0, description="Offset for pagination")
+
+
+class TextChunkSearchResponse(BaseResponse):
+    """Text chunk search response."""
 
     data: Optional[Dict[str, Any]] = None
 

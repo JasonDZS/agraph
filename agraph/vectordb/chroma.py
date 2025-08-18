@@ -43,7 +43,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
     high-performance vector search and multiple embedding models.
     """
 
-    # pylint: disable=too-many-positional-arguments,too-many-public-methods,too-many-ancestors
+    # pylint: disable=too-many-public-methods,too-many-ancestors
     def __init__(
         self,
         collection_name: str = "knowledge_graph",

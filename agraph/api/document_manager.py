@@ -5,7 +5,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..logger import logger
 
@@ -49,9 +49,12 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Failed to save document index: {e}")
 
-    def _generate_document_id(self, content: str, filename: Optional[str] = None) -> str:
+    def _generate_document_id(self, content: Any, filename: Optional[str] = None) -> str:
         """Generate unique document ID based on content."""
-        content_hash = hashlib.md5(content.encode("utf-8")).hexdigest()
+        if isinstance(content, bytes):
+            content_hash = hashlib.md5(content).hexdigest()
+        else:
+            content_hash = hashlib.md5(str(content).encode("utf-8")).hexdigest()
         timestamp = str(int(time.time()))
         if filename:
             filename_hash = hashlib.md5(filename.encode("utf-8")).hexdigest()[:8]
@@ -60,7 +63,7 @@ class DocumentManager:
 
     def store_document(
         self,
-        content: str,
+        content: Union[str, bytes],
         filename: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
@@ -68,12 +71,29 @@ class DocumentManager:
         """Store a document and return its ID."""
         doc_id = self._generate_document_id(content, filename)
 
+        # Determine if this is binary content and file extension
+        is_binary = isinstance(content, bytes)
+        if is_binary and filename:
+            # Keep original file extension for binary files
+            file_extension = Path(filename).suffix
+        else:
+            file_extension = ".txt"
+
         # Store document content
-        doc_file = self.documents_dir / f"{doc_id}.txt"
-        with open(doc_file, "w", encoding="utf-8") as f:
-            f.write(content)
+        doc_file = self.documents_dir / f"{doc_id}{file_extension}"
+        if is_binary:
+            with open(doc_file, "wb") as f:
+                f.write(content)  # type: ignore[arg-type]
+        else:
+            with open(doc_file, "w", encoding="utf-8") as f:
+                f.write(content)  # type: ignore[arg-type]
 
         # Store metadata
+        if is_binary:
+            content_hash = hashlib.md5(content).hexdigest()  # type: ignore[arg-type]
+        else:
+            content_hash = hashlib.md5(str(content).encode("utf-8")).hexdigest()
+
         doc_metadata = {
             "id": doc_id,
             "filename": filename,
@@ -82,7 +102,9 @@ class DocumentManager:
             "project_name": self.project_name,
             "metadata": metadata or {},
             "tags": tags or [],
-            "content_hash": hashlib.md5(content.encode("utf-8")).hexdigest(),
+            "content_hash": content_hash,
+            "is_binary": is_binary,
+            "file_extension": file_extension,
         }
 
         metadata_file = self.metadata_dir / f"{doc_id}.json"
@@ -97,10 +119,12 @@ class DocumentManager:
             "project_name": self.project_name,
             "tags": tags or [],
             "metadata": metadata or {},
+            "is_binary": is_binary,
+            "file_extension": file_extension,
         }
         self._save_index()
 
-        logger.info(f"Document stored with ID: {doc_id}")
+        logger.info(f"Document stored with ID: {doc_id} (binary: {is_binary})")
         return doc_id
 
     def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
@@ -109,22 +133,33 @@ class DocumentManager:
             return None
 
         try:
-            # Load content
-            doc_file = self.documents_dir / f"{doc_id}.txt"
-            if not doc_file.exists():
-                logger.warning(f"Document file not found: {doc_file}")
-                return None
-
-            with open(doc_file, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            # Load metadata
+            # Load metadata first to determine file type
             metadata_file = self.metadata_dir / f"{doc_id}.json"
             if metadata_file.exists():
                 with open(metadata_file, "r", encoding="utf-8") as f:
                     metadata = json.load(f)
             else:
                 metadata = self.index[doc_id]
+
+            # Determine file extension and binary status
+            is_binary = metadata.get("is_binary", False)
+            file_extension = metadata.get("file_extension", ".txt")
+
+            # Load content
+            doc_file = self.documents_dir / f"{doc_id}{file_extension}"
+            if not doc_file.exists():
+                # Fallback to .txt for old documents
+                doc_file = self.documents_dir / f"{doc_id}.txt"
+                if not doc_file.exists():
+                    logger.warning(f"Document file not found: {doc_file}")
+                    return None
+
+            if is_binary:
+                with open(doc_file, "rb") as f:
+                    content: Union[str, bytes] = f.read()
+            else:
+                with open(doc_file, "r", encoding="utf-8") as f:
+                    content = f.read()
 
             return {"id": doc_id, "content": content, **metadata}
 
@@ -192,12 +227,21 @@ class DocumentManager:
                     results[doc_id] = False
                     continue
 
+                # Get file extension from index or metadata
+                index_data = self.index[doc_id]
+                file_extension = index_data.get("file_extension", ".txt")
+
                 # Delete files
-                doc_file = self.documents_dir / f"{doc_id}.txt"
+                doc_file = self.documents_dir / f"{doc_id}{file_extension}"
+                # Also try .txt for backward compatibility
+                doc_file_txt = self.documents_dir / f"{doc_id}.txt"
                 metadata_file = self.metadata_dir / f"{doc_id}.json"
 
                 if doc_file.exists():
                     doc_file.unlink()
+                elif doc_file_txt.exists():
+                    doc_file_txt.unlink()
+
                 if metadata_file.exists():
                     metadata_file.unlink()
 

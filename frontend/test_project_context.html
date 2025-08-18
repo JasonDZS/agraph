@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Project Context</title>
+</head>
+<body>
+    <h1>Test Project Context for Knowledge Graph</h1>
+    <button onclick="testProjectContext()">Test Project Context</button>
+    <div id="result"></div>
+
+    <script>
+        async function testProjectContext() {
+            const resultDiv = document.getElementById('result');
+
+            try {
+                // Test visualization data API
+                const response = await fetch('http://localhost:8000/knowledge-graph/visualization-data?project_name=finance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        include_clusters: true,
+                        max_entities: 10,
+                        max_relations: 20,
+                        min_confidence: 0.1
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <h3>✅ Success!</h3>
+                        <p>Status: ${data.status}</p>
+                        <p>Message: ${data.message}</p>
+                        <p>Nodes: ${data.data?.nodes?.length || 0}</p>
+                        <p>Edges: ${data.data?.edges?.length || 0}</p>
+                        <p>Clusters: ${data.data?.clusters?.length || 0}</p>
+                    `;
+                } else {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `
+                        <h3>❌ Error!</h3>
+                        <p>Status: ${response.status}</p>
+                        <p>Error: ${JSON.stringify(error, null, 2)}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>❌ Network Error!</h3>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
