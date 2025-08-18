@@ -132,3 +132,4 @@ workdir/
 CLAUDE.md
 .idea/
 .vscode/
+node_modules/

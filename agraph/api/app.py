@@ -1,5 +1,6 @@
 """FastAPI application for AGraph."""
 
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -43,6 +44,29 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log HTTP requests."""
+    start_time = time.time()
+    
+    # Get client IP
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Calculate response time
+    process_time = time.time() - start_time
+    
+    # Log request
+    logger.info(
+        f"{client_ip} - \"{request.method} {request.url.path}\" "
+        f"{response.status_code} - {process_time:.3f}s"
+    )
+    
+    return response
 
 # Add CORS middleware
 app.add_middleware(

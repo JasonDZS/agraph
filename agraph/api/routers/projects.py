@@ -170,7 +170,7 @@ async def get_project_info(project_name: str) -> ProjectResponse:
         stats = {
             "project_exists": project_dir.exists(),
             "document_count": (
-                len(list(doc_storage_dir.glob("**/*.txt"))) if doc_storage_dir.exists() else 0
+                len([f for f in doc_storage_dir.glob("**/*") if f.is_file()]) if doc_storage_dir.exists() else 0
             ),
             "has_vector_db": vector_db_dir.exists() and any(vector_db_dir.iterdir()),
             "cache_size": len(list(cache_dir.glob("**/*"))) if cache_dir.exists() else 0,
@@ -266,7 +266,7 @@ async def get_projects_overview(
 
                     stats: Dict[str, Any] = {
                         "document_count": (
-                            len(list(doc_storage_dir.glob("**/*")))
+                            len([f for f in doc_storage_dir.glob("**/*") if f.is_file()])
                             if doc_storage_dir.exists()
                             else 0
                         ),
