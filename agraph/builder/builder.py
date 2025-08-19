@@ -474,12 +474,6 @@ class KnowledgeGraphBuilder:
             self.cache_manager.update_build_status(error_message=str(e))
             raise
 
-    # Removed - functionality moved to RelationHandler
-
-    # Removed - functionality moved to ClusterHandler
-
-    # Removed - functionality moved to GraphAssembler
-
     # User interaction methods
     def get_chunks_for_editing(self) -> List[TextChunk]:
         """Get text chunks for user editing."""

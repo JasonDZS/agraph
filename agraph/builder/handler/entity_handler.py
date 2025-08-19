@@ -67,6 +67,14 @@ class EntityHandler:
             if cached_entities is not None:
                 all_entities.extend(cached_entities)
                 cached_entities_count += len(cached_entities)
+
+                # Update text chunks with cached entity references (bidirectional linking)
+                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                for entity in cached_entities:
+                    for chunk_id in entity.text_chunks:
+                        if chunk_id in chunk_map:
+                            chunk_map[chunk_id].entities.add(entity.id)
+
                 logger.debug(f"Using cached entities for {doc_id}: {len(cached_entities)} entities")
             else:
                 chunks_to_process.extend(doc_chunks)
@@ -100,6 +108,13 @@ class EntityHandler:
                     doc_entities = extraction_result if extraction_result is not None else []
 
                 all_entities.extend(doc_entities)
+
+                # Update text chunks with entity references (bidirectional linking)
+                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                for entity in doc_entities:
+                    for chunk_id in entity.text_chunks:
+                        if chunk_id in chunk_map:
+                            chunk_map[chunk_id].entities.add(entity.id)
 
                 # Cache entities for this document
                 doc_entities_id = self.cache_manager.backend.generate_key(

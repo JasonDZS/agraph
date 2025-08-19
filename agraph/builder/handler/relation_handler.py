@@ -121,6 +121,14 @@ class RelationHandler:
 
                 all_relations.extend(cached_relations)
                 cached_relations_count += len(cached_relations)
+
+                # Update text chunks with cached relation references (bidirectional linking)
+                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                for relation in cached_relations:
+                    for chunk_id in relation.text_chunks:
+                        if chunk_id in chunk_map:
+                            chunk_map[chunk_id].relations.add(relation.id)
+
                 logger.debug(
                     f"Using cached relations for {doc_id}: {len(cached_relations)} relations"
                 )
@@ -152,6 +160,13 @@ class RelationHandler:
                     doc_relations = extraction_result if extraction_result is not None else []
 
                 all_relations.extend(doc_relations)
+
+                # Update text chunks with relation references (bidirectional linking)
+                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                for relation in doc_relations:
+                    for chunk_id in relation.text_chunks:
+                        if chunk_id in chunk_map:
+                            chunk_map[chunk_id].relations.add(relation.id)
 
                 # Cache relations for this document with entity context
                 doc_input = (doc_chunks, doc_entities)
