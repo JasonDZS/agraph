@@ -299,8 +299,52 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             raise VectorStoreError(f"Failed to add entity {entity.id}: {e}") from e
 
     async def update_entity(self, entity: Entity, embedding: Optional[List[float]] = None) -> bool:
-        """Update entity information."""
-        return await self.add_entity(entity, embedding)
+        """Update entity information with incremental changes."""
+        try:
+            # Get existing entity
+            existing_entity = await self.get_entity(entity.id)
+            if not existing_entity:
+                # Entity doesn't exist, create new one
+                return await self.add_entity(entity, embedding)
+
+            # Merge updates with existing data
+            updated_entity = Entity(
+                id=entity.id,
+                name=entity.name if entity.name else existing_entity.name,
+                entity_type=(
+                    entity.entity_type if entity.entity_type else existing_entity.entity_type
+                ),
+                description=(
+                    entity.description if entity.description else existing_entity.description
+                ),
+                properties={**existing_entity.properties, **entity.properties},
+                aliases=(
+                    list(set(existing_entity.aliases + entity.aliases))
+                    if entity.aliases
+                    else existing_entity.aliases
+                ),
+                confidence=(
+                    entity.confidence if entity.confidence != 1.0 else existing_entity.confidence
+                ),
+                source=entity.source if entity.source else existing_entity.source,
+                text_chunks=existing_entity.text_chunks.union(entity.text_chunks),
+                created_at=existing_entity.created_at,  # Preserve original creation time
+                updated_at=datetime.now(),  # Update modification time
+            )
+
+            # Save the merged entity
+            collection = self._get_collection("entity")
+            entity_id, document, metadata = self._prepare_entity_data(updated_entity)
+
+            collection.upsert(
+                ids=[entity_id],
+                documents=[document],
+                metadatas=[metadata],
+                embeddings=[embedding] if embedding is not None else None,
+            )
+            return True
+        except Exception as e:
+            raise VectorStoreError(f"Failed to update entity {entity.id}: {e}") from e
 
     async def delete_entity(self, entity_id: str) -> bool:
         """Delete entity."""
@@ -398,8 +442,56 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
     async def update_relation(
         self, relation: Relation, embedding: Optional[List[float]] = None
     ) -> bool:
-        """Update relation information."""
-        return await self.add_relation(relation, embedding)
+        """Update relation information with incremental changes."""
+        try:
+            # Get existing relation
+            existing_relation = await self.get_relation(relation.id)
+            if not existing_relation:
+                # Relation doesn't exist, create new one
+                return await self.add_relation(relation, embedding)
+
+            # Merge updates with existing data
+            updated_relation = Relation(
+                id=relation.id,
+                head_entity=(
+                    relation.head_entity if relation.head_entity else existing_relation.head_entity
+                ),
+                tail_entity=(
+                    relation.tail_entity if relation.tail_entity else existing_relation.tail_entity
+                ),
+                relation_type=(
+                    relation.relation_type
+                    if relation.relation_type
+                    else existing_relation.relation_type
+                ),
+                description=(
+                    relation.description if relation.description else existing_relation.description
+                ),
+                properties={**existing_relation.properties, **relation.properties},
+                confidence=(
+                    relation.confidence
+                    if relation.confidence != 0.8
+                    else existing_relation.confidence
+                ),
+                source=relation.source if relation.source else existing_relation.source,
+                text_chunks=existing_relation.text_chunks.union(relation.text_chunks),
+                created_at=existing_relation.created_at,  # Preserve original creation time
+                updated_at=datetime.now(),  # Update modification time
+            )
+
+            # Save the merged relation
+            collection = self._get_collection("relation")
+            relation_id, document, metadata = self._prepare_relation_data(updated_relation)
+
+            collection.upsert(
+                ids=[relation_id],
+                documents=[document],
+                metadatas=[metadata],
+                embeddings=[embedding] if embedding is not None else None,
+            )
+            return True
+        except Exception as e:
+            raise VectorStoreError(f"Failed to update relation {relation.id}: {e}") from e
 
     async def delete_relation(self, relation_id: str) -> bool:
         """Delete relation."""
@@ -536,8 +628,65 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
     async def update_cluster(
         self, cluster: Cluster, embedding: Optional[List[float]] = None
     ) -> bool:
-        """Update cluster information."""
-        return await self.add_cluster(cluster, embedding)
+        """Update cluster information with incremental changes."""
+        try:
+            # Get existing cluster
+            existing_cluster = await self.get_cluster(cluster.id)
+            if not existing_cluster:
+                # Cluster doesn't exist, create new one
+                return await self.add_cluster(cluster, embedding)
+
+            # Merge updates with existing data
+            updated_cluster = Cluster(
+                id=cluster.id,
+                name=cluster.name if cluster.name else existing_cluster.name,
+                cluster_type=(
+                    cluster.cluster_type if cluster.cluster_type else existing_cluster.cluster_type
+                ),
+                description=(
+                    cluster.description if cluster.description else existing_cluster.description
+                ),
+                entities=existing_cluster.entities.union(cluster.entities),
+                relations=existing_cluster.relations.union(cluster.relations),
+                centroid_entity_id=(
+                    cluster.centroid_entity_id
+                    if cluster.centroid_entity_id
+                    else existing_cluster.centroid_entity_id
+                ),
+                parent_cluster_id=(
+                    cluster.parent_cluster_id
+                    if cluster.parent_cluster_id
+                    else existing_cluster.parent_cluster_id
+                ),
+                child_clusters=existing_cluster.child_clusters.union(cluster.child_clusters),
+                cohesion_score=(
+                    cluster.cohesion_score
+                    if cluster.cohesion_score != 0.0
+                    else existing_cluster.cohesion_score
+                ),
+                properties={**existing_cluster.properties, **cluster.properties},
+                confidence=(
+                    cluster.confidence if cluster.confidence != 0.8 else existing_cluster.confidence
+                ),
+                source=cluster.source if cluster.source else existing_cluster.source,
+                text_chunks=existing_cluster.text_chunks.union(cluster.text_chunks),
+                created_at=existing_cluster.created_at,  # Preserve original creation time
+                updated_at=datetime.now(),  # Update modification time
+            )
+
+            # Save the merged cluster
+            collection = self._get_collection("cluster")
+            cluster_id, document, metadata = self._prepare_cluster_data(updated_cluster)
+
+            collection.upsert(
+                ids=[cluster_id],
+                documents=[document],
+                metadatas=[metadata],
+                embeddings=[embedding] if embedding is not None else None,
+            )
+            return True
+        except Exception as e:
+            raise VectorStoreError(f"Failed to update cluster {cluster.id}: {e}") from e
 
     async def delete_cluster(self, cluster_id: str) -> bool:
         """Delete cluster."""
@@ -666,8 +815,59 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
     async def update_text_chunk(
         self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
     ) -> bool:
-        """Update text chunk information."""
-        return await self.add_text_chunk(text_chunk, embedding)
+        """Update text chunk information with incremental changes."""
+        try:
+            # Get existing text chunk
+            existing_chunk = await self.get_text_chunk(text_chunk.id)
+            if not existing_chunk:
+                # Text chunk doesn't exist, create new one
+                return await self.add_text_chunk(text_chunk, embedding)
+
+            # Merge updates with existing data
+            updated_chunk = TextChunk(
+                id=text_chunk.id,
+                content=text_chunk.content if text_chunk.content else existing_chunk.content,
+                title=text_chunk.title if text_chunk.title else existing_chunk.title,
+                source=text_chunk.source if text_chunk.source else existing_chunk.source,
+                start_index=(
+                    text_chunk.start_index
+                    if text_chunk.start_index is not None
+                    else existing_chunk.start_index
+                ),
+                end_index=(
+                    text_chunk.end_index
+                    if text_chunk.end_index is not None
+                    else existing_chunk.end_index
+                ),
+                chunk_type=(
+                    text_chunk.chunk_type if text_chunk.chunk_type else existing_chunk.chunk_type
+                ),
+                language=text_chunk.language if text_chunk.language else existing_chunk.language,
+                confidence=(
+                    text_chunk.confidence
+                    if text_chunk.confidence != 1.0
+                    else existing_chunk.confidence
+                ),
+                metadata={**existing_chunk.metadata, **text_chunk.metadata},
+                entities=existing_chunk.entities.union(text_chunk.entities),
+                relations=existing_chunk.relations.union(text_chunk.relations),
+                created_at=existing_chunk.created_at,  # Preserve original creation time
+                updated_at=datetime.now(),  # Update modification time
+            )
+
+            # Save the merged text chunk
+            collection = self._get_collection("text_chunk")
+            chunk_id, document, metadata = self._prepare_text_chunk_data(updated_chunk)
+
+            collection.upsert(
+                ids=[chunk_id],
+                documents=[document],
+                metadatas=[metadata],
+                embeddings=[embedding] if embedding is not None else None,
+            )
+            return True
+        except Exception as e:
+            raise VectorStoreError(f"Failed to update text_chunk {text_chunk.id}: {e}") from e
 
     async def delete_text_chunk(self, chunk_id: str) -> bool:
         """Delete text chunk."""
