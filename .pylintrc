@@ -31,7 +31,8 @@ disable=
     line-too-long,
     invalid-name,
     redefined-outer-name,
-    duplicate-code
+    duplicate-code,
+    too-many-lines
 
 
 [REPORTS]
