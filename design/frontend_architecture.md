@@ -29,6 +29,153 @@
 - React-Flow (流程图)
 ```
 
+## 🎨 设计系统与配色方案
+
+### 品牌配色系统
+
+#### 主色系
+- **品牌主色**: `#1890ff` (Ant Design 蓝) - 主要按钮、链接、导航
+- **品牌辅色**: `#52c41a` (成功绿) - 成功状态、关系展示
+- **品牌强调色**: `#722ed1` (紫色) - 特殊功能、文本片段
+
+#### 功能色彩
+```css
+:root {
+  /* 主色系 */
+  --primary-color: #1890ff;
+  --primary-hover: #40a9ff;
+  --primary-active: #096dd9;
+
+  /* 辅助色 */
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #ff4d4f;
+  --info-color: #1890ff;
+
+  /* 中性色 */
+  --text-primary: #262626;
+  --text-secondary: #8c8c8c;
+  --text-disabled: #bfbfbf;
+  --border-color: #d9d9d9;
+  --background-color: #fafafa;
+  --card-background: #ffffff;
+}
+```
+
+#### 知识图谱专用配色
+```css
+/* 知识图谱可视化色彩 */
+:root {
+  --entity-color: #1890ff;        /* 实体节点 */
+  --relation-color: #52c41a;      /* 关系连线 */
+  --text-chunk-color: #722ed1;    /* 文本片段 */
+  --highlight-color: #ff7a45;     /* 选中高亮 */
+  --cluster-color: #13c2c2;       /* 实体集群 */
+}
+```
+
+#### 暗色主题配色
+```css
+[data-theme='dark'] {
+  --primary-color: #177ddc;
+  --success-color: #49aa19;
+  --warning-color: #d89614;
+  --error-color: #dc4446;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a6a6a6;
+  --text-disabled: #595959;
+  --border-color: #434343;
+  --background-color: #141414;
+  --card-background: #1f1f1f;
+}
+```
+
+### 组件色彩应用规范
+
+#### 实体类型配色映射
+```typescript
+export const entityTypeColors = {
+  person: '#1890ff',        // 人物 - 蓝色
+  organization: '#52c41a',  // 组织 - 绿色
+  location: '#722ed1',      // 地点 - 紫色
+  concept: '#fa8c16',       // 概念 - 橙色
+  event: '#eb2f96',         // 事件 - 粉色
+  time: '#13c2c2',          // 时间 - 青色
+  document: '#faad14',      // 文档 - 黄色
+  product: '#f759ab',       // 产品 - 品红
+} as const;
+```
+
+#### 关系类型配色映射
+```typescript
+export const relationTypeColors = {
+  contains: '#52c41a',      // 包含关系 - 绿色
+  belongs_to: '#1890ff',    // 归属关系 - 蓝色
+  references: '#722ed1',    // 引用关系 - 紫色
+  similar_to: '#fa8c16',    // 相似关系 - 橙色
+  depends_on: '#eb2f96',    // 依赖关系 - 粉色
+  related_to: '#13c2c2',    // 相关关系 - 青色
+} as const;
+```
+
+### 主题系统实现
+
+#### CSS 变量系统
+```css
+/* styles/variables.css */
+:root {
+  /* 间距系统 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* 字体系统 */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+
+  /* 圆角系统 */
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 1px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+```
+
+#### 主题切换工具
+```typescript
+// utils/theme.ts
+export type Theme = 'light' | 'dark';
+
+export const themeManager = {
+  setTheme(theme: Theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('agraph-theme', theme);
+  },
+
+  getTheme(): Theme {
+    const saved = localStorage.getItem('agraph-theme') as Theme;
+    return saved || 'light';
+  },
+
+  toggleTheme() {
+    const current = this.getTheme();
+    const next = current === 'light' ? 'dark' : 'light';
+    this.setTheme(next);
+    return next;
+  }
+};
+```
+
 ## 项目结构
 
 ```

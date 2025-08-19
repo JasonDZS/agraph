@@ -73,7 +73,7 @@ const initialState = {
   isStreaming: false,
   error: null,
   currentContext: null,
-  showContext: false,
+  showContext: true,
 };
 
 export const useChatStore = create<ChatState>()(
@@ -288,9 +288,27 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 if (chunk.context) {
+                  // Transform context data structure from backend format to frontend format
+                  const transformedContext = {
+                    entities:
+                      chunk.context.entities?.map(
+                        (item: any) => item.entity || item
+                      ) || [],
+                    relations:
+                      chunk.context.relations?.map(
+                        (item: any) => item.relation || item
+                      ) || [],
+                    text_chunks:
+                      chunk.context.text_chunks?.map(
+                        (item: any) => item.text_chunk || item
+                      ) || [],
+                    reasoning: chunk.context.reasoning,
+                  };
+
                   set(
                     {
-                      currentContext: chunk.context,
+                      currentContext: transformedContext,
+                      showContext: true, // Auto-show context when available
                     },
                     false,
                     'sendMessage:updateContext'

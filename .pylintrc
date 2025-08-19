@@ -21,6 +21,7 @@ disable=
     too-many-locals,
     too-many-branches,
     too-many-statements,
+    too-many-positional-arguments,
     broad-except,
     unused-argument,
     import-error,

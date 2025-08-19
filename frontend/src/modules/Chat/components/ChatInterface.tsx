@@ -29,6 +29,8 @@ import {
   InfoCircleOutlined,
   ClearOutlined,
   MessageOutlined,
+  LeftOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import { ChatInterfaceProps, SendMessageOptions } from '../types';
 import { useStreamChat } from '../hooks/useStreamChat';
@@ -42,12 +44,14 @@ const { confirm } = Modal;
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   height = 600,
-  showContext = true,
+  showContext: showContextProp = true,
   defaultSettings = {},
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [contextCollapsed, setContextCollapsed] = useState(false);
+  const contextWidth = 600; // Fixed width
   const [settings, setSettings] = useState<SendMessageOptions>({
     entity_top_k: 5,
     relation_top_k: 5,
@@ -66,7 +70,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     isStreaming,
     error,
     currentContext,
-    showContext: contextVisible,
+    showContext,
     hasMessages,
     hasConversations,
     canRegenerate,
@@ -97,6 +101,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       inputRef.current.focus();
     }
   }, [isStreaming]);
+
+  // Handle responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const containerWidth = window.innerWidth;
+      // On small screens, auto-collapse the context panel
+      if (
+        containerWidth < 1024 &&
+        !contextCollapsed &&
+        showContextProp &&
+        showContext
+      ) {
+        setContextCollapsed(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [contextCollapsed, showContextProp, showContext]);
+
+  const toggleContextPanel = () => {
+    setContextCollapsed(!contextCollapsed);
+  };
 
   const handleSendMessage = async () => {
     const content = inputValue.trim();
@@ -144,6 +173,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     regenerateResponse();
   };
 
+  const handleShowContextFromMessage = (context: any) => {
+    // 设置当前上下文并确保侧边栏显示
+    if (!showContext) {
+      toggleContext();
+    }
+    // 展开侧边栏如果它是折叠的
+    if (contextCollapsed) {
+      setContextCollapsed(false);
+    }
+  };
+
   const conversationMenuItems: MenuProps['items'] = [
     {
       key: 'settings',
@@ -158,11 +198,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       onClick: () => setShowHistory(true),
     },
     {
+      type: 'divider',
+    },
+    {
       key: 'context',
-      label: contextVisible ? '隐藏上下文' : '显示上下文',
+      label: showContext ? '隐藏参考信息' : '显示参考信息',
       icon: <InfoCircleOutlined />,
       onClick: toggleContext,
-      disabled: !currentContext,
+      disabled: !showContextProp || !currentContext,
+    },
+    {
+      key: 'context-collapse',
+      label: contextCollapsed ? '展开侧边栏' : '折叠侧边栏',
+      icon: contextCollapsed ? <RightOutlined /> : <LeftOutlined />,
+      onClick: toggleContextPanel,
+      disabled: !showContextProp || !showContext || !currentContext,
     },
     {
       type: 'divider',
@@ -177,9 +227,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   ];
 
   return (
-    <div style={{ height, display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        height: '100%', // Use full height of parent container
+        maxHeight: '100%', // Prevent expansion beyond parent
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        overflow: 'hidden', // Prevent root container from scrolling
+        overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+        overflowY: 'hidden', // Explicitly prevent vertical scrolling
+      }}
+    >
       {/* Header */}
-      <Header
+      <div
         style={{
           background: '#fff',
           borderBottom: '1px solid #f0f0f0',
@@ -188,6 +249,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           height: 64,
+          minHeight: 64,
+          maxHeight: 64,
+          flexShrink: 0, // Prevent header from shrinking
+          flexGrow: 0, // Prevent header from growing
+          zIndex: 100, // Local z-index for stacking context
+          overflow: 'hidden', // Prevent any scrolling
+          overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+          overflowY: 'hidden', // Explicitly prevent vertical scrolling
+          position: 'relative', // Ensure proper positioning
+          boxSizing: 'border-box', // Include padding in height calculation
+          marginRight:
+            showContextProp && showContext && currentContext
+              ? contextCollapsed
+                ? '48px'
+                : `${contextWidth}px`
+              : '0px',
+          transition: 'margin-right 0.3s ease',
         }}
       >
         <div>
@@ -220,18 +298,60 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             <Button icon={<SettingOutlined />} size="small" />
           </Dropdown>
         </Space>
-      </Header>
+      </div>
 
       {/* Content */}
-      <Layout style={{ flex: 1, background: '#fff' }}>
-        {/* Messages */}
-        <Content
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          background: '#fff',
+          overflow: 'hidden', // Prevent parent container from scrolling
+          overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+          overflowY: 'hidden', // Explicitly prevent vertical scrolling
+          minHeight: 0, // Allow flex shrinking
+          maxHeight: '100%', // Prevent expansion beyond parent
+          height: '100%', // Take full height of parent
+        }}
+      >
+        {/* Messages Area Container - Fixed size */}
+        <div
           style={{
-            padding: '16px',
-            overflow: 'auto',
+            flex: '1 1 0px', // Take remaining space, allow shrinking, base size 0
+            display: 'flex',
+            flexDirection: 'column',
             background: '#fafafa',
+            marginRight:
+              showContextProp && showContext && currentContext
+                ? contextCollapsed
+                  ? '48px'
+                  : `${contextWidth}px`
+                : '0px',
+            transition: 'margin-right 0.3s ease',
+            minHeight: 0, // Allow flex item to shrink
+            maxHeight: '100%', // Prevent expansion beyond container
+            height: 'auto', // Let flex control the height
+            position: 'relative', // Establish positioning context
+            overflow: 'hidden', // Container itself doesn't scroll
+            overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+            overflowY: 'hidden', // Explicitly prevent vertical scrolling
           }}
         >
+          {/* Scrollable Messages Content */}
+          <div
+            style={{
+              flex: '1 1 0px', // Take remaining space, allow shrinking, base size 0
+              padding: '16px',
+              paddingBottom: '16px',
+              overflow: 'hidden auto', // Only allow vertical scrolling of content
+              overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+              scrollBehavior: 'smooth', // Smooth scrolling for better UX
+              minHeight: 0, // Allow flex item to shrink
+              maxHeight: '100%', // Prevent expansion beyond container
+            }}
+          >
           {!hasMessages ? (
             <div
               style={{
@@ -280,6 +400,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       ? handleRegenerateResponse
                       : undefined
                   }
+                  onShowContext={handleShowContextFromMessage}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -298,58 +419,242 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <Text type="danger">{error}</Text>
             </Card>
           )}
-        </Content>
+          </div>
+        </div>
 
-        {/* Context Sidebar */}
-        {showContext && (
-          <Sider
-            width={400}
-            style={{
-              background: '#fff',
-              borderLeft: '1px solid #f0f0f0',
-            }}
-          >
-            <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
-              <ContextPanel
-                context={currentContext}
-                visible={contextVisible}
-                onClose={closeContext}
+      {/* Context Sidebar Container - Fixed positioned relative to entire chat */}
+      {showContextProp && showContext && currentContext && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'calc(64px + 64px)', // MainLayout Header + Chat Header
+            right: '0px',
+            bottom: '0px', // To viewport bottom
+            width: contextCollapsed ? '48px' : `${contextWidth}px`,
+            minWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
+            maxWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
+            transition: 'width 0.3s ease',
+            backgroundColor: '#fff',
+            borderLeft: '1px solid #f0f0f0',
+            zIndex: 1000,
+            overflow: 'hidden', // Container itself doesn't scroll
+            overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+            overflowY: 'hidden', // Explicitly prevent vertical scrolling
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+            {/* Collapse/Expand Button */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px', // Position within Context Sidebar
+                left: contextCollapsed ? '10px' : contextWidth - 40,
+                zIndex: 20,
+                transition: 'left 0.3s ease',
+              }}
+            >
+              <Button
+                type="text"
+                size="small"
+                icon={contextCollapsed ? <RightOutlined /> : <LeftOutlined />}
+                onClick={toggleContextPanel}
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  border: '1px solid #d9d9d9',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  borderRadius: '4px',
+                  width: '28px',
+                  height: '28px',
+                }}
+                title={contextCollapsed ? '展开参考信息' : '折叠参考信息'}
               />
             </div>
-          </Sider>
-        )}
-      </Layout>
 
-      {/* Input Area */}
-      <div
-        style={{
-          borderTop: '1px solid #f0f0f0',
-          padding: '16px',
-          background: '#fff',
-        }}
-      >
-        <Space.Compact style={{ width: '100%' }}>
-          <TextArea
-            ref={inputRef}
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={isStreaming ? '正在生成回答...' : '请输入您的问题...'}
-            disabled={isStreaming}
-            autoSize={{ minRows: 1, maxRows: 4 }}
-            style={{ resize: 'none' }}
-          />
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isStreaming}
-            loading={isStreaming}
-            style={{ height: 'auto' }}
-          >
-            发送
-          </Button>
-        </Space.Compact>
+            {/* Collapsed Preview - Fixed content */}
+            {contextCollapsed && currentContext && (
+              <div
+                style={{
+                  padding: '60px 8px 16px 8px', // Normal padding since we're inside Messages Area
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                  overflow: 'hidden', // No scrolling in collapsed preview
+                  overflowX: 'hidden',
+                  overflowY: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    writing: 'vertical-rl',
+                    textOrientation: 'mixed',
+                    fontSize: '12px',
+                    color: '#666',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  参考信息
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor:
+                        currentContext.entities?.length > 0
+                          ? '#1890ff'
+                          : '#f0f0f0',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                    }}
+                    title={`${currentContext.entities?.length || 0} 个实体`}
+                  >
+                    {currentContext.entities?.length || 0}
+                  </div>
+
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor:
+                        currentContext.relations?.length > 0
+                          ? '#52c41a'
+                          : '#f0f0f0',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                    }}
+                    title={`${currentContext.relations?.length || 0} 个关系`}
+                  >
+                    {currentContext.relations?.length || 0}
+                  </div>
+
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor:
+                        currentContext.text_chunks?.length > 0
+                          ? '#722ed1'
+                          : '#f0f0f0',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                    }}
+                    title={`${currentContext.text_chunks?.length || 0} 个文本片段`}
+                  >
+                    {currentContext.text_chunks?.length || 0}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Panel Content Container - Fixed size */}
+            {!contextCollapsed && (
+              <div
+                style={{
+                  flex: 1, // Take remaining space
+                  display: 'flex',
+                  flexDirection: 'column',
+                  paddingTop: '60px', // Give space for collapse button only
+                  overflow: 'hidden', // Container itself doesn't scroll
+                  maxHeight: '100%', // Prevent expansion
+                }}
+              >
+                {/* Scrollable Panel Content */}
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '16px',
+                    paddingTop: '0px', // Already has padding from parent
+                    overflow: 'hidden auto', // Only allow vertical scrolling of content
+                    overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+                    height: '100%', // Take full height of container
+                  }}
+                >
+                <ContextPanel
+                  context={currentContext}
+                  visible={showContext}
+                  onClose={closeContext}
+                />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Input Area - Fixed at bottom with dynamic width */}
+        <div
+          style={{
+            borderTop: '1px solid #f0f0f0',
+            padding: '16px',
+            background: '#fff',
+            flexShrink: 0, // Prevent input area from shrinking
+            flexGrow: 0, // Prevent input area from growing
+            marginRight:
+              showContextProp && showContext && currentContext
+                ? contextCollapsed
+                  ? '48px'
+                  : `${contextWidth}px`
+                : '0px',
+            transition: 'margin-right 0.3s ease',
+            overflow: 'hidden', // Prevent any scrolling in input area
+            overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+            overflowY: 'hidden', // Explicitly prevent vertical scrolling
+            minHeight: '80px', // Minimum height
+            maxHeight: '160px', // Maximum height for input area
+            position: 'relative', // Ensure proper positioning
+            boxSizing: 'border-box', // Include padding in height calculation
+          }}
+        >
+          <Space.Compact style={{ width: '100%' }}>
+            <TextArea
+              ref={inputRef}
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={
+                isStreaming ? '正在生成回答...' : '请输入您的问题...'
+              }
+              disabled={isStreaming}
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              style={{ resize: 'none' }}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isStreaming}
+              loading={isStreaming}
+              style={{ height: 'auto' }}
+            >
+              发送
+            </Button>
+          </Space.Compact>
+        </div>
       </div>
 
       {/* History Drawer */}

@@ -91,8 +91,14 @@ export interface TextChunk {
   source?: string;
   start_index?: number;
   end_index?: number;
-  entities: string[];
-  relations: string[];
+  metadata?: Record<string, any>;
+  chunk_type?: string;
+  language?: string;
+  confidence?: number;
+  entities?: string[];
+  relations?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Cluster {
@@ -176,9 +182,10 @@ export interface StreamChatChunk {
   partial_answer: string;
   answer?: string;
   context?: {
-    entities: Entity[];
-    relations: Relation[];
-    text_chunks: TextChunk[];
+    entities: Array<{ entity: Entity; score: number }> | Entity[];
+    relations: Array<{ relation: Relation; score: number }> | Relation[];
+    text_chunks: Array<{ text_chunk: TextChunk; score: number }> | TextChunk[];
+    reasoning?: string;
   };
   finished: boolean;
 }

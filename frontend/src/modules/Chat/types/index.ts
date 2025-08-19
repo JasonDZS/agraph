@@ -46,6 +46,7 @@ export interface MessageBubbleProps {
   context?: ChatContext;
   onRegenerate?: () => void;
   onCopy?: (content: string) => void;
+  onShowContext?: (context: ChatContext) => void;
 }
 
 export interface ContextPanelProps {

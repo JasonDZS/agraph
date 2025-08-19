@@ -4,14 +4,18 @@ import { Outlet } from 'react-router-dom';
 import Header from '../Header';
 import Sidebar from '../Sidebar';
 import { useProject } from '@/modules/Projects/hooks/useProject';
+import ProjectCreateModal from '@/modules/Projects/components/ProjectCreateModal';
+import type { EnhancedProject } from '@/modules/Projects/types/project';
 
 const { Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
   const { token } = theme.useToken();
-  const { loadProjects } = useProject();
+  const { loadProjects, createProject } = useProject();
 
   // Initialize projects on layout mount
   useEffect(() => {
@@ -26,6 +30,29 @@ const MainLayout = () => {
     setIsDarkMode(!isDarkMode);
   };
 
+  const handleCreateProject = () => {
+    setCreateModalVisible(true);
+  };
+
+  const handleCreateSuccess = async (project: EnhancedProject) => {
+    setCreateLoading(true);
+    try {
+      await createProject({
+        name: project.name,
+        description: project.description,
+      });
+      setCreateModalVisible(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateCancel = () => {
+    setCreateModalVisible(false);
+  };
+
   return (
     <ConfigProvider
       theme={{
@@ -35,12 +62,19 @@ const MainLayout = () => {
       <Layout style={{ minHeight: '100vh' }}>
         <Sidebar collapsed={collapsed} />
 
-        <Layout style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Layout
+          style={{
+            marginLeft: collapsed ? 80 : 240, // Add left margin for fixed sidebar
+            transition: 'margin-left 0.2s', // Smooth transition when collapsing
+            minHeight: '100vh',
+          }}
+        >
           <Header
             collapsed={collapsed}
             onToggleCollapsed={toggleCollapsed}
             isDarkMode={isDarkMode}
             onToggleTheme={toggleTheme}
+            onCreateProject={handleCreateProject}
           />
 
           <Content
@@ -49,15 +83,23 @@ const MainLayout = () => {
               padding: '24px',
               background: token.colorBgContainer,
               borderRadius: token.borderRadius,
-              minHeight: 'calc(100vh - 112px)', // 64px header + 32px margins + 16px padding
-              overflow: 'auto',
+              height: 'calc(100vh - 112px)', // 64px header + 32px margins + 16px padding
+              overflow: 'hidden', // 让子组件处理滚动
               flex: 1, // 确保内容区域占据可用空间
-              width: '100%', // 确保宽度为100%
+              display: 'flex', // 添加flex布局
+              flexDirection: 'column', // 垂直布局
             }}
           >
             <Outlet />
           </Content>
         </Layout>
+
+        <ProjectCreateModal
+          visible={createModalVisible}
+          onCancel={handleCreateCancel}
+          onSuccess={handleCreateSuccess}
+          confirmLoading={createLoading}
+        />
       </Layout>
     </ConfigProvider>
   );

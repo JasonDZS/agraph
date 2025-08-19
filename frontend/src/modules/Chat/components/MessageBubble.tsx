@@ -6,7 +6,6 @@ import {
   Space,
   Tooltip,
   Typography,
-  Modal,
   Badge,
 } from 'antd';
 import {
@@ -18,7 +17,7 @@ import {
   CheckOutlined,
 } from '@ant-design/icons';
 import { MessageBubbleProps } from '../types';
-import ContextPanel from './ContextPanel';
+import MarkdownRenderer from '@/components/Common/MarkdownRenderer';
 
 const { Text, Paragraph } = Typography;
 
@@ -29,9 +28,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   context,
   onRegenerate,
   onCopy,
+  onShowContext,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [showContext, setShowContext] = useState(false);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
@@ -56,7 +55,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const handleShowContext = () => {
-    setShowContext(true);
+    if (onShowContext && context) {
+      onShowContext(context);
+    }
   };
 
   const getMessageTime = () => {
@@ -117,29 +118,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           }}
         >
           <div>
-            <Paragraph
+            <MarkdownRenderer
+              content={message.content + (isStreaming && isAssistant ? ' ▌' : '')}
               style={{
                 margin: 0,
                 color: isUser ? 'white' : 'inherit',
                 wordBreak: 'break-word',
-                whiteSpace: 'pre-wrap',
+                fontSize: '14px',
+                lineHeight: '1.6',
               }}
-              copyable={false}
-            >
-              {message.content}
-              {isStreaming && isAssistant && (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: '8px',
-                    height: '16px',
-                    backgroundColor: 'currentColor',
-                    marginLeft: '4px',
-                    animation: 'blink 1s infinite',
-                  }}
-                />
-              )}
-            </Paragraph>
+              className="message-content"
+            />
 
             {/* Message actions */}
             <div
@@ -240,23 +229,63 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         />
       )}
 
-      {/* Context Modal */}
-      <Modal
-        title="消息上下文信息"
-        open={showContext}
-        onCancel={() => setShowContext(false)}
-        footer={null}
-        width={800}
-        style={{ top: 20 }}
-      >
-        <ContextPanel
-          context={context}
-          visible={showContext}
-          onClose={() => setShowContext(false)}
-        />
-      </Modal>
 
-      <style jsx>{`
+      <style jsx global>{`
+        .message-content {
+          font-family: inherit;
+        }
+
+        /* 用户消息中的所有文本为白色 */
+        .message-content p,
+        .message-content h1,
+        .message-content h2,
+        .message-content h3,
+        .message-content h4,
+        .message-content h5,
+        .message-content h6,
+        .message-content li,
+        .message-content span {
+          color: inherit !important;
+        }
+
+        /* 用户消息中的代码块样式调整 */
+        .message-content pre {
+          background-color: ${isUser ? 'rgba(255, 255, 255, 0.15)' : '#f6f8fa'} !important;
+          border: ${isUser ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #d0d7de'} !important;
+        }
+
+        .message-content code {
+          background-color: ${isUser ? 'rgba(255, 255, 255, 0.15)' : '#f6f8fa'} !important;
+          color: ${isUser ? 'rgba(255, 255, 255, 0.9)' : 'inherit'} !important;
+        }
+
+        /* 用户消息中的链接样式 */
+        .message-content a {
+          color: ${isUser ? 'rgba(255, 255, 255, 0.9)' : '#0969da'} !important;
+        }
+
+        /* 用户消息中的引用块样式 */
+        .message-content blockquote {
+          border-left-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+          color: ${isUser ? 'rgba(255, 255, 255, 0.8)' : '#656d76'} !important;
+        }
+
+        /* 用户消息中的表格样式 */
+        .message-content table,
+        .message-content th,
+        .message-content td {
+          border-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+        }
+
+        .message-content th {
+          background-color: ${isUser ? 'rgba(255, 255, 255, 0.1)' : '#f6f8fa'} !important;
+        }
+
+        /* 分割线样式 */
+        .message-content hr {
+          border-top-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+        }
+
         @keyframes blink {
           0%,
           50% {
