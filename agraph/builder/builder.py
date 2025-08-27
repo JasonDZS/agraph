@@ -613,3 +613,21 @@ class KnowledgeGraphBuilder:
     ) -> Optional[T]:
         """Get cached result for a step."""
         return self.cache_manager.get_step_result(step_name, input_data, expected_type)
+
+    async def aclose(self) -> None:
+        """Close all async resources."""
+        # Close entity extractor if it has aclose method
+        if hasattr(self.entity_extractor, "aclose"):
+            await self.entity_extractor.aclose()
+
+        # Close relation extractor if it has aclose method
+        if hasattr(self.relation_extractor, "aclose"):
+            await self.relation_extractor.aclose()
+
+    async def __aenter__(self) -> "KnowledgeGraphBuilder":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self) -> None:
+        """Async context manager exit."""
+        await self.aclose()

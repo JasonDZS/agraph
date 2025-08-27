@@ -209,12 +209,29 @@ Requirements:
                 temperature=self.settings.llm.temperature,
                 max_tokens=4096,
             )
+            content = response.choices[0].message.content
 
-            return response.choices[0].message.content or ""
+            if content and "</think>" in content:
+                return content.split("</think>")[-1] or ""
+
+            return content or ""
 
         except Exception as e:
             logger.error(f"Error calling LLM API: {e}")
             raise
+
+    async def aclose(self) -> None:
+        """Close the AsyncOpenAI client."""
+        if hasattr(self, "client") and self.client:
+            await self.client.close()
+
+    async def __aenter__(self) -> "EntityExtractor":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self) -> None:
+        """Async context manager exit."""
+        await self.aclose()
 
 
 class LLMRelationExtractor(RelationExtractor):
@@ -464,3 +481,16 @@ Requirements:
         except Exception as e:
             logger.error(f"Error calling LLM API: {e}")
             raise
+
+    async def aclose(self) -> None:
+        """Close the AsyncOpenAI client."""
+        if hasattr(self, "client") and self.client:
+            await self.client.close()
+
+    async def __aenter__(self) -> "RelationExtractor":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self) -> None:
+        """Async context manager exit."""
+        await self.aclose()

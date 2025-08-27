@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Type, TypeVar
 from ...base.clusters import Cluster
 from ...base.entities import Entity
 from ...base.graph import KnowledgeGraph
+from ...base.optimized_graph import OptimizedKnowledgeGraph
 from ...base.relations import Relation
 from ...base.text import TextChunk
 from ...config import CacheMetadata
@@ -265,7 +266,9 @@ class FileCacheBackend(CacheBackend):
 
     def _serialize_data(self, data: Any) -> Any:
         """Serialize data for JSON storage."""
-        if isinstance(data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph)):
+        if isinstance(
+            data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph, OptimizedKnowledgeGraph)
+        ):
             return {"_type": data.__class__.__name__, "_data": data.to_dict()}
         if isinstance(data, list):
             return [self._serialize_data(item) for item in data]
@@ -292,6 +295,8 @@ class FileCacheBackend(CacheBackend):
                 return TextChunk.from_dict(obj_data)  # type: ignore
             if obj_type == "KnowledgeGraph":
                 return KnowledgeGraph.from_dict(obj_data)  # type: ignore
+            if obj_type == "OptimizedKnowledgeGraph":
+                return OptimizedKnowledgeGraph.from_dict(obj_data)  # type: ignore
 
         if isinstance(data, list) and expected_type in [list, List]:
             # For lists, we need to handle entity resolution differently

@@ -13,12 +13,12 @@ from threading import RLock
 from typing import Any, Dict, List, Optional, Union
 
 from .clusters import Cluster
-from .content import TextChunk
 from .dao import DataAccessLayer
 from .entities import Entity
 from .interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
 from .relations import Relation
 from .result import ErrorCode, ErrorDetail, Result
+from .text import TextChunk
 from .types import ClusterType, EntityType, RelationType
 
 

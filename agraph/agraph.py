@@ -1077,6 +1077,10 @@ class AGraph:
                 self._background_tasks.clear()
                 logger.info("All background tasks completed")
 
+            # Close builder resources
+            if self.builder and hasattr(self.builder, "aclose"):
+                await self.builder.aclose()
+
             if self.vector_store:
                 await self.vector_store.close()
 
