@@ -32,7 +32,8 @@ disable=
     invalid-name,
     redefined-outer-name,
     duplicate-code,
-    too-many-lines
+    too-many-lines,
+    attribute-defined-outside-init
 
 
 [REPORTS]

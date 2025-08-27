@@ -46,6 +46,7 @@ const ProjectList: React.FC = () => {
     createProject,
     switchProject,
     deleteProject,
+    buildKnowledgeGraph,
   } = useProject();
 
   // Modal states
@@ -204,6 +205,22 @@ const ProjectList: React.FC = () => {
   const handleConfigProject = (projectName: string) => {
     setProjectToConfig(projectName);
     setShowConfigModal(true);
+  };
+
+  // Handle project knowledge graph build
+  const handleBuildKnowledgeGraph = async (
+    projectName: string,
+    request: any
+  ) => {
+    setOperationLoading(true);
+    try {
+      const result = await buildKnowledgeGraph(projectName, request);
+      if (result.success) {
+        // loadProjects will be called automatically after build
+      }
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
   return (
@@ -427,6 +444,7 @@ const ProjectList: React.FC = () => {
                   onSwitch={handleSwitchProject}
                   onDelete={handleDeleteProject}
                   onConfig={handleConfigProject}
+                  onBuild={handleBuildKnowledgeGraph}
                   isLoading={operationLoading}
                   showActions={true}
                 />

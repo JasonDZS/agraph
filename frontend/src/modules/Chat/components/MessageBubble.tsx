@@ -1,13 +1,5 @@
-import React, { useState } from 'react';
-import {
-  Avatar,
-  Button,
-  Card,
-  Space,
-  Tooltip,
-  Typography,
-  Badge,
-} from 'antd';
+import React, { useState, useMemo } from 'react';
+import { Avatar, Button, Card, Space, Tooltip, Typography, Badge, Collapse } from 'antd';
 import {
   UserOutlined,
   RobotOutlined,
@@ -15,6 +7,9 @@ import {
   ReloadOutlined,
   InfoCircleOutlined,
   CheckOutlined,
+  BulbOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons';
 import { MessageBubbleProps } from '../types';
 import MarkdownRenderer from '@/components/Common/MarkdownRenderer';
@@ -31,8 +26,90 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onShowContext,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [manualThinkingToggle, setManualThinkingToggle] = useState<boolean | null>(null);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+
+  // Parse think content from message with streaming support
+  const parsedMessage = useMemo(() => {
+    const content = message.content;
+    let thinkContent = '';
+    let mainContent = '';
+    let hasThinking = false;
+    let isInThinkBlock = false;
+    let hasOpenThinkTag = false;
+
+    // Check for think tags in streaming content
+    const openThinkIndex = content.indexOf('<think>');
+    const closeThinkIndex = content.indexOf('</think>');
+
+    if (openThinkIndex !== -1) {
+      hasThinking = true;
+      hasOpenThinkTag = true;
+
+      if (closeThinkIndex !== -1 && closeThinkIndex > openThinkIndex) {
+        // Complete think block found
+        const beforeThink = content.substring(0, openThinkIndex);
+        const thinkBlock = content.substring(openThinkIndex + 7, closeThinkIndex);
+        const afterThink = content.substring(closeThinkIndex + 8);
+
+        // Handle multiple think blocks
+        const remainingContent = afterThink;
+        const additionalMatches = remainingContent.match(/<think>([\s\S]*?)<\/think>/g);
+
+        thinkContent = thinkBlock.trim();
+        if (additionalMatches) {
+          const additionalThinkContent = additionalMatches
+            .map(match => match.replace(/<think>|<\/think>/g, '').trim())
+            .join('\n\n');
+          thinkContent = thinkContent + (thinkContent ? '\n\n' : '') + additionalThinkContent;
+        }
+
+        // Remove all complete think blocks from main content
+        mainContent = (beforeThink + remainingContent.replace(/<think>[\s\S]*?<\/think>/g, '')).trim();
+      } else {
+        // Incomplete think block (streaming in progress)
+        const beforeThink = content.substring(0, openThinkIndex);
+        const partialThinkContent = content.substring(openThinkIndex + 7);
+
+        thinkContent = partialThinkContent;
+        mainContent = beforeThink.trim();
+        isInThinkBlock = true;
+      }
+    } else {
+      // No think tags, treat as main content
+      mainContent = content;
+    }
+
+    return {
+      thinkContent,
+      mainContent,
+      hasThinking,
+      isInThinkBlock,
+      hasOpenThinkTag
+    };
+  }, [message.content]);
+
+  // Determine if thinking section should be shown
+  const showThinking = useMemo(() => {
+    if (!parsedMessage.hasThinking) return false;
+
+    // If user has manually toggled, always respect their choice
+    if (manualThinkingToggle !== null) {
+      console.log('Using manual toggle:', manualThinkingToggle);
+      return manualThinkingToggle;
+    }
+
+    // Auto-expand if there's any thinking content (streaming or complete)
+    console.log('Using auto expand for thinking content');
+    return parsedMessage.hasThinking;
+  }, [parsedMessage.hasThinking, manualThinkingToggle]);
+
+  const handleThinkingToggle = () => {
+    console.log('Think toggle clicked, current showThinking:', showThinking);
+    setManualThinkingToggle(!showThinking);
+    console.log('Set manualThinkingToggle to:', !showThinking);
+  };
 
   const handleCopy = async () => {
     if (onCopy) {
@@ -118,8 +195,79 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           }}
         >
           <div>
+            {/* Think content section */}
+            {parsedMessage.hasThinking && isAssistant && (
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 8px',
+                    backgroundColor: 'rgba(24, 144, 255, 0.1)',
+                    borderRadius: 6,
+                    border: '1px solid rgba(24, 144, 255, 0.2)',
+                    cursor: 'pointer',
+                    marginBottom: showThinking ? 8 : 0,
+                  }}
+                  onClick={handleThinkingToggle}
+                >
+                  <Space size="small">
+                    <BulbOutlined style={{ color: '#1890ff', fontSize: 14 }} />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: '#1890ff',
+                        fontWeight: 500,
+                      }}
+                    >
+                      思考过程
+                    </Text>
+                  </Space>
+                  {showThinking ? (
+                    <EyeInvisibleOutlined style={{ color: '#1890ff', fontSize: 14 }} />
+                  ) : (
+                    <EyeOutlined style={{ color: '#1890ff', fontSize: 14 }} />
+                  )}
+                </div>
+
+                {showThinking && (
+                  <Card
+                    size="small"
+                    style={{
+                      backgroundColor: '#fafafa',
+                      border: '1px solid #f0f0f0',
+                      borderRadius: 6,
+                    }}
+                    bodyStyle={{
+                      padding: '8px 12px',
+                    }}
+                  >
+                    <MarkdownRenderer
+                      content={
+                        parsedMessage.thinkContent +
+                        (isStreaming && parsedMessage.isInThinkBlock ? ' ▌' : '')
+                      }
+                      style={{
+                        margin: 0,
+                        fontSize: '13px',
+                        lineHeight: '1.5',
+                        color: '#666',
+                        wordBreak: 'break-word',
+                      }}
+                      className="think-content"
+                    />
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Main message content */}
             <MarkdownRenderer
-              content={message.content + (isStreaming && isAssistant ? ' ▌' : '')}
+              content={
+                parsedMessage.mainContent +
+                (isStreaming && isAssistant && !parsedMessage.isInThinkBlock ? ' ▌' : '')
+              }
               style={{
                 margin: 0,
                 color: isUser ? 'white' : 'inherit',
@@ -133,7 +281,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {/* Message actions */}
             <div
               style={{
-                marginTop: message.content ? 8 : 0,
+                marginTop: (parsedMessage.mainContent || parsedMessage.thinkContent) ? 8 : 0,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -229,9 +377,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         />
       )}
 
-
       <style jsx global>{`
         .message-content {
+          font-family: inherit;
+        }
+
+        .think-content {
           font-family: inherit;
         }
 
@@ -248,14 +399,52 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           color: inherit !important;
         }
 
+        /* Think content styling */
+        .think-content p,
+        .think-content h1,
+        .think-content h2,
+        .think-content h3,
+        .think-content h4,
+        .think-content h5,
+        .think-content h6,
+        .think-content li,
+        .think-content span {
+          color: #666 !important;
+        }
+
+        .think-content pre {
+          background-color: #f6f8fa !important;
+          border: 1px solid #e1e4e8 !important;
+        }
+
+        .think-content code {
+          background-color: #f6f8fa !important;
+          color: #666 !important;
+        }
+
+        .think-content a {
+          color: #0969da !important;
+        }
+
+        .think-content blockquote {
+          border-left-color: #e1e4e8 !important;
+          color: #656d76 !important;
+        }
+
         /* 用户消息中的代码块样式调整 */
         .message-content pre {
-          background-color: ${isUser ? 'rgba(255, 255, 255, 0.15)' : '#f6f8fa'} !important;
-          border: ${isUser ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #d0d7de'} !important;
+          background-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.15)'
+            : '#f6f8fa'} !important;
+          border: ${isUser
+            ? '1px solid rgba(255, 255, 255, 0.2)'
+            : '1px solid #d0d7de'} !important;
         }
 
         .message-content code {
-          background-color: ${isUser ? 'rgba(255, 255, 255, 0.15)' : '#f6f8fa'} !important;
+          background-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.15)'
+            : '#f6f8fa'} !important;
           color: ${isUser ? 'rgba(255, 255, 255, 0.9)' : 'inherit'} !important;
         }
 
@@ -266,7 +455,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
         /* 用户消息中的引用块样式 */
         .message-content blockquote {
-          border-left-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+          border-left-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.3)'
+            : '#d0d7de'} !important;
           color: ${isUser ? 'rgba(255, 255, 255, 0.8)' : '#656d76'} !important;
         }
 
@@ -274,16 +465,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         .message-content table,
         .message-content th,
         .message-content td {
-          border-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+          border-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.3)'
+            : '#d0d7de'} !important;
         }
 
         .message-content th {
-          background-color: ${isUser ? 'rgba(255, 255, 255, 0.1)' : '#f6f8fa'} !important;
+          background-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.1)'
+            : '#f6f8fa'} !important;
         }
 
         /* 分割线样式 */
         .message-content hr {
-          border-top-color: ${isUser ? 'rgba(255, 255, 255, 0.3)' : '#d0d7de'} !important;
+          border-top-color: ${isUser
+            ? 'rgba(255, 255, 255, 0.3)'
+            : '#d0d7de'} !important;
         }
 
         @keyframes blink {

@@ -20,12 +20,27 @@ export interface EnhancedProject extends BaseProject {
   updated_at?: string;
 }
 
+export interface KnowledgeGraphBuildRequest {
+  document_ids?: string[];
+  texts?: string[];
+  graph_name: string;
+  graph_description: string;
+  use_cache: boolean;
+  save_to_vector_store: boolean;
+  from_step?: string;
+  enable_graph: boolean;
+}
+
 export interface ProjectCardProps {
   project: EnhancedProject;
   onSelect?: (project: EnhancedProject) => void;
   onDelete?: (projectName: string) => void;
   onSwitch?: (projectName: string) => void;
   onConfig?: (projectName: string) => void;
+  onBuild?: (
+    projectName: string,
+    request: KnowledgeGraphBuildRequest
+  ) => Promise<void>;
   isSelected?: boolean;
   isLoading?: boolean;
   showActions?: boolean;

@@ -64,7 +64,9 @@ const ProjectDropdown = ({ onCreateProject }: ProjectDropdownProps) => {
         <Space>
           <FolderOutlined />
           <span>Default Workspace</span>
-          {!currentProject && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
+          {!currentProject && (
+            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          )}
         </Space>
       ),
       onClick: () => handleProjectSwitch(''),

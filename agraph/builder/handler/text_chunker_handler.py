@@ -2,7 +2,8 @@
 Text chunking handler for knowledge graph builder.
 """
 
-from typing import List
+from pathlib import Path
+from typing import List, Optional, Union
 
 from ...base.text import TextChunk
 from ...builder.cache import CacheManager
@@ -26,12 +27,18 @@ class TextChunkerHandler:
         self.config = config
         self.chunker = chunker
 
-    def chunk_texts(self, texts: List[str], use_cache: bool = True) -> List[TextChunk]:
+    def chunk_texts(
+        self,
+        texts: List[str],
+        use_cache: bool = True,
+        documents: Optional[List[Union[str, Path]]] = None,
+    ) -> List[TextChunk]:
         """Chunk texts into smaller pieces with incremental processing support.
 
         Args:
             texts: List of texts to chunk
             use_cache: Whether to use caching
+            documents: Optional list of document paths corresponding to texts
 
         Returns:
             List of text chunks
@@ -39,7 +46,7 @@ class TextChunkerHandler:
         logger.info(f"Chunking {len(texts)} texts with chunk size {self.config.chunk_size}")
 
         if not use_cache:
-            return self._chunk_all_texts(texts)
+            return self._chunk_all_texts(texts, documents)
 
         # Try incremental approach: check for cached chunks per text
         all_chunks = []
@@ -56,7 +63,9 @@ class TextChunkerHandler:
                 for chunk in cached_chunks:
                     if hasattr(chunk, "id"):
                         chunk.id = f"chunk_{i}_{chunk.id.split('_')[-1]}"
-                    if hasattr(chunk, "source"):
+                    if hasattr(chunk, "source") and documents:
+                        chunk.source = Path(documents[i]).name
+                    elif hasattr(chunk, "source"):
                         chunk.source = f"document_{i}"
                 all_chunks.extend(cached_chunks)
                 cached_chunks_map[i] = cached_chunks
@@ -75,13 +84,18 @@ class TextChunkerHandler:
 
                     text_chunks = []
                     for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
+                        source_name = (
+                            Path(documents[i]).name
+                            if documents and i < len(documents)
+                            else f"document_{i}"
+                        )
                         chunk = TextChunk(
                             id=f"chunk_{i}_{j}",
                             content=chunk_text,
                             title=f"Document {i} Chunk {j}",
                             start_index=start_idx,
                             end_index=end_idx,
-                            source=f"document_{i}",
+                            source=source_name,
                         )
                         text_chunks.append(chunk)
                         all_chunks.append(chunk)
@@ -109,7 +123,9 @@ class TextChunkerHandler:
 
         return all_chunks
 
-    def _chunk_all_texts(self, texts: List[str]) -> List[TextChunk]:
+    def _chunk_all_texts(
+        self, texts: List[str], documents: Optional[List[Union[str, Path]]] = None
+    ) -> List[TextChunk]:
         """Chunk all texts without caching (fallback method)."""
         all_chunks = []
 
@@ -120,13 +136,18 @@ class TextChunkerHandler:
                 logger.debug(f"Text {i+1} split into {len(chunks_with_positions)} chunks")
 
                 for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
+                    source_name = (
+                        Path(documents[i]).name
+                        if documents and i < len(documents)
+                        else f"document_{i}"
+                    )
                     chunk = TextChunk(
                         id=f"chunk_{i}_{j}",
                         content=chunk_text,
                         title=f"Document {i} Chunk {j}",
                         start_index=start_idx,
                         end_index=end_idx,
-                        source=f"document_{i}",
+                        source=source_name,
                     )
                     all_chunks.append(chunk)
 

@@ -1,11 +1,10 @@
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
 from loguru import logger as _logger  # pylint: disable=import-error
-
-from .config import settings
 
 PRINT_LEVEL = "INFO"
 
@@ -21,9 +20,12 @@ def define_log_level(
     formatted_date = current_date.strftime("%Y%m%d%H%M%S")
     log_name = f"{name}_{formatted_date}" if name else formatted_date  # name a log with prefix name
 
+    # Get workdir from environment or default to avoid circular imports
+    workdir = os.getenv("AGRAPH_WORKDIR", "workdir")
+
     _logger.remove()
     _logger.add(sys.stderr, level=print_level)
-    _logger.add(Path(settings.workdir) / f"logs/{log_name}.log", level=logfile_level)
+    _logger.add(Path(workdir) / f"logs/{log_name}.log", level=logfile_level)
     return _logger
 
 

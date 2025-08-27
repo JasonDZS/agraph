@@ -6,9 +6,10 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, TypeVar
 
-from ...config import CacheMetadata
+if TYPE_CHECKING:
+    from ...config import CacheMetadata
 
 T = TypeVar("T")
 
@@ -37,7 +38,7 @@ class CacheBackend(ABC):
         """
 
     @abstractmethod
-    def set(self, key: str, value: Any, metadata: Optional[CacheMetadata] = None) -> None:
+    def set(self, key: str, value: Any, metadata: Optional["CacheMetadata"] = None) -> None:
         """Set cached value.
 
         Args:
@@ -80,7 +81,7 @@ class CacheBackend(ABC):
         """
 
     @abstractmethod
-    def get_metadata(self, key: str) -> Optional[CacheMetadata]:
+    def get_metadata(self, key: str) -> Optional["CacheMetadata"]:
         """Get cache metadata.
 
         Args:
@@ -142,7 +143,7 @@ class CacheBackend(ABC):
         combined = "|".join(key_parts)
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def is_expired(self, metadata: CacheMetadata, ttl: int) -> bool:
+    def is_expired(self, metadata: "CacheMetadata", ttl: int) -> bool:
         """Check if cache entry is expired.
 
         Args:

@@ -1,0 +1,33 @@
+{
+  "_type": "KnowledgeGraph",
+  "_data": {
+    "id": "178b3e5d-cac1-43bb-9f84-2f0a98b8de66",
+    "name": "test2",
+    "description": "Knowledge graph generated from documents",
+    "entities": {},
+    "relations": {},
+    "clusters": {},
+    "text_chunks": {
+      "chunk_0_0": {
+        "id": "chunk_0_0",
+        "content": "Simple test text for from_step verification.",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 44,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-08-22T13:58:39.750543",
+        "updated_at": "2025-08-22T13:58:39.750543"
+      }
+    },
+    "metadata": {},
+    "created_at": "2025-08-22T13:58:39.753265",
+    "updated_at": "2025-08-22T13:58:39.753316"
+  }
+}

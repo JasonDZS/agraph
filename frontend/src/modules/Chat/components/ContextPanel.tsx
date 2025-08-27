@@ -272,7 +272,6 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     },
   ];
 
-
   return (
     <div
       style={{
@@ -297,9 +296,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         }}
       >
         <Space>
-          <InfoCircleOutlined
-            style={{ color: '#1890ff', fontSize: '16px' }}
-          />
+          <InfoCircleOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
           <Title level={5} style={{ margin: 0, color: '#1890ff' }}>
             📊 该回答基于以下知识图谱信息生成
           </Title>
@@ -329,13 +326,21 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             style={{
               cursor: 'pointer',
               padding: '8px 0',
-              borderBottom: activeTab === 'entities' ? '2px solid #1890ff' : '2px solid transparent',
-              transition: 'border-color 0.3s'
+              borderBottom:
+                activeTab === 'entities'
+                  ? '2px solid #1890ff'
+                  : '2px solid transparent',
+              transition: 'border-color 0.3s',
             }}
           >
             <Space>
               <NodeIndexOutlined style={{ color: '#1890ff' }} />
-              <Text strong style={{ color: activeTab === 'entities' ? '#1890ff' : '#666' }}>实体信息</Text>
+              <Text
+                strong
+                style={{ color: activeTab === 'entities' ? '#1890ff' : '#666' }}
+              >
+                实体信息
+              </Text>
               <Tag color="blue" size="small">
                 {entities.length}
               </Tag>
@@ -346,13 +351,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             style={{
               cursor: 'pointer',
               padding: '8px 0',
-              borderBottom: activeTab === 'relations' ? '2px solid #1890ff' : '2px solid transparent',
-              transition: 'border-color 0.3s'
+              borderBottom:
+                activeTab === 'relations'
+                  ? '2px solid #1890ff'
+                  : '2px solid transparent',
+              transition: 'border-color 0.3s',
             }}
           >
             <Space>
               <ShareAltOutlined style={{ color: '#52c41a' }} />
-              <Text strong style={{ color: activeTab === 'relations' ? '#1890ff' : '#666' }}>关系信息</Text>
+              <Text
+                strong
+                style={{
+                  color: activeTab === 'relations' ? '#1890ff' : '#666',
+                }}
+              >
+                关系信息
+              </Text>
               <Tag color="green" size="small">
                 {relations.length}
               </Tag>
@@ -363,13 +378,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             style={{
               cursor: 'pointer',
               padding: '8px 0',
-              borderBottom: activeTab === 'text_chunks' ? '2px solid #1890ff' : '2px solid transparent',
-              transition: 'border-color 0.3s'
+              borderBottom:
+                activeTab === 'text_chunks'
+                  ? '2px solid #1890ff'
+                  : '2px solid transparent',
+              transition: 'border-color 0.3s',
             }}
           >
             <Space>
               <FileTextOutlined style={{ color: '#722ed1' }} />
-              <Text strong style={{ color: activeTab === 'text_chunks' ? '#1890ff' : '#666' }}>文本片段</Text>
+              <Text
+                strong
+                style={{
+                  color: activeTab === 'text_chunks' ? '#1890ff' : '#666',
+                }}
+              >
+                文本片段
+              </Text>
               <Tag color="purple" size="small">
                 {text_chunks.length}
               </Tag>
@@ -381,13 +406,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               style={{
                 cursor: 'pointer',
                 padding: '8px 0',
-                borderBottom: activeTab === 'reasoning' ? '2px solid #1890ff' : '2px solid transparent',
-                transition: 'border-color 0.3s'
+                borderBottom:
+                  activeTab === 'reasoning'
+                    ? '2px solid #1890ff'
+                    : '2px solid transparent',
+                transition: 'border-color 0.3s',
               }}
             >
               <Space>
                 <InfoCircleOutlined style={{ color: '#fa8c16' }} />
-                <Text strong style={{ color: activeTab === 'reasoning' ? '#1890ff' : '#666' }}>推理过程</Text>
+                <Text
+                  strong
+                  style={{
+                    color: activeTab === 'reasoning' ? '#1890ff' : '#666',
+                  }}
+                >
+                  推理过程
+                </Text>
               </Space>
             </div>
           )}
@@ -442,7 +477,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           >
             <Table
               columns={textChunkColumns}
-              dataSource={text_chunks.map(chunk => ({ ...chunk, key: chunk.id }))}
+              dataSource={text_chunks.map(chunk => ({
+                ...chunk,
+                key: chunk.id,
+              }))}
               pagination={false}
               size="small"
               style={{ backgroundColor: 'transparent' }}

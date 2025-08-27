@@ -9,7 +9,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from ..logger import logger
+
+def _get_logger() -> Any:
+    """Get logger instance with lazy import to avoid circular imports."""
+    from ..logger import logger  # pylint: disable=import-outside-toplevel
+
+    return logger
 
 
 class DocumentProcessor(ABC):
@@ -112,26 +117,26 @@ class DocumentProcessor(ABC):
             PermissionError: If the file cannot be read due to permissions.
         """
         path = Path(file_path)
-        logger.debug(f"Validating file: {file_path}")
+        _get_logger().debug(f"Validating file: {file_path}")
 
         if not path.exists():
-            logger.error(f"File not found: {file_path}")
+            _get_logger().error(f"File not found: {file_path}")
             raise FileNotFoundError(f"File not found: {file_path}")
 
         if not path.is_file():
-            logger.error(f"Path is not a file: {file_path}")
+            _get_logger().error(f"Path is not a file: {file_path}")
             raise ValueError(f"Path is not a file: {file_path}")
 
         if not path.stat().st_size > 0:
-            logger.warning(f"File is empty: {file_path}")
+            _get_logger().warning(f"File is empty: {file_path}")
             raise ValueError(f"File is empty: {file_path}")
 
         # Check file permissions
         if not os.access(path, os.R_OK):
-            logger.error(f"File is not readable due to permissions: {file_path}")
+            _get_logger().error(f"File is not readable due to permissions: {file_path}")
             raise PermissionError(f"File is not readable: {file_path}")
 
-        logger.debug(f"File validation successful: {file_path}")
+        _get_logger().debug(f"File validation successful: {file_path}")
 
 
 class ProcessingError(Exception):

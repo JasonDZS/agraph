@@ -7,7 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ..logger import logger
+
+def _get_logger() -> Any:
+    """Get logger instance with lazy import to avoid circular imports."""
+    from ..logger import logger  # pylint: disable=import-outside-toplevel
+
+    return logger
 
 
 class DocumentManager:
@@ -36,7 +41,7 @@ class DocumentManager:
                 with open(self.index_file, "r", encoding="utf-8") as f:
                     self.index = json.load(f)
             except Exception as e:
-                logger.warning(f"Failed to load document index: {e}")
+                _get_logger().warning(f"Failed to load document index: {e}")
                 self.index = {}
         else:
             self.index = {}
@@ -47,7 +52,7 @@ class DocumentManager:
             with open(self.index_file, "w", encoding="utf-8") as f:
                 json.dump(self.index, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"Failed to save document index: {e}")
+            _get_logger().error(f"Failed to save document index: {e}")
 
     def _generate_document_id(self, content: Any, filename: Optional[str] = None) -> str:
         """Generate unique document ID based on content."""
@@ -124,7 +129,7 @@ class DocumentManager:
         }
         self._save_index()
 
-        logger.info(f"Document stored with ID: {doc_id} (binary: {is_binary})")
+        _get_logger().info(f"Document stored with ID: {doc_id} (binary: {is_binary})")
         return doc_id
 
     def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
@@ -151,7 +156,7 @@ class DocumentManager:
                 # Fallback to .txt for old documents
                 doc_file = self.documents_dir / f"{doc_id}.txt"
                 if not doc_file.exists():
-                    logger.warning(f"Document file not found: {doc_file}")
+                    _get_logger().warning(f"Document file not found: {doc_file}")
                     return None
 
             if is_binary:
@@ -164,7 +169,7 @@ class DocumentManager:
             return {"id": doc_id, "content": content, **metadata}
 
         except Exception as e:
-            logger.error(f"Failed to load document {doc_id}: {e}")
+            _get_logger().error(f"Failed to load document {doc_id}: {e}")
             return None
 
     def get_documents_by_ids(self, doc_ids: List[str]) -> List[Dict[str, Any]]:
@@ -175,7 +180,7 @@ class DocumentManager:
             if doc:
                 documents.append(doc)
             else:
-                logger.warning(f"Document not found: {doc_id}")
+                _get_logger().warning(f"Document not found: {doc_id}")
         return documents
 
     def list_documents(
@@ -249,10 +254,10 @@ class DocumentManager:
                 del self.index[doc_id]
                 results[doc_id] = True
 
-                logger.info(f"Document deleted: {doc_id}")
+                _get_logger().info(f"Document deleted: {doc_id}")
 
             except Exception as e:
-                logger.error(f"Failed to delete document {doc_id}: {e}")
+                _get_logger().error(f"Failed to delete document {doc_id}: {e}")
                 results[doc_id] = False
 
         self._save_index()

@@ -5,16 +5,12 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
+from ...base.entities import Entity
 from ...logger import logger
 from ...processor.factory import DocumentProcessorManager
-from ..dependencies import (
-    get_agraph_instance,
-    get_agraph_instance_dependency,
-    get_document_manager,
-    get_document_manager_dependency,
-)
+from ..dependencies import get_agraph_instance, get_document_manager
 from ..models import (
     KnowledgeGraphBuildRequest,
     KnowledgeGraphBuildResponse,
@@ -104,15 +100,12 @@ async def build_knowledge_graph(
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
-    doc_manager: Any = Depends(get_document_manager_dependency),
 ) -> KnowledgeGraphBuildResponse:
     """Build knowledge graph from stored documents or direct texts."""
     try:
-        # Use project-specific instances if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
-            doc_manager = get_document_manager(project_name)
+        # Get project-specific instances
+        agraph = await get_agraph_instance(project_name)
+        doc_manager = get_document_manager(project_name)
         texts_to_process = []
         document_info = []
 
@@ -236,15 +229,12 @@ async def update_knowledge_graph(
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
-    doc_manager: Any = Depends(get_document_manager_dependency),
 ) -> KnowledgeGraphUpdateResponse:
     """Update existing knowledge graph with additional documents or texts."""
     try:
-        # Use project-specific instances if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
-            doc_manager = get_document_manager(project_name)
+        # Get project-specific instances
+        agraph = await get_agraph_instance(project_name)
+        doc_manager = get_document_manager(project_name)
         if not agraph.has_knowledge_graph:
             raise HTTPException(
                 status_code=400,
@@ -327,6 +317,8 @@ async def update_knowledge_graph(
             f"Updating knowledge graph with {len(additional_texts)} additional text sources"
         )
 
+        # agraph.enable_knowledge_graph = request.enable_graph  # Commented out - attribute not found
+
         # Get current knowledge graph info
         current_kg = agraph.knowledge_graph
         if not current_kg:
@@ -399,13 +391,11 @@ async def get_knowledge_graph_status(
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
 ) -> KnowledgeGraphStatusResponse:
     """Get current knowledge graph status and statistics."""
     try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
         if not agraph.has_knowledge_graph:
             return KnowledgeGraphStatusResponse(
                 status=ResponseStatus.SUCCESS,
@@ -485,13 +475,11 @@ async def get_knowledge_graph(
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
 ) -> KnowledgeGraphGetResponse:
     """Get complete knowledge graph data."""
     try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
 
         if not agraph.has_knowledge_graph:
             raise HTTPException(
@@ -537,8 +525,8 @@ async def get_knowledge_graph(
             relations.append(
                 {
                     "id": relation.id,
-                    "head_entity_id": relation.head_entity.id,
-                    "tail_entity_id": relation.tail_entity.id,
+                    "head_entity_id": relation.head_entity.id if relation.head_entity else None,
+                    "tail_entity_id": relation.tail_entity.id if relation.tail_entity else None,
                     "relation_type": (
                         relation.relation_type.value
                         if hasattr(relation.relation_type, "value")
@@ -609,13 +597,11 @@ async def get_visualization_data(
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
 ) -> KnowledgeGraphVisualizationResponse:
     """Get knowledge graph data optimized for visualization."""
-    try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+    try:  # pylint: disable=too-many-nested-blocks
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
 
         if not agraph.has_knowledge_graph:
             raise HTTPException(
@@ -659,8 +645,12 @@ async def get_visualization_data(
         for relation in kg.relations.values():
             # Only include relations between filtered entities
             if (
-                relation.head_entity.id not in entity_ids
-                or relation.tail_entity.id not in entity_ids
+                not relation.head_entity
+                or not relation.tail_entity
+                or (
+                    relation.head_entity.id not in entity_ids
+                    or relation.tail_entity.id not in entity_ids
+                )
             ):
                 continue
             # Filter by relation type
@@ -710,8 +700,8 @@ async def get_visualization_data(
             edges.append(
                 {
                     "id": relation.id,
-                    "source": relation.head_entity.id,
-                    "target": relation.tail_entity.id,
+                    "source": relation.head_entity.id if relation.head_entity else None,
+                    "target": relation.tail_entity.id if relation.tail_entity else None,
                     "label": relation_type,
                     "relationType": relation_type,
                     "confidence": relation.confidence,
@@ -758,6 +748,61 @@ async def get_visualization_data(
                     )
             response_data["clusters"] = clusters
 
+        # Include text chunks if requested
+        if request.include_text_chunks:
+            text_chunks = []
+            for chunk in kg.text_chunks.values():
+                # Get all entities associated with this text chunk
+                chunk_entities = getattr(chunk, "entities", [])
+                all_chunk_entity_objs = []
+                filtered_chunk_entity_objs = []
+
+                if isinstance(chunk_entities, set):
+                    # If entities is a set of IDs, need to get the actual entity objects
+                    for entity_id in chunk_entities:
+                        chunk_entity: Optional[Entity] = kg.entities.get(entity_id)
+                        if chunk_entity is not None and hasattr(chunk_entity, "id"):
+                            all_chunk_entity_objs.append(chunk_entity)
+                            # Also track which entities are in the filtered set
+                            if chunk_entity.id in entity_ids:
+                                filtered_chunk_entity_objs.append(chunk_entity)
+                else:
+                    # entities is already a list of entity objects
+                    for chunk_entity in chunk_entities:
+                        if hasattr(chunk_entity, "id"):
+                            all_chunk_entity_objs.append(chunk_entity)
+                            # Also track which entities are in the filtered set
+                            if chunk_entity.id in entity_ids:
+                                filtered_chunk_entity_objs.append(chunk_entity)
+
+                # Include all text chunks, but mark which entities are in the filtered set
+                text_chunks.append(
+                    {
+                        "id": chunk.id,
+                        "content": chunk.content,
+                        "source": chunk.source,
+                        "start_index": chunk.start_index,
+                        "end_index": chunk.end_index,
+                        "entities": [entity.id for entity in all_chunk_entity_objs],
+                        "filtered_entities": [entity.id for entity in filtered_chunk_entity_objs],
+                        "relations": [],  # Add relations field for frontend compatibility
+                        "entity_details": [
+                            {
+                                "id": entity.id,
+                                "name": entity.name,
+                                "entity_type": (
+                                    entity.entity_type.value
+                                    if hasattr(entity.entity_type, "value")
+                                    else str(entity.entity_type)
+                                ),
+                                "in_filtered_set": entity.id in entity_ids,
+                            }
+                            for entity in all_chunk_entity_objs
+                        ],
+                    }
+                )
+            response_data["text_chunks"] = text_chunks
+
         return KnowledgeGraphVisualizationResponse(
             status=ResponseStatus.SUCCESS,
             message="Visualization data retrieved successfully",
@@ -771,19 +816,96 @@ async def get_visualization_data(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/text-chunks", response_model=Dict[str, Any])
+async def get_text_chunks(
+    project_name: Optional[str] = Query(
+        default=None, description="Project name for isolated knowledge graph"
+    ),
+    limit: Optional[int] = Query(default=None, description="Limit number of text chunks"),
+    offset: int = Query(default=0, description="Offset for pagination"),
+) -> Dict[str, Any]:
+    """Get all text chunks from the knowledge graph."""
+    try:
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
+
+        if not agraph.has_knowledge_graph:
+            raise HTTPException(
+                status_code=404, detail="No knowledge graph found. Please build one first."
+            )
+
+        kg = agraph.knowledge_graph
+        if not kg:
+            raise HTTPException(
+                status_code=500, detail="Knowledge graph exists but is not accessible"
+            )
+
+        # Get all text chunks
+        all_chunks = list(kg.text_chunks.values())
+        total_count = len(all_chunks)
+
+        # Apply pagination
+        start_idx = offset
+        if limit:
+            end_idx = start_idx + limit
+            paginated_chunks = all_chunks[start_idx:end_idx]
+        else:
+            paginated_chunks = all_chunks[start_idx:]
+            end_idx = len(all_chunks)
+
+        # Convert to API format
+        text_chunks = []
+        for chunk in paginated_chunks:
+            text_chunks.append(
+                {
+                    "id": chunk.id,
+                    "content": chunk.content,
+                    "source": chunk.source,
+                    "start_index": chunk.start_index,
+                    "end_index": chunk.end_index,
+                    "entities": list(chunk.entities) if hasattr(chunk, "entities") else [],
+                    "relations": list(chunk.relations) if hasattr(chunk, "relations") else [],
+                    "created_at": (
+                        chunk.created_at.isoformat() if hasattr(chunk, "created_at") else None
+                    ),
+                    "updated_at": (
+                        chunk.updated_at.isoformat() if hasattr(chunk, "updated_at") else None
+                    ),
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": f"Retrieved {len(text_chunks)} text chunks",
+            "data": {
+                "text_chunks": text_chunks,
+                "pagination": {
+                    "total": total_count,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": end_idx < total_count,
+                },
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get text chunks: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.post("/text-chunks", response_model=TextChunkSearchResponse)
 async def search_text_chunks(
     request: TextChunkSearchRequest,
     project_name: Optional[str] = Query(
         default=None, description="Project name for isolated knowledge graph"
     ),
-    agraph: Any = Depends(get_agraph_instance_dependency),
 ) -> TextChunkSearchResponse:
     """Search and retrieve text chunks from the knowledge graph."""
     try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
 
         if not agraph.has_knowledge_graph:
             raise HTTPException(
@@ -803,8 +925,8 @@ async def search_text_chunks(
         for chunk in all_chunks:
             # Filter by entity ID if provided
             if request.entity_id:
-                chunk_entity_ids = [entity.id for entity in chunk.entities]
-                if request.entity_id not in chunk_entity_ids:
+                # chunk.entities is a set of entity IDs (strings)
+                if request.entity_id not in chunk.entities:
                     continue
 
             # Filter by search query if provided
@@ -891,4 +1013,331 @@ async def search_text_chunks(
         raise
     except Exception as e:
         logger.error(f"Failed to search text chunks: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/entities", response_model=Dict[str, Any])
+async def get_entities(
+    project_name: Optional[str] = Query(
+        default=None, description="Project name for isolated knowledge graph"
+    ),
+    entity_type: Optional[str] = Query(default=None, description="Filter by entity type"),
+    limit: Optional[int] = Query(default=None, description="Limit number of entities"),
+    offset: int = Query(default=0, description="Offset for pagination"),
+) -> Dict[str, Any]:
+    """Get all entities from the knowledge graph."""
+    try:
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
+
+        if not agraph.has_knowledge_graph:
+            raise HTTPException(
+                status_code=404, detail="No knowledge graph found. Please build one first."
+            )
+
+        kg = agraph.knowledge_graph
+        if not kg:
+            raise HTTPException(
+                status_code=500, detail="Knowledge graph exists but is not accessible"
+            )
+
+        # Get all entities
+        all_entities = list(kg.entities.values())
+
+        # Filter by entity type if provided
+        if entity_type:
+            filtered_entities = []
+            for entity in all_entities:
+                entity_type_value = (
+                    entity.entity_type.value
+                    if hasattr(entity.entity_type, "value")
+                    else str(entity.entity_type)
+                )
+                if entity_type_value == entity_type:
+                    filtered_entities.append(entity)
+            all_entities = filtered_entities
+
+        total_count = len(all_entities)
+
+        # Apply pagination
+        start_idx = offset
+        if limit:
+            end_idx = start_idx + limit
+            paginated_entities = all_entities[start_idx:end_idx]
+        else:
+            paginated_entities = all_entities[start_idx:]
+            end_idx = len(all_entities)
+
+        # Convert to API format
+        entities = []
+        for entity in paginated_entities:
+            entities.append(
+                {
+                    "id": entity.id,
+                    "name": entity.name,
+                    "entity_type": (
+                        entity.entity_type.value
+                        if hasattr(entity.entity_type, "value")
+                        else str(entity.entity_type)
+                    ),
+                    "description": entity.description,
+                    "confidence": entity.confidence,
+                    "properties": entity.properties or {},
+                    "aliases": entity.aliases or [],
+                    "text_chunks": (
+                        list(entity.text_chunks) if hasattr(entity, "text_chunks") else []
+                    ),
+                    "created_at": (
+                        entity.created_at.isoformat() if hasattr(entity, "created_at") else None
+                    ),
+                    "updated_at": (
+                        entity.updated_at.isoformat() if hasattr(entity, "updated_at") else None
+                    ),
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": f"Retrieved {len(entities)} entities",
+            "data": {
+                "entities": entities,
+                "pagination": {
+                    "total": total_count,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": end_idx < total_count,
+                },
+                "filters": {
+                    "entity_type": entity_type,
+                },
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get entities: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/relations", response_model=Dict[str, Any])
+async def get_relations(
+    project_name: Optional[str] = Query(
+        default=None, description="Project name for isolated knowledge graph"
+    ),
+    relation_type: Optional[str] = Query(default=None, description="Filter by relation type"),
+    entity_id: Optional[str] = Query(
+        default=None, description="Filter by entity ID (head or tail)"
+    ),
+    limit: Optional[int] = Query(default=None, description="Limit number of relations"),
+    offset: int = Query(default=0, description="Offset for pagination"),
+) -> Dict[str, Any]:
+    """Get all relations from the knowledge graph."""
+    try:
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
+
+        if not agraph.has_knowledge_graph:
+            raise HTTPException(
+                status_code=404, detail="No knowledge graph found. Please build one first."
+            )
+
+        kg = agraph.knowledge_graph
+        if not kg:
+            raise HTTPException(
+                status_code=500, detail="Knowledge graph exists but is not accessible"
+            )
+
+        # Get all relations
+        all_relations = list(kg.relations.values())
+
+        # Filter by relation type if provided
+        if relation_type:
+            filtered_relations = []
+            for relation in all_relations:
+                relation_type_value = (
+                    relation.relation_type.value
+                    if hasattr(relation.relation_type, "value")
+                    else str(relation.relation_type)
+                )
+                if relation_type_value == relation_type:
+                    filtered_relations.append(relation)
+            all_relations = filtered_relations
+
+        # Filter by entity ID if provided
+        if entity_id:
+            filtered_relations = []
+            for relation in all_relations:
+                if (relation.head_entity and relation.head_entity.id == entity_id) or (
+                    relation.tail_entity and relation.tail_entity.id == entity_id
+                ):
+                    filtered_relations.append(relation)
+            all_relations = filtered_relations
+
+        total_count = len(all_relations)
+
+        # Apply pagination
+        start_idx = offset
+        if limit:
+            end_idx = start_idx + limit
+            paginated_relations = all_relations[start_idx:end_idx]
+        else:
+            paginated_relations = all_relations[start_idx:]
+            end_idx = len(all_relations)
+
+        # Convert to API format
+        relations = []
+        for relation in paginated_relations:
+            relations.append(
+                {
+                    "id": relation.id,
+                    "head_entity_id": relation.head_entity.id if relation.head_entity else None,
+                    "tail_entity_id": relation.tail_entity.id if relation.tail_entity else None,
+                    "head_entity_name": relation.head_entity.name if relation.head_entity else None,
+                    "tail_entity_name": relation.tail_entity.name if relation.tail_entity else None,
+                    "relation_type": (
+                        relation.relation_type.value
+                        if hasattr(relation.relation_type, "value")
+                        else str(relation.relation_type)
+                    ),
+                    "description": relation.description,
+                    "confidence": relation.confidence,
+                    "properties": relation.properties or {},
+                    "text_chunks": (
+                        list(relation.text_chunks) if hasattr(relation, "text_chunks") else []
+                    ),
+                    "created_at": (
+                        relation.created_at.isoformat() if hasattr(relation, "created_at") else None
+                    ),
+                    "updated_at": (
+                        relation.updated_at.isoformat() if hasattr(relation, "updated_at") else None
+                    ),
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": f"Retrieved {len(relations)} relations",
+            "data": {
+                "relations": relations,
+                "pagination": {
+                    "total": total_count,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": end_idx < total_count,
+                },
+                "filters": {
+                    "relation_type": relation_type,
+                    "entity_id": entity_id,
+                },
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get relations: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/clusters", response_model=Dict[str, Any])
+async def get_clusters(
+    project_name: Optional[str] = Query(
+        default=None, description="Project name for isolated knowledge graph"
+    ),
+    cluster_type: Optional[str] = Query(default=None, description="Filter by cluster type"),
+    limit: Optional[int] = Query(default=None, description="Limit number of clusters"),
+    offset: int = Query(default=0, description="Offset for pagination"),
+) -> Dict[str, Any]:
+    """Get all clusters from the knowledge graph."""
+    try:
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
+
+        if not agraph.has_knowledge_graph:
+            raise HTTPException(
+                status_code=404, detail="No knowledge graph found. Please build one first."
+            )
+
+        kg = agraph.knowledge_graph
+        if not kg:
+            raise HTTPException(
+                status_code=500, detail="Knowledge graph exists but is not accessible"
+            )
+
+        # Get all clusters
+        all_clusters = list(kg.clusters.values())
+
+        # Filter by cluster type if provided
+        if cluster_type:
+            filtered_clusters = []
+            for cluster in all_clusters:
+                cluster_type_value = (
+                    cluster.cluster_type.value
+                    if hasattr(cluster, "cluster_type") and hasattr(cluster.cluster_type, "value")
+                    else str(getattr(cluster, "cluster_type", ""))
+                )
+                if cluster_type_value == cluster_type:
+                    filtered_clusters.append(cluster)
+            all_clusters = filtered_clusters
+
+        total_count = len(all_clusters)
+
+        # Apply pagination
+        start_idx = offset
+        if limit:
+            end_idx = start_idx + limit
+            paginated_clusters = all_clusters[start_idx:end_idx]
+        else:
+            paginated_clusters = all_clusters[start_idx:]
+            end_idx = len(all_clusters)
+
+        # Convert to API format
+        clusters = []
+        for cluster in paginated_clusters:
+            clusters.append(
+                {
+                    "id": cluster.id,
+                    "name": cluster.name,
+                    "description": cluster.description,
+                    "cluster_type": (
+                        cluster.cluster_type.value
+                        if hasattr(cluster, "cluster_type")
+                        and hasattr(cluster.cluster_type, "value")
+                        else str(getattr(cluster, "cluster_type", ""))
+                    ),
+                    "entities": list(cluster.entities) if hasattr(cluster, "entities") else [],
+                    "relations": list(cluster.relations) if hasattr(cluster, "relations") else [],
+                    "confidence": getattr(cluster, "confidence", 1.0),
+                    "properties": getattr(cluster, "properties", {}),
+                    "created_at": (
+                        cluster.created_at.isoformat() if hasattr(cluster, "created_at") else None
+                    ),
+                    "updated_at": (
+                        cluster.updated_at.isoformat() if hasattr(cluster, "updated_at") else None
+                    ),
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": f"Retrieved {len(clusters)} clusters",
+            "data": {
+                "clusters": clusters,
+                "pagination": {
+                    "total": total_count,
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": end_idx < total_count,
+                },
+                "filters": {
+                    "cluster_type": cluster_type,
+                },
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get clusters: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -175,6 +175,7 @@ class KnowledgeGraphBuildRequest(BaseModel):
     use_cache: bool = True
     save_to_vector_store: bool = True
     from_step: Optional[str] = None
+    enable_graph: bool = True
 
 
 class KnowledgeGraphBuildResponse(BaseResponse):
@@ -223,6 +224,7 @@ class KnowledgeGraphVisualizationRequest(BaseModel):
     """Knowledge graph visualization data request."""
 
     include_clusters: bool = Field(default=True, description="Include cluster information")
+    include_text_chunks: bool = Field(default=False, description="Include text chunk information")
     max_entities: int = Field(default=500, description="Maximum number of entities to return")
     max_relations: int = Field(default=1000, description="Maximum number of relations to return")
     min_confidence: float = Field(default=0.0, description="Minimum confidence threshold")

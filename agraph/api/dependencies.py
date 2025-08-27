@@ -1,9 +1,10 @@
 """Shared dependencies for AGraph API."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from ..agraph import AGraph
-from ..config import BuilderConfig, get_project_paths, get_settings
+from ..base.instances import register_reset_callback
+from ..config import BuilderConfig, get_project_paths, get_settings, load_project_settings
 from .document_manager import DocumentManager
 
 # Project-specific instances cache
@@ -13,8 +14,22 @@ _document_managers: dict[str, DocumentManager] = {}
 
 async def get_agraph_instance(project_name: Optional[str] = None) -> AGraph:
     """Get or create AGraph instance for a specific project."""
-    settings = get_settings()
-    current_project = project_name or settings.current_project or "default"
+    from ..logger import logger  # pylint: disable=import-outside-toplevel
+
+    logger.info(f"Getting AGraph instance for project: {project_name or 'default'}")
+    logger.info(f"Current instances: {list(_agraph_instances.keys())}")
+    if project_name:
+        settings = load_project_settings(project_name)
+        current_project = project_name
+        logger.info(
+            f"Project settings loaded for {project_name}: model={settings.llm.model}, provider={settings.llm.provider}"
+        )
+    else:
+        settings = get_settings()
+        current_project = settings.current_project or "default"
+        logger.info(
+            f"Global settings loaded: model={settings.llm.model}, provider={settings.llm.provider}"
+        )
 
     # Use project-specific paths if project is specified
     if current_project != "default":
@@ -33,12 +48,42 @@ async def get_agraph_instance(project_name: Optional[str] = None) -> AGraph:
         existing_instance = _agraph_instances[current_project]
         # Verify the instance is still valid and has the correct collection name
         if existing_instance.collection_name == collection_name:
-            return existing_instance
-        # Collection name mismatch, close and remove old instance
+            # Check if the configuration has changed
+            current_config = existing_instance.config
+            # Also check AGraph instance settings
+            current_agraph_settings = existing_instance.settings
+
+            def _is_config_unchanged() -> bool:
+                """Check if configuration remains unchanged."""
+                return (
+                    current_config.llm_model == settings.llm.model
+                    and current_config.llm_provider == settings.llm.provider
+                    and current_config.chunk_size == settings.text.max_chunk_size
+                    and current_config.chunk_overlap == settings.text.chunk_overlap
+                    and current_agraph_settings.llm.temperature == settings.llm.temperature
+                    and current_agraph_settings.llm.max_tokens == settings.llm.max_tokens
+                    and current_agraph_settings.openai.api_key == settings.openai.api_key
+                    and current_agraph_settings.openai.api_base == settings.openai.api_base
+                )
+
+            if _is_config_unchanged():
+                return existing_instance
+        # Configuration changed or collection name mismatch, close and remove old instance
+        logger.info(
+            f"Configuration changed for project {current_project}, removing existing instance"
+        )
+        logger.info(f"Old model: {current_config.llm_model}, New model: {settings.llm.model}")
+        logger.info(
+            f"Old temperature: {current_agraph_settings.llm.temperature}, New temperature: {settings.llm.temperature}"
+        )
         await existing_instance.close()
         del _agraph_instances[current_project]
 
     # Create new instance for this project
+    logger.info(
+        f"Creating new AGraph instance for {current_project} with model: {settings.llm.model}, "
+        f"temperature: {settings.llm.temperature}, api_base: {settings.openai.api_base}"
+    )
     config = BuilderConfig(
         chunk_size=settings.text.max_chunk_size,
         chunk_overlap=settings.text.chunk_overlap,
@@ -56,6 +101,7 @@ async def get_agraph_instance(project_name: Optional[str] = None) -> AGraph:
         config=config,
         use_openai_embeddings=True,
         enable_knowledge_graph=True,
+        settings=settings,
     )
 
     await new_instance.initialize()
@@ -68,8 +114,12 @@ async def get_agraph_instance(project_name: Optional[str] = None) -> AGraph:
 
 def get_document_manager(project_name: Optional[str] = None) -> DocumentManager:
     """Get or create DocumentManager instance for a specific project."""
-    settings = get_settings()
-    current_project = project_name or settings.current_project or "default"
+    if project_name:
+        settings = load_project_settings(project_name)
+        current_project = project_name
+    else:
+        settings = get_settings()
+        current_project = settings.current_project or "default"
 
     # Use project-specific paths if project is specified
     if current_project != "default":
@@ -99,6 +149,15 @@ def get_document_manager(project_name: Optional[str] = None) -> DocumentManager:
 async def get_agraph_instance_dependency() -> AGraph:
     """Fastapi dependency for getting AGraph instance."""
     return await get_agraph_instance()
+
+
+def get_agraph_instance_dependency_factory(project_name: Optional[str] = None) -> Any:
+    """Factory function to create project-aware AGraph dependency."""
+
+    async def _get_agraph_instance() -> AGraph:
+        return await get_agraph_instance(project_name)
+
+    return _get_agraph_instance
 
 
 def get_document_manager_dependency() -> DocumentManager:
@@ -131,8 +190,8 @@ async def close_agraph_instance(project_name: Optional[str] = None) -> None:
         _agraph_instances.clear()
 
 
-def reset_instances(project_name: Optional[str] = None) -> None:
-    """Reset instances for a specific project or all instances."""
+def _reset_local_instances(project_name: Optional[str] = None) -> None:
+    """Reset local instances for a specific project or all instances."""
     if project_name:
         # Reset specific project instances
         if project_name in _agraph_instances:
@@ -143,3 +202,7 @@ def reset_instances(project_name: Optional[str] = None) -> None:
         # Reset all instances
         _agraph_instances.clear()
         _document_managers.clear()
+
+
+# Register our reset callback
+register_reset_callback("api_dependencies", _reset_local_instances)

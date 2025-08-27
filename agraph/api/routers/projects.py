@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ...base.instances import reset_instances
 from ...config import (
     create_project,
     delete_project,
@@ -15,7 +16,6 @@ from ...config import (
     set_current_project,
 )
 from ...logger import logger
-from ..dependencies import reset_instances
 from ..models import (
     ProjectCreateRequest,
     ProjectDeleteRequest,

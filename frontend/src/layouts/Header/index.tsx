@@ -81,14 +81,6 @@ const Header = ({
             color: '#D9DCE0', // 浅灰色图标
           }}
         />
-        <img
-          src="/logo.svg"
-          alt="AGraph"
-          style={{
-            height: '32px',
-            width: 'auto',
-          }}
-        />
         <ProjectDropdown onCreateProject={onCreateProject} />
       </Space>
 
@@ -104,10 +96,13 @@ const Header = ({
         />
 
         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-          <Button type="text" style={{
-            height: 40,
-            color: '#D9DCE0', // 浅灰色文字
-          }}>
+          <Button
+            type="text"
+            style={{
+              height: 40,
+              color: '#D9DCE0', // 浅灰色文字
+            }}
+          >
             <Space>
               <Avatar
                 size="small"

@@ -15,12 +15,24 @@ import asyncio
 import sys
 from pathlib import Path
 from agraph import AGraph, get_settings
+from agraph.config import update_settings, save_config_to_workdir
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# 设置工作目录并保存配置
+workdir = str(project_root / "workdir" / "agraph_quickstart-cache")
+update_settings({"workdir": workdir})
+
+# 保存配置到工作目录
+try:
+    config_path = save_config_to_workdir()
+    print(f"✅ 配置已保存到: {config_path}")
+except Exception as e:
+    print(f"⚠️  配置保存失败: {e}")
+
 settings = get_settings()
-settings.workdir = str(project_root / "workdir" / "agraph_quickstart-cache")
 
 async def quickstart_demo():
     """AGraph快速开始演示"""
@@ -86,7 +98,7 @@ async def quickstart_demo():
                 texts=sample_texts,
                 graph_name=graph_name,
                 graph_description=graph_description,
-                use_cache=True,  # 启用缓存以加快后续构建速度
+                use_cache=False,  # 启用缓存以加快后续构建速度
                 save_to_vector_store=True,  # 保存到向量存储
             )
 

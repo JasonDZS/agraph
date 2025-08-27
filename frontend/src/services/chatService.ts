@@ -1,4 +1,6 @@
 import { apiClient, ApiResponse } from './api';
+import { useProjectStore } from '@/store/projectStore';
+import { projectSync } from '@/utils/projectSync';
 import type {
   ChatRequest,
   ChatResponse,
@@ -37,10 +39,34 @@ export interface StreamEventData {
 class ChatService {
   private readonly baseEndpoint = '/chat';
 
+  private async getCurrentProjectName(): Promise<string | null> {
+    // First try to get from store
+    let projectName = useProjectStore.getState().currentProject?.name;
+
+    // If not found, try to sync with backend
+    if (!projectName) {
+      projectName = await projectSync.ensureProjectSync();
+    }
+
+    return projectName;
+  }
+
+  private async addProjectParam(url: string): Promise<string> {
+    const projectName = await this.getCurrentProjectName();
+    if (!projectName) return url;
+
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}project_name=${encodeURIComponent(projectName)}`;
+  }
+
   async sendMessage(request: ChatRequest): Promise<ApiResponse<ChatResponse>> {
-    return apiClient.post<ChatResponse>(`${this.baseEndpoint}/send`, request, {
-      timeout: 120000, // 2 minutes for chat response
-    });
+    return apiClient.post<ChatResponse>(
+      await this.addProjectParam(this.baseEndpoint),
+      request,
+      {
+        timeout: 120000, // 2 minutes for chat response
+      }
+    );
   }
 
   async sendStreamMessage(
@@ -49,7 +75,8 @@ class ChatService {
     onError?: (error: any) => void,
     onComplete?: () => void
   ): Promise<void> {
-    const url = `${(apiClient as any).baseURL}${this.baseEndpoint}/stream`;
+    const endpoint = await this.addProjectParam(`${this.baseEndpoint}/stream`);
+    const url = `${(apiClient as any).baseURL}${endpoint}`;
 
     try {
       const response = await fetch(url, {
@@ -123,7 +150,8 @@ class ChatService {
     onError?: (error: any) => void,
     onComplete?: () => void
   ): Promise<() => void> {
-    const url = `${(apiClient as any).baseURL}${this.baseEndpoint}/stream`;
+    const endpoint = await this.addProjectParam(`${this.baseEndpoint}/stream`);
+    const url = `${(apiClient as any).baseURL}${endpoint}`;
 
     // Create a POST request first to initiate the stream
     const response = await fetch(url, {
@@ -172,9 +200,12 @@ class ChatService {
   }
 
   async getChatHistory(): Promise<ApiResponse<ChatHistoryResponse>> {
-    return apiClient.get<ChatHistoryResponse>(`${this.baseEndpoint}/history`, {
-      cache: true,
-    });
+    return apiClient.get<ChatHistoryResponse>(
+      await this.addProjectParam(`${this.baseEndpoint}/history`),
+      {
+        cache: true,
+      }
+    );
   }
 
   async getConversation(

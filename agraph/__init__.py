@@ -8,7 +8,8 @@ with focus on entities, relations, and text processing capabilities.
 from .agraph import AGraph
 from .base.clusters import Cluster
 from .base.entities import Entity
-from .base.graph import KnowledgeGraph
+from .base.graph import KnowledgeGraph  # DEPRECATED: Use OptimizedKnowledgeGraph instead
+from .base.optimized_graph import OptimizedKnowledgeGraph  # RECOMMENDED
 from .base.relations import Relation
 from .base.text import TextChunk
 from .base.types import ClusterType, EntityType, RelationType
@@ -25,7 +26,8 @@ __all__ = [
     "Entity",
     "Relation",
     "Cluster",
-    "KnowledgeGraph",
+    "KnowledgeGraph",  # DEPRECATED
+    "OptimizedKnowledgeGraph",  # RECOMMENDED
     "TextChunk",
     "EntityType",
     "RelationType",

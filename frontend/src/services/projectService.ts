@@ -6,6 +6,7 @@ import type {
   ProjectDeleteRequest,
   BaseApiResponse,
 } from '@/types/api';
+import type { KnowledgeGraphBuildRequest } from '@/modules/Projects/types/project';
 
 export interface ProjectStatistics {
   document_count: number;
@@ -31,6 +32,25 @@ export interface ProjectResponse extends BaseApiResponse {
     project_name?: string;
     project_details?: Project;
     current_project?: string;
+  };
+}
+
+export interface KnowledgeGraphBuildResponse extends BaseApiResponse {
+  data?: {
+    graph_name: string;
+    graph_description: string;
+    entities_count: number;
+    relations_count: number;
+    clusters_count: number;
+    text_chunks_count: number;
+    source_documents: Array<{
+      id: string;
+      filename: string;
+      content_length: number;
+    }>;
+    total_texts_processed: number;
+    from_stored_documents: number;
+    from_direct_texts: number;
   };
 }
 
@@ -157,6 +177,21 @@ class ProjectService {
       project_data: projectData,
       overwrite,
     });
+  }
+
+  async buildKnowledgeGraph(
+    projectName: string,
+    request: KnowledgeGraphBuildRequest
+  ): Promise<ApiResponse<KnowledgeGraphBuildResponse>> {
+    return apiClient.post<KnowledgeGraphBuildResponse>(
+      '/knowledge-graph/build',
+      request,
+      {
+        params: {
+          project_name: projectName,
+        },
+      }
+    );
   }
 
   clearCache(): void {

@@ -2,12 +2,11 @@
 
 from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from ...agraph import AGraph
 from ...logger import logger
-from ..dependencies import get_agraph_instance, get_agraph_instance_dependency
+from ..dependencies import get_agraph_instance
 from ..models import ChatRequest, ChatResponse, ResponseStatus, StreamChatResponse
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -19,13 +18,11 @@ async def chat(
     project_name: Optional[str] = Query(
         default=None, description="Project name for project-specific chat"
     ),
-    agraph: AGraph = Depends(get_agraph_instance_dependency),
 ) -> ChatResponse:
     """Chat with the knowledge base (non-streaming)."""
     try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+        # Get the appropriate AGraph instance based on project_name
+        agraph = await get_agraph_instance(project_name)
         if request.stream:
             raise HTTPException(
                 status_code=400, detail="Use /chat/stream endpoint for streaming responses"
@@ -54,6 +51,9 @@ async def chat(
     except Exception as e:
         logger.error(f"Chat failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+    finally:
+        # Note: Don't close the instance here as it's cached and reused
+        pass
 
 
 @router.post("/stream")
@@ -62,13 +62,11 @@ async def chat_stream(
     project_name: Optional[str] = Query(
         default=None, description="Project name for project-specific chat"
     ),
-    agraph: AGraph = Depends(get_agraph_instance_dependency),
 ) -> StreamingResponse:
     """Chat with the knowledge base (streaming)."""
     try:
-        # Use project-specific instance if project_name is provided
-        if project_name:
-            agraph = await get_agraph_instance(project_name)
+        # Get the appropriate AGraph instance based on project_name
+        agraph = await get_agraph_instance(project_name)
 
         async def generate() -> AsyncGenerator[str, None]:
             try:

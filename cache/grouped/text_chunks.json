@@ -1,0 +1,46 @@
+{
+  "text_chunks_e522d4004db0c881fc2bfd6eb6c32d24d81135b07e112fbdff25bab72a6e4990": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Simple test text for from_step verification.",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 44,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-08-22T13:58:39.750543",
+        "updated_at": "2025-08-22T13:58:39.750543"
+      }
+    }
+  ],
+  "text_chunking_f91b8524fcdb0d3e6595a62799529fe4ad25d97da1f8448de1ad5187acc27a66_9c63c539457f2f8e7ebaaeedda5cb40b7720982fa7f2465b64edd3f4a32f77ce": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Simple test text for from_step verification.",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 44,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-08-22T13:58:39.750543",
+        "updated_at": "2025-08-22T13:58:39.750543"
+      }
+    }
+  ]
+}

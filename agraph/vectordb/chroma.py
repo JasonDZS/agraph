@@ -22,7 +22,7 @@ from ..base.clusters import Cluster
 from ..base.entities import Entity
 from ..base.relations import Relation
 from ..base.text import TextChunk
-from ..config import settings
+from ..config import get_settings
 from ..utils import get_type_value
 from .constants import COLLECTION_SUFFIXES, ERROR_MESSAGES, MAX_CONTENT_LENGTH_IN_METADATA
 from .embeddings import (
@@ -990,7 +990,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         """Batch add entities."""
         # pylint: disable=too-many-locals
         if batch_size is None:
-            batch_size = settings.embedding.batch_size
+            batch_size = get_settings().embedding.batch_size
         try:
             collection = self._get_collection("entity")
 
@@ -1025,7 +1025,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         """Batch add relations."""
         # pylint: disable=too-many-locals
         if batch_size is None:
-            batch_size = settings.embedding.batch_size
+            batch_size = get_settings().embedding.batch_size
         try:
             collection = self._get_collection("relation")
 
@@ -1061,7 +1061,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         """Batch add clusters."""
         # pylint: disable=too-many-locals
         if batch_size is None:
-            batch_size = settings.embedding.batch_size
+            batch_size = get_settings().embedding.batch_size
         try:
             collection = self._get_collection("cluster")
 
@@ -1096,7 +1096,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         """Batch add text chunks."""
         # pylint: disable=too-many-locals
         if batch_size is None:
-            batch_size = settings.embedding.batch_size
+            batch_size = get_settings().embedding.batch_size
         try:
             collection = self._get_collection("text_chunk")
 

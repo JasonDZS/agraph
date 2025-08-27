@@ -21,6 +21,7 @@ export interface RequestConfig extends Omit<RequestInit, 'cache'> {
   retry?: number;
   timeout?: number;
   cache?: boolean;
+  params?: Record<string, string | number | boolean | null | undefined>;
 }
 
 export interface RequestInterceptor {
@@ -157,6 +158,7 @@ class ApiClient {
         cache: _cache,
         retry: _retry,
         timeout: _timeout,
+        params: _params,
         ...fetchConfig
       } = requestConfig;
       const response = await fetch(url, fetchConfig);
@@ -228,7 +230,20 @@ class ApiClient {
     endpoint: string,
     options: RequestConfig = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+    let url = `${this.baseURL}${endpoint}`;
+
+    // Add query parameters if provided
+    if (options.params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          searchParams.append(key, String(value));
+        }
+      });
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
 
     let config: RequestConfig = {
       ...options,
@@ -239,11 +254,11 @@ class ApiClient {
     };
 
     // Remove Content-Type for FormData uploads to let browser set it correctly
-    if (
-      config.body instanceof FormData &&
-      config.headers?.['Content-Type'] === 'application/json'
-    ) {
-      delete config.headers['Content-Type'];
+    if (config.body instanceof FormData && config.headers) {
+      const headers = config.headers as Record<string, string>;
+      if (headers['Content-Type'] === 'application/json') {
+        delete headers['Content-Type'];
+      }
     }
 
     // Apply request interceptors

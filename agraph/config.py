@@ -157,7 +157,7 @@ Provide comprehensive, well-structured responses to user queries by synthesizing
 
 ### Reference Format Template
 ```
-# References
+### References
 - ID:1 [KG] Entity relationship describing system performance metrics
 - ID:2 [DC] Research document excerpt about performance improvements
 - ID:3 [KG] Semantic connection between entities showing growth trends
@@ -177,7 +177,7 @@ If the available data sources are insufficient to answer the query, explicitly s
 class Settings(BaseModel):
     """Main application settings."""
 
-    workdir: str = Field(default="workdir")
+    workdir: str = Field(default_factory=lambda: os.getenv("AGRAPH_WORKDIR", "workdir"))
     current_project: Optional[str] = Field(default=None)  # Current active project
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
@@ -256,7 +256,24 @@ def get_settings() -> Settings:
     global _settings_instance  # pylint: disable=global-statement
     if _settings_instance is None:
         _settings_instance = Settings()
+        # Try to auto-load config from workdir if it exists
+        _try_auto_load_workdir_config()
     return _settings_instance
+
+
+def _try_auto_load_workdir_config() -> None:
+    """Internal function to try loading config from workdir."""
+    global _settings_instance  # pylint: disable=global-statement
+    if _settings_instance is None:
+        return
+    config_path = Path(_settings_instance.workdir) / "config.json"
+    if config_path.exists():
+        try:
+            new_settings = Settings.load_from_file(str(config_path))
+            _settings_instance = new_settings
+        except Exception:
+            # If loading fails, keep the default settings
+            pass
 
 
 def set_settings(new_settings: Settings) -> None:
@@ -272,6 +289,16 @@ def update_settings(updates: Dict[str, Any]) -> Settings:
     current_settings = get_settings()
     new_settings = current_settings.update_from_dict(updates)
     set_settings(new_settings)
+
+    # Invalidate cached instances to ensure new settings are used
+    try:
+        from .base.instances import reset_instances  # pylint: disable=import-outside-toplevel
+
+        reset_instances()  # Reset all instances for global settings update
+    except ImportError:
+        # Instance management module not available, skip cache invalidation
+        pass
+
     return new_settings
 
 
@@ -281,6 +308,82 @@ def reset_settings() -> Settings:
     _settings_instance = None
     get_settings.cache_clear()
     return get_settings()
+
+
+def save_config_to_workdir(config_name: str = "config.json") -> str:
+    """Save current configuration to workdir.
+
+    Args:
+        config_name: Name of the config file
+
+    Returns:
+        Path to the saved config file
+    """
+    settings = get_settings()
+    config_path = Path(settings.workdir) / config_name
+
+    # Ensure directory exists
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Save settings to file
+    settings.save_to_file(str(config_path))
+
+    return str(config_path)
+
+
+def load_config_from_workdir(config_name: str = "config.json") -> Optional[Settings]:
+    """Load configuration from workdir.
+
+    Args:
+        config_name: Name of the config file
+
+    Returns:
+        Loaded settings or None if file doesn't exist
+    """
+    settings = get_settings()
+    config_path = Path(settings.workdir) / config_name
+
+    if not config_path.exists():
+        return None
+
+    # Load settings from file
+    new_settings = Settings.load_from_file(str(config_path))
+    set_settings(new_settings)
+
+    return new_settings
+
+
+def auto_load_workdir_config(config_name: str = "config.json") -> bool:
+    """Automatically load configuration from workdir if exists.
+
+    Args:
+        config_name: Name of the config file
+
+    Returns:
+        True if config was loaded, False otherwise
+    """
+    loaded_settings = load_config_from_workdir(config_name)
+    return loaded_settings is not None
+
+
+def get_workdir_config_path() -> str:
+    """Get the path to the config file in workdir.
+
+    Returns:
+        Full path to the config file
+    """
+    settings = get_settings()
+    return str(Path(settings.workdir) / "config.json")
+
+
+def has_workdir_config() -> bool:
+    """Check if config file exists in workdir.
+
+    Returns:
+        True if config file exists
+    """
+    config_path = Path(get_workdir_config_path())
+    return config_path.exists()
 
 
 def get_config_file_path(workdir: Optional[str] = None, project_name: Optional[str] = None) -> str:
@@ -763,6 +866,15 @@ def update_project_settings(
     # Save updated settings
     save_project_settings(project_name, updated_settings, workdir)
 
+    # Invalidate cached instances for this project to ensure new settings are used
+    try:
+        from .base.instances import reset_instances  # pylint: disable=import-outside-toplevel
+
+        reset_instances(project_name)
+    except ImportError:
+        # Instance management module not available, skip cache invalidation
+        pass
+
     return updated_settings
 
 
@@ -808,5 +920,5 @@ def reset_project_settings(project_name: str, workdir: Optional[str] = None) -> 
     return default_settings
 
 
-# Load settings at module level (will be created on first access)
-settings = get_settings()
+# Settings will be loaded on first access via get_settings()
+# Removed module-level initialization to avoid circular imports

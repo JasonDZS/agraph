@@ -13,13 +13,20 @@ import os
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
+from .base.dao import MemoryDataAccessLayer
 from .base.entities import Entity
 from .base.graph import KnowledgeGraph
+from .base.interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
+
+# Import unified architecture components
+from .base.manager_factory import create_managers
+from .base.optimized_graph import OptimizedKnowledgeGraph
 from .base.relations import Relation
+from .base.result import Result
 from .base.text import TextChunk
 from .builder.builder import KnowledgeGraphBuilder
 from .chunker import TokenChunker
-from .config import BuilderConfig, get_settings
+from .config import BuilderConfig, Settings, get_settings
 from .logger import logger
 from .processor import DocumentProcessorFactory
 from .vectordb.factory import VectorStoreFactory, create_chroma_store
@@ -37,6 +44,7 @@ class AGraph:
         config: Optional[BuilderConfig] = None,
         use_openai_embeddings: bool = True,
         enable_knowledge_graph: bool = True,
+        settings: Optional[Settings] = None,
         **_kwargs: Any,
     ) -> None:
         """Initialize AGraph system.
@@ -48,6 +56,7 @@ class AGraph:
             config: Builder configuration.
             use_openai_embeddings: Whether to use OpenAI embeddings.
             enable_knowledge_graph: Whether to enable knowledge graph construction.
+            settings: Settings instance to use (if None, will load default settings).
             **kwargs: Other parameters.
         """
         self.collection_name = collection_name
@@ -55,7 +64,7 @@ class AGraph:
         self.vector_store_type = vector_store_type
         self.use_openai_embeddings = use_openai_embeddings
         self.enable_knowledge_graph = enable_knowledge_graph
-        self.settings = get_settings()
+        self.settings = settings or get_settings()
 
         # Initialize configuration
         if config is None:
@@ -73,9 +82,14 @@ class AGraph:
         # Initialize components
         self.vector_store: Optional[VectorStore] = None
         self.builder: Optional[KnowledgeGraphBuilder] = None
-        self.knowledge_graph: Optional[KnowledgeGraph] = None
+        self.knowledge_graph: Optional[Union[KnowledgeGraph, OptimizedKnowledgeGraph]] = None
         self._is_initialized = False
         self._background_tasks: List[asyncio.Task] = []
+
+        # Initialize unified architecture components
+        self._dao: Optional[MemoryDataAccessLayer] = None
+        self._managers: Optional[Dict[str, Any]] = None
+        self._use_unified_architecture = True  # Flag to control architecture usage
 
         logger.info(
             f"AGraph initialization completed, collection: {collection_name}, persist_dir: {self.persist_directory}, enable_kg: {enable_knowledge_graph}"
@@ -93,11 +107,15 @@ class AGraph:
             # 1. Initialize vector store
             await self._initialize_vector_store()
 
-            # 2. Initialize knowledge graph builder (if enabled)
+            # 2. Initialize unified architecture (if enabled)
+            if self._use_unified_architecture:
+                self._initialize_unified_architecture()
+
+            # 3. Initialize knowledge graph builder (if enabled)
             if self.enable_knowledge_graph:
                 self._initialize_builder()
 
-            # 3. Try to load existing knowledge graph from disk
+            # 4. Try to load existing knowledge graph from disk
             if self.enable_knowledge_graph:
                 loaded = self.load_knowledge_graph_from_disk()
                 if loaded:
@@ -137,6 +155,23 @@ class AGraph:
             logger.error(f"Vector store initialization failed: {e}")
             raise
 
+    def _initialize_unified_architecture(self) -> None:
+        """Initialize unified architecture components."""
+        try:
+            # Initialize DAO
+            self._dao = MemoryDataAccessLayer()
+
+            # Create managers using optimized factory for better performance
+            manager_type = "optimized" if self.enable_knowledge_graph else "default"
+            self._managers = create_managers(manager_type, dao=self._dao)
+
+            logger.info(f"Unified architecture initialization successful (type: {manager_type})")
+            logger.info(f"Available managers: {list(self._managers.keys())}")
+
+        except Exception as e:
+            logger.error(f"Unified architecture initialization failed: {e}")
+            raise
+
     def _initialize_builder(self) -> None:
         """Initialize knowledge graph builder."""
         try:
@@ -148,6 +183,73 @@ class AGraph:
             logger.error(f"Knowledge graph builder initialization failed: {e}")
             raise
 
+    # =============== Unified Architecture Access Methods ===============
+
+    @property
+    def entity_manager(self) -> Optional[EntityManager]:
+        """Get the entity manager from unified architecture."""
+        if self._managers:
+            return self._managers.get("entity_manager")
+        return None
+
+    @property
+    def relation_manager(self) -> Optional[RelationManager]:
+        """Get the relation manager from unified architecture."""
+        if self._managers:
+            return self._managers.get("relation_manager")
+        return None
+
+    @property
+    def cluster_manager(self) -> Optional[ClusterManager]:
+        """Get the cluster manager from unified architecture."""
+        if self._managers:
+            return self._managers.get("cluster_manager")
+        return None
+
+    @property
+    def text_chunk_manager(self) -> Optional[TextChunkManager]:
+        """Get the text chunk manager from unified architecture."""
+        if self._managers:
+            return self._managers.get("text_chunk_manager")
+        return None
+
+    def get_unified_stats(self) -> Optional[Result[Dict[str, Any]]]:
+        """Get comprehensive statistics from all unified managers."""
+        if not self._managers:
+            return None
+
+        try:
+            stats = {}
+
+            # Get entity statistics
+            if self.entity_manager:
+                entity_stats = self.entity_manager.get_statistics()
+                if entity_stats.is_ok():
+                    stats["entities"] = entity_stats.data
+
+            # Get relation statistics
+            if self.relation_manager:
+                relation_stats = self.relation_manager.get_statistics()
+                if relation_stats.is_ok():
+                    stats["relations"] = relation_stats.data
+
+            # Get cluster statistics
+            if self.cluster_manager:
+                cluster_stats = self.cluster_manager.get_statistics()
+                if cluster_stats.is_ok():
+                    stats["clusters"] = cluster_stats.data
+
+            # Get text chunk statistics
+            if self.text_chunk_manager:
+                chunk_stats = self.text_chunk_manager.get_statistics()
+                if chunk_stats.is_ok():
+                    stats["text_chunks"] = chunk_stats.data
+
+            return Result.ok(stats)
+
+        except Exception as e:
+            return Result.internal_error(e)
+
     # =============== Knowledge Graph Construction Functions ===============
 
     async def build_from_documents(
@@ -157,7 +259,7 @@ class AGraph:
         graph_description: str = "Built by AGraph",
         use_cache: bool = True,
         save_to_vector_store: bool = True,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph from documents.
 
         Args:
@@ -233,7 +335,7 @@ class AGraph:
         graph_description: str = "Built by AGraph from texts",
         use_cache: bool = True,
         save_to_vector_store: bool = True,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph from text list.
 
         Args:
@@ -278,13 +380,15 @@ class AGraph:
                 task = asyncio.create_task(self._save_to_vector_store())
                 self._background_tasks.append(task)
 
-            logger.info(
-                f"Knowledge graph construction completed: {len(self.knowledge_graph.entities)} entities, "
-                f"{len(self.knowledge_graph.relations)} relations, "
-                f"{len(self.knowledge_graph.text_chunks)} text chunks"
-            )
+            if self.knowledge_graph:
+                logger.info(
+                    f"Knowledge graph construction completed: {len(self.knowledge_graph.entities)} entities, "
+                    f"{len(self.knowledge_graph.relations)} relations, "
+                    f"{len(self.knowledge_graph.text_chunks)} text chunks"
+                )
 
-            return self.knowledge_graph
+                return self.knowledge_graph
+            raise RuntimeError("Knowledge graph construction failed")
 
         except Exception as e:
             logger.error(f"Building knowledge graph from texts failed: {e}")
@@ -299,7 +403,7 @@ class AGraph:
         graph_description: str,
         use_cache: bool,
         save_to_vector_store: bool,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph with text chunks only from documents (no entities/relations/clusters)."""
         # Process document path parameters
         if isinstance(documents, (str, Path)):
@@ -347,7 +451,7 @@ class AGraph:
                         title=f"Document {i} Chunk {j}",
                         start_index=start_idx,
                         end_index=end_idx,
-                        source=str(documents_list[i]),
+                        source=Path(documents_list[i]).name,
                     )
                     chunks.append(chunk)
 
@@ -382,7 +486,7 @@ class AGraph:
         graph_description: str,
         use_cache: bool,
         save_to_vector_store: bool,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph with text chunks only from texts (no entities/relations/clusters)."""
         logger.info(f"Starting text-only processing from {len(texts)} texts: {graph_name}")
 
@@ -643,6 +747,9 @@ class AGraph:
             prompt = self._build_chat_prompt(
                 question, context_info, conversation_history, response_type
             )
+            logger.info(
+                f"Model: {self.settings.llm}, Built prompt: {prompt[:100]}..."
+            )  # Log first 100 chars of prompt
 
             # 3. Call LLM to generate answer
             if stream:

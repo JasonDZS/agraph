@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { Card, Spin, Alert, Typography, Space, Tabs, Table, Tag } from 'antd';
+import { Card, Spin, Alert, Typography, Space, Tabs, Table, Tag, InputNumber, Button, Form, Row, Col } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import * as echarts from 'echarts/core';
 import {
@@ -77,6 +77,8 @@ export interface GraphVisualizerProps {
   className?: string;
   style?: React.CSSProperties;
   showDataTable?: boolean;
+  maxEntities?: number;
+  maxRelations?: number;
 }
 
 const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
@@ -87,6 +89,8 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
   className,
   style,
   showDataTable = true,
+  maxEntities = 500,
+  maxRelations = 750,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -99,12 +103,16 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [selectedEdge, setSelectedEdge] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('nodes');
+  const [inputMaxEntities, setInputMaxEntities] = useState<number>(maxEntities);
+  const [inputMaxRelations, setInputMaxRelations] = useState<number>(maxRelations);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Store hooks
   const {
     currentGraph,
     entities,
     relations,
+    textChunks,
     visualState,
     currentLayout,
     showNodeLabels,
@@ -239,17 +247,14 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
   // Initialize ECharts
   const initializeChart = useCallback(() => {
     if (!chartRef.current) {
-      console.log('Chart ref not available');
       return;
     }
 
     if (chartInstance.current) {
-      console.log('Chart instance already exists');
       return;
     }
 
     try {
-      console.log('Initializing ECharts instance', chartRef.current);
       chartInstance.current = echarts.init(chartRef.current);
 
       // Resize chart when window resizes
@@ -264,7 +269,6 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
       setIsInitialized(true);
       setError(null);
 
-      console.log('ECharts initialized successfully');
 
       return () => {
         window.removeEventListener('resize', handleResize);
@@ -476,11 +480,28 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     console.log('Converted graph data:', newGraphData);
 
     setGraphData(newGraphData);
+    console.log('Graph data state updated');
   }, [data, convertToEChartsData, entities.length, relations.length]);
 
   // Load graph data from API if needed
-  const loadGraphData = useCallback(async () => {
-    if (data || !currentProject) return;
+  const loadGraphData = useCallback(async (customMaxEntities?: number, customMaxRelations?: number, forceReload = false) => {
+    console.log('loadGraphData called with:', {
+      customMaxEntities,
+      customMaxRelations,
+      forceReload,
+      hasData: !!data,
+      hasCurrentProject: !!currentProject
+    });
+
+    if (!currentProject) {
+      console.log('loadGraphData early return: no current project');
+      return;
+    }
+
+    if (!forceReload && data) {
+      console.log('loadGraphData early return: has data and not force reload');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -488,13 +509,15 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     try {
       const response = await knowledgeGraphService.getVisualizationData({
         include_clusters: false,
-        max_entities: options.maxNodes || 500,
-        max_relations: 750,
+        include_text_chunks: true,
+        max_entities: customMaxEntities || maxEntities,
+        max_relations: customMaxRelations || maxRelations,
         min_confidence: confidenceThreshold || 0.5,
         entity_types:
           entityTypeFilter.length > 0 ? entityTypeFilter : undefined,
         relation_types:
           relationTypeFilter.length > 0 ? relationTypeFilter : undefined,
+        use_cache: !forceReload,
       });
 
       if (response.success && response.data) {
@@ -522,8 +545,21 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
           properties: edge.properties || {},
         }));
 
+        console.log('Setting new entities and relations:', {
+          entitiesCount: entitiesFromNodes.length,
+          relationsCount: relationsFromEdges.length,
+          textChunksCount: visualData.text_chunks?.length || 0
+        });
+
         useKnowledgeGraphStore.getState().setEntities(entitiesFromNodes);
         useKnowledgeGraphStore.getState().setRelations(relationsFromEdges);
+
+        // Handle text chunks if available
+        if (visualData.text_chunks) {
+          useKnowledgeGraphStore.getState().setTextChunks(visualData.text_chunks);
+        }
+
+        console.log('Data loaded successfully, entities and relations set in store');
       } else {
         setError(response.message || 'Failed to load graph data');
       }
@@ -538,7 +574,8 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
   }, [
     data,
     currentProject,
-    options.maxNodes,
+    maxEntities,
+    maxRelations,
     confidenceThreshold,
     entityTypeFilter,
     relationTypeFilter,
@@ -636,6 +673,19 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     }
   }, [isInitialized, graphData, renderGraph]);
 
+  // Refresh graph with new parameters
+  const handleRefresh = useCallback(async () => {
+    console.log('handleRefresh called with:', { inputMaxEntities, inputMaxRelations });
+    setIsRefreshing(true);
+    try {
+      // Clear cache first to ensure fresh data
+      knowledgeGraphService.clearCache();
+      await loadGraphData(inputMaxEntities, inputMaxRelations, true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [inputMaxEntities, inputMaxRelations, loadGraphData]);
+
   // Load initial data
   useEffect(() => {
     loadGraphData();
@@ -715,6 +765,90 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
           {type || '关系'}
         </Tag>
       ),
+    },
+  ];
+
+  // State for expanded text chunks
+  const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set());
+
+  // Toggle expanded state for a text chunk
+  const toggleChunkExpansion = (chunkId: string) => {
+    const newExpanded = new Set(expandedChunks);
+    if (newExpanded.has(chunkId)) {
+      newExpanded.delete(chunkId);
+    } else {
+      newExpanded.add(chunkId);
+    }
+    setExpandedChunks(newExpanded);
+  };
+
+  // Render text chunks table columns - simplified to show only content with expand functionality
+  const textChunkColumns = [
+    {
+      title: '文档内容',
+      dataIndex: 'content',
+      key: 'content',
+      width: '100%',
+      render: (content: string, record: any) => {
+        const isExpanded = expandedChunks.has(record.id);
+        const shouldTruncate = content.length > 200;
+        const displayContent = isExpanded || !shouldTruncate
+          ? content
+          : `${content.substring(0, 200)}...`;
+
+        return (
+          <div style={{
+            padding: '8px 0',
+            borderBottom: '1px solid #f0f0f0',
+            cursor: shouldTruncate ? 'pointer' : 'default'
+          }}>
+            <div
+              style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: '1.6',
+                fontSize: '14px',
+                color: '#333',
+                marginBottom: shouldTruncate ? 12 : 0,
+                padding: '8px 12px',
+                backgroundColor: '#fafafa',
+                borderRadius: '4px',
+                border: '1px solid #e8e8e8'
+              }}
+              onClick={() => shouldTruncate && toggleChunkExpansion(record.id)}
+            >
+              {displayContent}
+            </div>
+            {shouldTruncate && (
+              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                <a
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleChunkExpansion(record.id);
+                  }}
+                  style={{
+                    fontSize: '12px',
+                    color: '#1890ff',
+                    textDecoration: 'none',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #d1e9ff'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = '#e6f4ff';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.backgroundColor = '#f0f9ff';
+                  }}
+                >
+                  {isExpanded ? '收起 ↑' : '展开查看更多 ↓'}
+                </a>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -826,7 +960,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
             pagination={false}
             size="small"
             scroll={{
-              y: height - 180, // 动态计算高度，减去标题和标签栏的高度
+              y: height - 120, // 优化高度计算
               scrollToFirstRowOnChange: false,
             }}
             onRow={record => ({
@@ -865,7 +999,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
             pagination={false}
             size="small"
             scroll={{
-              y: height - 180, // 动态计算高度，减去标题和标签栏的高度
+              y: height - 120, // 优化高度计算
               scrollToFirstRowOnChange: false,
             }}
             onRow={record => ({
@@ -886,6 +1020,63 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
         </div>
       ),
     },
+    {
+      key: 'textChunks',
+      label: `文本块 (${textChunks?.length || 0})`,
+      children: (
+        <div
+          style={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <style>
+            {`
+              .text-chunk-row {
+                border: none !important;
+              }
+              .text-chunk-row td {
+                border: none !important;
+                padding: 4px 8px !important;
+              }
+              .text-chunk-row:hover {
+                background-color: transparent !important;
+              }
+            `}
+          </style>
+          <Table
+            columns={textChunkColumns}
+            dataSource={textChunks || []}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            showHeader={false}
+            scroll={{
+              y: height - 120, // 优化高度计算
+              scrollToFirstRowOnChange: false,
+            }}
+            onRow={record => ({
+              onClick: (e) => {
+                // Prevent row click if user clicked on expand/collapse button
+                if ((e.target as HTMLElement).tagName === 'A') {
+                  e.stopPropagation();
+                }
+              },
+              style: {
+                cursor: 'default',
+                border: 'none',
+              },
+            })}
+            rowClassName={() => 'text-chunk-row'}
+            style={{
+              backgroundColor: 'transparent',
+            }}
+          />
+        </div>
+      ),
+    },
   ];
 
   // 主布局：左侧图谱 + 右侧数据面板
@@ -893,52 +1084,102 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     <ErrorBoundary>
       <Card
         className={className}
-        style={style}
-        styles={{ body: { padding: 0 } }}
+        style={{ ...style, height: '100%' }}
+        styles={{ body: { padding: 0, height: '100%' } }}
       >
-        <div style={{ display: 'flex', height }}>
+        <div style={{ display: 'flex', height: '100%', minHeight: height || '600px' }}>
           {/* 左侧知识图谱区域 - 呠2/3宽度 */}
           <div
             style={{
               flex: 2,
               position: 'relative',
               borderRight: '1px solid #f0f0f0',
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
             }}
           >
-            <div style={{ padding: '16px 16px 0 16px' }}>
-              <div style={{ marginBottom: 16, textAlign: 'center' }}>
+            <div style={{ padding: '12px 16px', flexShrink: 0 }}>
+              <div style={{ marginBottom: 12, textAlign: 'center' }}>
                 <Text strong style={{ fontSize: 16 }}>
                   知识图谱
                 </Text>
               </div>
-              {graphData && (
-                <div
-                  style={{
-                    marginBottom: 12,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: 24,
-                  }}
-                >
-                  <span>
-                    节点: <Text strong>{graphData.nodes?.length || 0}</Text>
-                  </span>
-                  <span>
-                    关系: <Text strong>{graphData.links?.length || 0}</Text>
-                  </span>
-                  <span>
-                    类别:{' '}
-                    <Text strong>{graphData.categories?.length || 0}</Text>
-                  </span>
-                </div>
-              )}
+
+              {/* 配置控件 */}
+              <div style={{ marginBottom: 12 }}>
+                <Row gutter={16} align="middle">
+                  <Col span={6}>
+                    <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                      <Text style={{ fontSize: '12px' }}>最大节点数</Text>
+                      <InputNumber
+                        size="small"
+                        min={1}
+                        max={10000}
+                        value={inputMaxEntities}
+                        onChange={(value) => setInputMaxEntities(value || 500)}
+                        style={{ width: '100%' }}
+                        placeholder="500"
+                      />
+                    </Space>
+                  </Col>
+                  <Col span={6}>
+                    <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                      <Text style={{ fontSize: '12px' }}>最大关系数</Text>
+                      <InputNumber
+                        size="small"
+                        min={1}
+                        max={10000}
+                        value={inputMaxRelations}
+                        onChange={(value) => setInputMaxRelations(value || 750)}
+                        style={{ width: '100%' }}
+                        placeholder="750"
+                      />
+                    </Space>
+                  </Col>
+                  <Col span={4}>
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={isRefreshing}
+                      onClick={handleRefresh}
+                      style={{ marginTop: '16px' }}
+                    >
+                      刷新
+                    </Button>
+                  </Col>
+                  <Col span={8}>
+                    {graphData && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          gap: 12,
+                          fontSize: '11px',
+                          marginTop: '8px',
+                        }}
+                      >
+                        <span>
+                          节点: <Text strong>{graphData.nodes?.length || 0}</Text>
+                        </span>
+                        <span>
+                          关系: <Text strong>{graphData.links?.length || 0}</Text>
+                        </span>
+                        <span>
+                          类别: <Text strong>{graphData.categories?.length || 0}</Text>
+                        </span>
+                      </div>
+                    )}
+                  </Col>
+                </Row>
+              </div>
             </div>
             <div
               ref={chartRef}
               style={{
                 width: '100%',
-                height: 'calc(100% - 80px)',
-                minHeight: '400px',
+                flex: 1,
+                minHeight: 0,
                 backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
               }}
             />
@@ -996,7 +1237,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
           >
             <div
               style={{
-                padding: '16px 16px 12px 16px',
+                padding: '12px 16px 8px 16px',
                 textAlign: 'center',
                 borderBottom: '1px solid #f0f0f0',
                 flexShrink: 0,
@@ -1012,6 +1253,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                minHeight: 0,
               }}
             >
               <Tabs
@@ -1026,9 +1268,10 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
                 tabPosition="top"
                 size="small"
                 tabBarStyle={{
-                  padding: '0 16px',
+                  padding: '0 12px',
                   margin: 0,
                   flexShrink: 0,
+                  minHeight: '40px',
                 }}
               />
             </div>

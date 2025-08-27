@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from ..config import settings
+from ..config import get_settings
 from .base import DocumentProcessor, ProcessingError
 
 
@@ -79,7 +79,7 @@ class OpenAIVisionModel(MultimodalModel):
         """Initialize OpenAI vision model.
 
         Args:
-            api_key: OpenAI API key. If None, uses settings.openai.api_key.
+            api_key: OpenAI API key. If None, uses get_settings().openai.api_key.
             model: Model name to use (default: 'gpt-4o' for optimal performance).
 
         Raises:
@@ -93,7 +93,7 @@ class OpenAIVisionModel(MultimodalModel):
             ) from exc
 
         self.client = openai.OpenAI(
-            api_key=settings.openai.api_key, base_url=settings.openai.api_base
+            api_key=get_settings().openai.api_key, base_url=get_settings().openai.api_base
         )
         self.model = model
 

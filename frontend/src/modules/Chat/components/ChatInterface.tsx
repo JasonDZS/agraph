@@ -352,98 +352,98 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               maxHeight: '100%', // Prevent expansion beyond container
             }}
           >
-          {!hasMessages ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                textAlign: 'center',
-              }}
-            >
-              <MessageOutlined
+            {!hasMessages ? (
+              <div
                 style={{
-                  fontSize: 64,
-                  color: '#d9d9d9',
-                  marginBottom: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
                 }}
-              />
-              <Title level={3} type="secondary">
-                开始新的对话
-              </Title>
-              <Text type="secondary">
-                向我提问任何关于知识图谱的问题，我会根据已有的知识为您提供准确的答案。
-              </Text>
-            </div>
-          ) : (
-            <>
-              {messages.map((message, index) => (
-                <MessageBubble
-                  key={`${message.role}-${index}-${message.timestamp}`}
-                  message={message}
-                  index={index}
-                  isStreaming={
-                    isStreaming &&
-                    index === messages.length - 1 &&
-                    message.role === 'assistant'
-                  }
-                  context={
-                    index === messages.length - 1 &&
-                    message.role === 'assistant'
-                      ? currentContext
-                      : undefined
-                  }
-                  onRegenerate={
-                    canRegenerate && index === messages.length - 1
-                      ? handleRegenerateResponse
-                      : undefined
-                  }
-                  onShowContext={handleShowContextFromMessage}
+              >
+                <MessageOutlined
+                  style={{
+                    fontSize: 64,
+                    color: '#d9d9d9',
+                    marginBottom: 16,
+                  }}
                 />
-              ))}
-              <div ref={messagesEndRef} />
-            </>
-          )}
+                <Title level={3} type="secondary">
+                  开始新的对话
+                </Title>
+                <Text type="secondary">
+                  向我提问任何关于知识图谱的问题，我会根据已有的知识为您提供准确的答案。
+                </Text>
+              </div>
+            ) : (
+              <>
+                {messages.map((message, index) => (
+                  <MessageBubble
+                    key={`${message.role}-${index}-${message.timestamp}`}
+                    message={message}
+                    index={index}
+                    isStreaming={
+                      isStreaming &&
+                      index === messages.length - 1 &&
+                      message.role === 'assistant'
+                    }
+                    context={
+                      index === messages.length - 1 &&
+                      message.role === 'assistant'
+                        ? currentContext
+                        : undefined
+                    }
+                    onRegenerate={
+                      canRegenerate && index === messages.length - 1
+                        ? handleRegenerateResponse
+                        : undefined
+                    }
+                    onShowContext={handleShowContextFromMessage}
+                  />
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
 
-          {error && (
-            <Card
-              size="small"
-              style={{
-                marginTop: 16,
-                borderColor: '#ff4d4f',
-                backgroundColor: '#fff2f0',
-              }}
-            >
-              <Text type="danger">{error}</Text>
-            </Card>
-          )}
+            {error && (
+              <Card
+                size="small"
+                style={{
+                  marginTop: 16,
+                  borderColor: '#ff4d4f',
+                  backgroundColor: '#fff2f0',
+                }}
+              >
+                <Text type="danger">{error}</Text>
+              </Card>
+            )}
           </div>
         </div>
 
-      {/* Context Sidebar Container - Fixed positioned relative to entire chat */}
-      {showContextProp && showContext && currentContext && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 'calc(64px + 64px)', // MainLayout Header + Chat Header
-            right: '0px',
-            bottom: '0px', // To viewport bottom
-            width: contextCollapsed ? '48px' : `${contextWidth}px`,
-            minWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
-            maxWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
-            transition: 'width 0.3s ease',
-            backgroundColor: '#fff',
-            borderLeft: '1px solid #f0f0f0',
-            zIndex: 1000,
-            overflow: 'hidden', // Container itself doesn't scroll
-            overflowX: 'hidden', // Explicitly prevent horizontal scrolling
-            overflowY: 'hidden', // Explicitly prevent vertical scrolling
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        {/* Context Sidebar Container - Fixed positioned relative to entire chat */}
+        {showContextProp && showContext && currentContext && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 'calc(64px + 64px)', // MainLayout Header + Chat Header
+              right: '0px',
+              bottom: '0px', // To viewport bottom
+              width: contextCollapsed ? '48px' : `${contextWidth}px`,
+              minWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
+              maxWidth: contextCollapsed ? '48px' : `${contextWidth}px`,
+              transition: 'width 0.3s ease',
+              backgroundColor: '#fff',
+              borderLeft: '1px solid #f0f0f0',
+              zIndex: 1000,
+              overflow: 'hidden', // Container itself doesn't scroll
+              overflowX: 'hidden', // Explicitly prevent horizontal scrolling
+              overflowY: 'hidden', // Explicitly prevent vertical scrolling
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             {/* Collapse/Expand Button */}
             <div
               style={{
@@ -595,11 +595,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     height: '100%', // Take full height of container
                   }}
                 >
-                <ContextPanel
-                  context={currentContext}
-                  visible={showContext}
-                  onClose={closeContext}
-                />
+                  <ContextPanel
+                    context={currentContext}
+                    visible={showContext}
+                    onClose={closeContext}
+                  />
                 </div>
               </div>
             )}

@@ -57,7 +57,6 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   // Load full document content when viewer opens
   useEffect(() => {
     if (open && document) {
-      console.log('DocumentViewer: Document data:', document);
       if (document.content) {
         // Document already has content, use it directly
         console.log('DocumentViewer: Using existing content');

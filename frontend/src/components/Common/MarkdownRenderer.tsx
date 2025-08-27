@@ -26,14 +26,16 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           code: ({ node, inline, className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '');
             return !inline && match ? (
-              <pre style={{
-                backgroundColor: '#f6f8fa',
-                padding: '12px',
-                borderRadius: '6px',
-                overflow: 'auto',
-                fontSize: '14px',
-                lineHeight: '1.45'
-              }}>
+              <pre
+                style={{
+                  backgroundColor: '#f6f8fa',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  overflow: 'auto',
+                  fontSize: '14px',
+                  lineHeight: '1.45',
+                }}
+              >
                 <code className={className} {...props}>
                   {children}
                 </code>
@@ -45,7 +47,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   backgroundColor: '#f6f8fa',
                   padding: '2px 4px',
                   borderRadius: '3px',
-                  fontSize: '85%'
+                  fontSize: '85%',
                 }}
                 {...props}
               >
@@ -60,7 +62,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
-                  border: '1px solid #d0d7de'
+                  border: '1px solid #d0d7de',
                 }}
                 {...props}
               >
@@ -74,7 +76,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 padding: '6px 13px',
                 border: '1px solid #d0d7de',
                 backgroundColor: '#f6f8fa',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
               }}
               {...props}
             >
@@ -85,7 +87,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <td
               style={{
                 padding: '6px 13px',
-                border: '1px solid #d0d7de'
+                border: '1px solid #d0d7de',
               }}
               {...props}
             >
@@ -97,7 +99,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <a
               style={{
                 color: '#0969da',
-                textDecoration: 'none'
+                textDecoration: 'none',
               }}
               target="_blank"
               rel="noopener noreferrer"
@@ -113,7 +115,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 borderLeft: '4px solid #d0d7de',
                 paddingLeft: '16px',
                 marginLeft: '0',
-                color: '#656d76'
+                color: '#656d76',
               }}
               {...props}
             >
@@ -121,12 +123,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             </blockquote>
           ),
           // 自定义分割线样式
-          hr: (props) => (
+          hr: props => (
             <hr
               style={{
                 border: 'none',
                 borderTop: '1px solid #d0d7de',
-                margin: '24px 0'
+                margin: '24px 0',
               }}
               {...props}
             />

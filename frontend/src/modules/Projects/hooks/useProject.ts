@@ -7,6 +7,7 @@ import type {
   ProjectFormData,
   ProjectDeleteConfirmation,
   ProjectStatistics,
+  KnowledgeGraphBuildRequest,
 } from '../types/project';
 
 export const useProject = () => {
@@ -339,6 +340,69 @@ export const useProject = () => {
     []
   );
 
+  // Build knowledge graph for project
+  const buildKnowledgeGraph = useCallback(
+    async (
+      projectName: string,
+      request: KnowledgeGraphBuildRequest
+    ): Promise<ProjectOperationResult> => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await projectService.buildKnowledgeGraph(
+          projectName,
+          request
+        );
+
+        if (!response.success && response.error) {
+          return {
+            success: false,
+            message: response.error.message,
+            error: response.error.message,
+          };
+        }
+
+        // Update project status to building
+        updateProject(projectName, {
+          status: 'building',
+          updated_at: new Date().toISOString(),
+        });
+
+        notifications.success(
+          'Knowledge Graph Build Started',
+          `Building knowledge graph for project "${projectName}"`
+        );
+
+        // Refresh projects list to get updated statistics
+        setTimeout(() => {
+          loadProjects(true);
+        }, 2000);
+
+        return {
+          success: true,
+          message: `Knowledge graph build started for project "${projectName}"`,
+          project: getProjectByName(projectName),
+        };
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Failed to build knowledge graph';
+        setError(message);
+        notifications.error('Build Failed', message);
+        return {
+          success: false,
+          message,
+          error: message,
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   // Refresh project data
   const refreshProject = useCallback(
     async (projectName: string): Promise<void> => {
@@ -376,6 +440,7 @@ export const useProject = () => {
     createProject,
     switchProject,
     deleteProject,
+    buildKnowledgeGraph,
     refreshProject,
 
     // Utilities

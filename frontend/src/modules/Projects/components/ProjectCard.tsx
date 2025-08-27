@@ -9,6 +9,7 @@ import {
   Space,
   Typography,
   Tooltip,
+  message,
 } from 'antd';
 import {
   MoreOutlined,
@@ -21,9 +22,11 @@ import {
   DatabaseOutlined,
   ClockCircleOutlined,
   SettingOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { ProjectCardProps } from '../types/project';
+import { ProjectBuildModal } from './ProjectBuildModal';
 
 const { Text, Title } = Typography;
 
@@ -33,11 +36,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onDelete,
   onSwitch,
   onConfig,
+  onBuild,
   isSelected = false,
   isLoading = false,
   showActions = true,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [buildModalVisible, setBuildModalVisible] = useState(false);
+  const [buildLoading, setBuildLoading] = useState(false);
 
   const handleCardClick = () => {
     if (onSelect && !isLoading) {
@@ -64,6 +70,31 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     if (onConfig) {
       onConfig(project.name);
     }
+  };
+
+  const handleBuild = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setBuildModalVisible(true);
+  };
+
+  const handleBuildSubmit = async (buildRequest: any) => {
+    if (!onBuild) return;
+
+    setBuildLoading(true);
+    try {
+      await onBuild(project.name, buildRequest);
+      setBuildModalVisible(false);
+      message.success('Knowledge graph build started successfully');
+    } catch (error) {
+      console.error('Build failed:', error);
+      message.error('Failed to start knowledge graph build');
+    } finally {
+      setBuildLoading(false);
+    }
+  };
+
+  const handleBuildCancel = () => {
+    setBuildModalVisible(false);
   };
 
   // Status badge component
@@ -151,6 +182,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       onClick: () => handleSwitchProject(),
     },
     {
+      key: 'build',
+      label: 'Build Knowledge Graph',
+      icon: <RocketOutlined />,
+      onClick: () => handleBuild(),
+    },
+    {
       key: 'config',
       label: 'Configuration',
       icon: <SettingOutlined />,
@@ -199,6 +236,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                 onClick={handleSwitchProject}
               >
                 {project.is_current ? 'Current' : 'Switch'}
+              </Button>,
+              <Button
+                key="build"
+                type="default"
+                size="small"
+                icon={<RocketOutlined />}
+                onClick={handleBuild}
+                disabled={!project.statistics?.document_count}
+              >
+                Build KG
               </Button>,
               <Dropdown
                 key="more"
@@ -366,6 +413,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           </Text>
         </Tooltip>
       </div>
+
+      {/* Build Modal */}
+      <ProjectBuildModal
+        visible={buildModalVisible}
+        onCancel={handleBuildCancel}
+        onBuild={handleBuildSubmit}
+        project={project}
+        loading={buildLoading}
+      />
     </Card>
   );
 };

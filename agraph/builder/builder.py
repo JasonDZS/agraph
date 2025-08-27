@@ -6,8 +6,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from ..base.clusters import Cluster
+from ..base.dao import MemoryDataAccessLayer
 from ..base.entities import Entity
 from ..base.graph import KnowledgeGraph
+
+# Import unified architecture components
+from ..base.manager_factory import create_managers
+from ..base.optimized_graph import OptimizedKnowledgeGraph
 from ..base.relations import Relation
 from ..base.text import TextChunk
 from ..chunker import TokenChunker
@@ -102,6 +107,15 @@ class KnowledgeGraphBuilder:
         self.cluster_handler = ClusterHandler(self.cache_manager, self.cluster_algorithm)
         self.graph_assembler = GraphAssembler(self.cache_manager)
 
+        # Initialize unified architecture components
+        self._dao = MemoryDataAccessLayer()
+        self._managers = create_managers("optimized", dao=self._dao)
+        self._use_unified_architecture = True
+
+        # Pass unified managers to graph assembler
+        if hasattr(self.graph_assembler, "set_unified_managers"):
+            self.graph_assembler.set_unified_managers(self._managers)
+
         logger.info(
             f"KnowledgeGraphBuilder initialized - "
             f"Enable KG: {enable_knowledge_graph}, "
@@ -121,7 +135,7 @@ class KnowledgeGraphBuilder:
         graph_description: str = "",
         use_cache: bool = True,
         from_step: Optional[str] = None,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph from document files.
 
         Args:
@@ -170,7 +184,7 @@ class KnowledgeGraphBuilder:
             if self._should_execute_step(BuildSteps.TEXT_CHUNKING, from_step):
                 logger.info(f"Step 2: Chunking {len(texts)} texts")
                 self.cache_manager.update_build_status(current_step=BuildSteps.TEXT_CHUNKING)
-                chunks = self.text_chunker_handler.chunk_texts(texts, use_cache)
+                chunks = self.text_chunker_handler.chunk_texts(texts, use_cache, documents)
                 logger.info(f"Text chunking completed - created {len(chunks)} chunks")
                 self.cache_manager.update_build_status(completed_step=BuildSteps.TEXT_CHUNKING)
             else:
@@ -272,7 +286,7 @@ class KnowledgeGraphBuilder:
                 cached_kg = self._get_cached_step_result(
                     BuildSteps.GRAPH_ASSEMBLY,
                     (entities, relations, clusters, chunks, graph_name, graph_description),
-                    KnowledgeGraph,
+                    OptimizedKnowledgeGraph,
                 )
                 if cached_kg is None:
                     # If cache result is None, fall back to assembling new graph
@@ -308,7 +322,7 @@ class KnowledgeGraphBuilder:
         graph_description: str = "",
         use_cache: bool = True,
         from_step: Optional[str] = None,
-    ) -> KnowledgeGraph:
+    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
         """Build knowledge graph from text strings.
 
         Args:
@@ -445,7 +459,7 @@ class KnowledgeGraphBuilder:
                 cached_kg = self._get_cached_step_result(
                     BuildSteps.GRAPH_ASSEMBLY,
                     (entities, relations, clusters, chunks, graph_name, graph_description),
-                    KnowledgeGraph,
+                    OptimizedKnowledgeGraph,
                 )
                 if cached_kg is None:
                     # If cache result is None, fall back to assembling new graph

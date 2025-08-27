@@ -87,11 +87,13 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
         }}
       >
         {collapsed ? (
-          <div style={{
-            fontSize: '16px',
-            fontWeight: 'bold',
-            color: '#FFA000'
-          }}>
+          <div
+            style={{
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#FFA000',
+            }}
+          >
             AG
           </div>
         ) : (

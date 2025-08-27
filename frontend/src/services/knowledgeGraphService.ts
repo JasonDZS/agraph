@@ -84,6 +84,7 @@ export interface GraphVisualizationData {
     confidence: number;
     properties?: Record<string, any>;
   }>;
+  text_chunks?: TextChunk[];
 }
 
 class KnowledgeGraphService {
@@ -438,15 +439,18 @@ class KnowledgeGraphService {
 
   async getVisualizationData(options?: {
     include_clusters?: boolean;
+    include_text_chunks?: boolean;
     max_entities?: number;
     max_relations?: number;
     min_confidence?: number;
     entity_types?: string[];
     relation_types?: string[];
     cluster_layout?: boolean;
+    use_cache?: boolean;
   }): Promise<ApiResponse<{ data: GraphVisualizationData }>> {
     const request = {
       include_clusters: options?.include_clusters ?? true,
+      include_text_chunks: options?.include_text_chunks ?? false,
       max_entities: options?.max_entities ?? 500,
       max_relations: options?.max_relations ?? 1000,
       min_confidence: options?.min_confidence ?? 0.0,
@@ -458,7 +462,7 @@ class KnowledgeGraphService {
     const response = await apiClient.post<{ data: GraphVisualizationData }>(
       await this.addProjectParam(`${this.baseEndpoint}/visualization-data`),
       request,
-      { cache: true }
+      { cache: options?.use_cache !== false }
     );
 
     // The backend response structure contains nodes and edges directly in data
