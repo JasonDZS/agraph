@@ -2,15 +2,16 @@
 Relation extraction handler for knowledge graph builder.
 """
 
+import asyncio
 import inspect
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from ...base.entities import Entity
 from ...base.relations import Relation
 from ...base.text import TextChunk
 from ...builder.cache import CacheManager
 from ...builder.extractors import RelationExtractor
-from ...config import BuildSteps
+from ...config import BuildSteps, get_settings
 from ...logger import logger
 
 
@@ -154,39 +155,80 @@ class RelationHandler:
                     doc_chunks_to_process[doc_id] = []
                 doc_chunks_to_process[doc_id].append(chunk)
 
-            for doc_id, doc_chunks in doc_chunks_to_process.items():
-                doc_entities = doc_entities_map[doc_id]
+            # Use concurrent processing with semaphore for rate limiting
+            settings = get_settings()
+            max_concurrent = settings.max_current
+            semaphore = asyncio.Semaphore(max_concurrent)
 
-                # Extract relations for this document's chunks and entities
-                extraction_result = self.relation_extractor.extract(doc_chunks, doc_entities)
-                if inspect.iscoroutine(extraction_result):
-                    doc_relations = await extraction_result
-                else:
-                    doc_relations = extraction_result if extraction_result is not None else []
+            logger.info(
+                f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks"
+            )
 
-                all_relations.extend(doc_relations)
+            async def process_document(doc_id: str, doc_chunks: List[TextChunk]) -> Any:
+                """Process a single document with concurrency control."""
+                async with semaphore:
+                    try:
+                        doc_entities = doc_entities_map[doc_id]
 
-                # Update text chunks with relation references (bidirectional linking)
-                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
-                for relation in doc_relations:
-                    for chunk_id in relation.text_chunks:
-                        if chunk_id in chunk_map:
-                            chunk_map[chunk_id].relations.add(relation.id)
+                        # Extract relations for this document's chunks and entities
+                        extraction_result = self.relation_extractor.extract(
+                            doc_chunks, doc_entities
+                        )
+                        if inspect.iscoroutine(extraction_result):
+                            doc_relations = await extraction_result
+                        else:
+                            doc_relations = (
+                                extraction_result if extraction_result is not None else []
+                            )
 
-                # Cache relations for this document with entity context (use stable content-based keys)
-                doc_chunks_content = [c.content for c in doc_chunks]
-                doc_entities_content = [
-                    (e.name, e.type) if hasattr(e, "name") and hasattr(e, "type") else str(e)
-                    for e in doc_entities
-                ]
-                doc_input = (doc_chunks_content, doc_entities_content)
-                doc_relations_key = (
-                    f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
-                )
-                # Save relations with entity context for proper deserialization
-                result_with_context = {"result": doc_relations, "entities_context": doc_entities}
-                self.cache_manager.backend.set(doc_relations_key, result_with_context)
-                logger.debug(f"Cached {len(doc_relations)} relations for {doc_id}")
+                        # Update text chunks with relation references (bidirectional linking)
+                        chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                        for relation in doc_relations:
+                            for chunk_id in relation.text_chunks:
+                                if chunk_id in chunk_map:
+                                    chunk_map[chunk_id].relations.add(relation.id)
+
+                        # Cache relations for this document with entity context (use stable content-based keys)
+                        doc_chunks_content = [c.content for c in doc_chunks]
+                        doc_entities_content = [
+                            (
+                                (e.name, e.type)
+                                if hasattr(e, "name") and hasattr(e, "type")
+                                else str(e)
+                            )
+                            for e in doc_entities
+                        ]
+                        doc_input = (doc_chunks_content, doc_entities_content)
+                        doc_relations_key = (
+                            f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
+                        )
+                        # Save relations with entity context for proper deserialization
+                        result_with_context = {
+                            "result": doc_relations,
+                            "entities_context": doc_entities,
+                        }
+                        self.cache_manager.backend.set(doc_relations_key, result_with_context)
+                        logger.debug(f"Cached {len(doc_relations)} relations for {doc_id}")
+
+                        return doc_relations
+                    except Exception as e:
+                        logger.error(f"Error processing document {doc_id}: {e}")
+                        return []
+
+            # Process all documents concurrently
+            tasks = [
+                process_document(doc_id, doc_chunks)
+                for doc_id, doc_chunks in doc_chunks_to_process.items()
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Collect results
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Task failed with exception: {result}")
+                elif isinstance(result, list):
+                    all_relations.extend(result)
 
         # Remove duplicate relations while preserving order
         unique_relations = []

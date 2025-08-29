@@ -185,12 +185,17 @@ class Settings(BaseModel):
     graph: GraphConfig = Field(default_factory=GraphConfig)
     text: TextConfig = Field(default_factory=TextConfig)
     rag: RAGConfig = Field(default_factory=RAGConfig)
+    max_current: int = Field(
+        default_factory=lambda: int(os.getenv("MAX_CURRENT", "5")),
+        description="Maximum number of concurrent operations",
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert settings to dictionary."""
         return {
             "workdir": self.workdir,
             "current_project": self.current_project,
+            "max_current": self.max_current,
             "openai": self.openai.model_dump(),
             "llm": self.llm.model_dump(),
             "embedding": self.embedding.model_dump(),
@@ -205,6 +210,7 @@ class Settings(BaseModel):
         return cls(
             workdir=data.get("workdir", "workdir"),
             current_project=data.get("current_project"),
+            max_current=data.get("max_current", 5),
             openai=OpenAIConfig(**data.get("openai", {})),
             llm=LLMConfig(**data.get("llm", {})),
             embedding=EmbeddingConfig(**data.get("embedding", {})),

@@ -4,13 +4,13 @@ Entity extraction handler for knowledge graph builder.
 
 import asyncio
 import inspect
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from ...base.entities import Entity
 from ...base.text import TextChunk
 from ...builder.cache import CacheManager
 from ...builder.extractors import EntityExtractor
-from ...config import BuildSteps
+from ...config import BuildSteps, get_settings
 from ...logger import logger
 
 
@@ -93,36 +93,62 @@ class EntityHandler:
                     doc_chunks_to_process[doc_id] = []
                 doc_chunks_to_process[doc_id].append(chunk)
 
-            for doc_id, doc_chunks in doc_chunks_to_process.items():
-                # Extract entities for this document's chunks
-                extraction_result = self.entity_extractor.extract(doc_chunks)
-                if inspect.iscoroutine(extraction_result):
+            # Use concurrent processing with semaphore for rate limiting
+            settings = get_settings()
+            max_concurrent = settings.max_current
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            logger.info(
+                f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks"
+            )
+
+            async def process_document(doc_id: str, doc_chunks: List[TextChunk]) -> Any:
+                """Process a single document with concurrency control."""
+                async with semaphore:
                     try:
-                        _ = asyncio.get_event_loop()
-                        doc_entities = await extraction_result
-                    except RuntimeError:
-                        # 降级到同步调用
-                        doc_entities = []
-                        logger.warning("无法在当前事件循环中执行异步实体提取，跳过此批次")
-                else:
-                    doc_entities = extraction_result if extraction_result is not None else []
+                        # Extract entities for this document's chunks
+                        extraction_result = self.entity_extractor.extract(doc_chunks)
+                        if inspect.iscoroutine(extraction_result):
+                            doc_entities = await extraction_result
+                        else:
+                            doc_entities = (
+                                extraction_result if extraction_result is not None else []
+                            )
 
-                all_entities.extend(doc_entities)
+                        # Update text chunks with entity references (bidirectional linking)
+                        chunk_map = {chunk.id: chunk for chunk in doc_chunks}
+                        for entity in doc_entities:
+                            for chunk_id in entity.text_chunks:
+                                if chunk_id in chunk_map:
+                                    chunk_map[chunk_id].entities.add(entity.id)
 
-                # Update text chunks with entity references (bidirectional linking)
-                chunk_map = {chunk.id: chunk for chunk in doc_chunks}
-                for entity in doc_entities:
-                    for chunk_id in entity.text_chunks:
-                        if chunk_id in chunk_map:
-                            chunk_map[chunk_id].entities.add(entity.id)
+                        # Cache entities for this document
+                        doc_entities_id = self.cache_manager.backend.generate_key(
+                            [c.content for c in doc_chunks]
+                        )
+                        doc_chunks_key = f"doc_entities_{doc_entities_id}"
+                        self.cache_manager.backend.set(doc_chunks_key, doc_entities)
+                        logger.debug(f"Cached {len(doc_entities)} entities for {doc_id}")
 
-                # Cache entities for this document
-                doc_entities_id = self.cache_manager.backend.generate_key(
-                    [c.content for c in doc_chunks]
-                )
-                doc_chunks_key = f"doc_entities_{doc_entities_id}"
-                self.cache_manager.backend.set(doc_chunks_key, doc_entities)
-                logger.debug(f"Cached {len(doc_entities)} entities for {doc_id}")
+                        return doc_entities
+                    except Exception as e:
+                        logger.error(f"Error processing document {doc_id}: {e}")
+                        return []
+
+            # Process all documents concurrently
+            tasks = [
+                process_document(doc_id, doc_chunks)
+                for doc_id, doc_chunks in doc_chunks_to_process.items()
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Collect results
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Task failed with exception: {result}")
+                elif isinstance(result, list):
+                    all_entities.extend(result)
 
         # Remove duplicates while preserving order (entities might overlap across documents)
         unique_entities = []
