@@ -1,806 +1,485 @@
-# AGraph Tutorial
+# AGraph 使用教程
 
-This tutorial will guide you through learning the core features of the AGraph knowledge graph
-toolkit with practical examples.
+AGraph 是一个强大的知识图谱构建和查询工具，支持从文本构建知识图谱、语义搜索和智能问答。本教程将指导您完成从安装到实际使用的全过程。
 
-## Table of Contents
+## 目录
 
-1. [Environment Setup](#environment-setup)
-2. [Quick Start](#quick-start)
-3. [Core Features](#core-features)
-4. [Advanced Usage](#advanced-usage)
-5. [Best Practices](#best-practices)
-6. [Troubleshooting](#troubleshooting)
+1. [环境准备](#环境准备)
+2. [基本配置](#基本配置)
+3. [创建您的第一个知识图谱](#创建您的第一个知识图谱)
+4. [语义搜索](#语义搜索)
+5. [智能问答](#智能问答)
+6. [高级功能](#高级功能)
+7. [常见问题](#常见问题)
 
-## Environment Setup
+## 环境准备
 
-### System Requirements
+### 系统要求
+- Python 3.10 或更高版本
+- 足够的磁盘空间用于存储向量数据库
 
-- Python 3.10+
-- OpenAI API key (for LLM and embedding services)
-
-### Install Dependencies
-
-```bash
-# Development installation
-make install-dev
-
-# Or basic installation
-pip install -e .
-```
-
-### Environment Configuration
-
-Set environment variables or create a `.env` file:
+### 安装 AGraph
 
 ```bash
-OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1  # Optional, default value
-OPENAI_MODEL=gpt-3.5-turbo  # Optional, default value
+pip install agraph
 ```
 
-## Quick Start
+### 设置 OpenAI API Key
+
+AGraph 使用 OpenAI 的 API 进行文本处理和嵌入生成。请设置您的 API Key：
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
+或者在代码中配置：
+
+```python
+import os
+os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+```
+
+## 基本配置
+
+### 1. 导入必要的模块
 
 ```python
 import asyncio
+import sys
 from pathlib import Path
 from agraph import AGraph, get_settings
+from agraph.config import update_settings, save_config_to_workdir
+```
 
-# 1. Basic Setup
-# Configure working directory
+### 2. 配置工作目录
+
+```python
+# 设置工作目录
+project_root = Path(__file__).parent
+workdir = str(project_root / "workdir" / "my_agraph_cache")
+update_settings({"workdir": workdir})
+
+# 保存配置到工作目录
+try:
+    config_path = save_config_to_workdir()
+    print(f"✅ 配置已保存到: {config_path}")
+except Exception as e:
+    print(f"⚠️ 配置保存失败: {e}")
+
 settings = get_settings()
-settings.workdir = str(Path("workdir/my_project"))
+```
 
-async def main():
-    # 2. Initialize AGraph Instance
-    agraph = AGraph(
+## 创建您的第一个知识图谱
+
+### 1. 准备文档数据
+
+首先，您需要准备一些文本数据。AGraph 支持多种文件格式：
+
+```python
+# 从文件目录读取文档
+documents_dir = Path("your_documents_directory")
+sample_texts = []
+
+if documents_dir.exists():
+    print(f"📂 从 {documents_dir} 读取文档...")
+    supported_extensions = {'.txt', '.md', '.json', '.csv'}
+
+    for file_path in documents_dir.iterdir():
+        if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if content.strip():
+                        sample_texts.append(content)
+                        print(f"   📄 读取: {file_path.name} ({len(content)} 字符)")
+            except UnicodeDecodeError:
+                # 尝试 GBK 编码
+                try:
+                    with open(file_path, 'r', encoding='gbk') as f:
+                        content = f.read()
+                        if content.strip():
+                            sample_texts.append(content)
+                            print(f"   📄 读取: {file_path.name} ({len(content)} 字符, GBK编码)")
+                except Exception as e:
+                    print(f"   ⚠️ 跳过文件 {file_path.name}: {e}")
+            except Exception as e:
+                print(f"   ⚠️ 读取文件失败 {file_path.name}: {e}")
+```
+
+### 2. 创建 AGraph 实例
+
+```python
+async def create_knowledge_graph():
+    # 创建 AGraph 实例
+    async with AGraph(
         collection_name="my_knowledge_graph",
-        persist_directory=settings.workdir,
-        vector_store_type="chroma",  # Choose vector store type
-        use_openai_embeddings=True  # Use OpenAI embeddings
-    )
-    await agraph.initialize()
-    print("✅ AGraph initialized successfully")
-
-    # 3. Prepare Document Data
-    sample_texts = [
-        "AGraph is a toolkit for building knowledge graphs.",
-        "It supports semantic search and intelligent Q&A.",
-        "You can build knowledge graphs from text documents."
-    ]
-
-    # 4. Build Knowledge Graph
-    knowledge_graph = await agraph.build_from_texts(
-        texts=sample_texts,
-        graph_name="Sample Knowledge Graph",
-        graph_description="Knowledge graph built from sample texts",
-        use_cache=True,  # Enable caching for acceleration
-        save_to_vector_store=True  # Save to vector store
-    )
-
-    print(f"📊 Build completed: {len(knowledge_graph.entities)} entities, {len(knowledge_graph.relations)} relations")
-
-    entities = await agraph.search_entities("company", top_k=5)
-    for entity, score in entities:
-        print(f"Entity: {entity.name} ({entity.entity_type}) - Similarity: {score:.3f}")
-
-    text_chunks = await agraph.search_text_chunks("artificial intelligence technology", top_k=3)
-    for chunk, score in text_chunks:
-        preview = chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content
-        print(f"Text: {preview} - Similarity: {score:.3f}")
-    # Properly close the AGraph instance
-    await agraph.close()
-
-asyncio.run(main())
-```
-
-## Core Features
-
-### Semantic Search
-
-#### Search Entities
-
-```python
-# Search entities by name
-entities = await agraph.search_entities("company", top_k=5)
-for entity, score in entities:
-    print(f"Entity: {entity.name} ({entity.entity_type}) - Similarity: {score:.3f}")
-```
-
-#### Search Text Chunks
-
-```python
-# Search text chunks by content
-text_chunks = await agraph.search_text_chunks("artificial intelligence technology", top_k=3)
-for chunk, score in text_chunks:
-    preview = chunk.content[:100] + "..." if len(chunk.content) > 100 else chunk.content
-    print(f"Text: {preview} - Similarity: {score:.3f}")
-```
-
-### Intelligent Q&A
-
-#### Basic Q&A
-
-```python
-# Simple question answering
-question = "What is the company's main business?"
-response = await agraph.chat(question)
-print(f"Answer: {response}")
-```
-
-#### Streaming Q&A
-
-```python
-# Streaming response, real-time display of generation process
-async for chunk_data in await agraph.chat(question, stream=True):
-    if chunk_data["chunk"]:
-        print(chunk_data["chunk"], end="", flush=True)
-    if chunk_data["finished"]:
-        print(f"\n✅ Complete answer: {chunk_data['answer']}")
-
-        # Display retrieval context information
-        context = chunk_data['context']
-        entities_used = len(context.get('entities', []))
-        chunks_used = len(context.get('text_chunks', []))
-        print(f"📊 Used {entities_used} entities, {chunks_used} document chunks")
-        break
-```
-
-### Graph Analysis
-
-#### View Statistics
-
-```python
-# Get system statistics
-stats = await agraph.get_stats()
-
-if 'vector_store' in stats:
-    vs_stats = stats['vector_store']
-    print("Vector store statistics:")
-    print(f"  - Entities: {vs_stats.get('entities', 0)}")
-    print(f"  - Relations: {vs_stats.get('relations', 0)}")
-    print(f"  - Text chunks: {vs_stats.get('text_chunks', 0)}")
-```
-
-#### Entity Relationship Exploration
-
-```python
-# Get relationships of specific entities
-entity_name = "company"
-entities = await agraph.search_entities(entity_name, top_k=1)
-if entities:
-    entity = entities[0][0]
-    print(f"Entity: {entity.name}")
-    print(f"Type: {entity.entity_type}")
-    print(f"Properties: {entity.properties}")
-    print(f"Aliases: {entity.aliases}")
-```
-
-## Advanced Usage
-
-### Caching Mechanism
-
-AGraph provides intelligent caching to improve performance:
-
-```python
-# Enable cache build
-knowledge_graph = await agraph.build_from_texts(
-    texts=sample_texts,
-    graph_name="cached_graph",
-    use_cache=True,  # Results will be cached after first build
-    cache_ttl=3600   # Cache for 1 hour
-)
-
-# Subsequent builds with the same texts will use cache directly
-```
-
-### Persistent Storage
-
-```python
-# Specify persistence directory
-async with AGraph(
-    collection_name="persistent_graph",
-    persist_directory="/path/to/storage",
-    vector_store_type="chroma"
-) as agraph:
-    # Data will be automatically saved to the specified directory
-    # It will be automatically loaded on next startup
-    pass
-```
-
-### Knowledge Graph Construction Control
-
-AGraph supports controlling whether to enable knowledge graph construction. When disabled,
-the system only performs text chunking and vector storage, skipping entity, relation, and
-cluster extraction:
-
-#### Enable Knowledge Graph (Default Behavior)
-
-```python
-# Complete knowledge graph construction, including entity, relation, cluster extraction
-agraph = AGraph(
-    collection_name="full_knowledge_graph",
-    enable_knowledge_graph=True  # Default value, can be omitted
-)
-
-# Build complete knowledge graph
-kg = await agraph.build_from_texts(texts)
-print(f"Entities: {len(kg.entities)}")      # > 0
-print(f"Relations: {len(kg.relations)}")     # > 0
-print(f"Clusters: {len(kg.clusters)}")      # > 0
-print(f"Text chunks: {len(kg.text_chunks)}")  # > 0
-```
-
-#### Disable Knowledge Graph (Text-Only Mode)
-
-```python
-# Only perform text processing and vector storage, suitable for pure document retrieval scenarios
-agraph = AGraph(
-    collection_name="text_only_mode",
-    enable_knowledge_graph=False  # Key setting
-)
-
-# Only creates text chunks, skips entity/relation/cluster extraction
-kg = await agraph.build_from_texts(texts)
-print(f"Entities: {len(kg.entities)}")      # 0
-print(f"Relations: {len(kg.relations)}")     # 0
-print(f"Clusters: {len(kg.clusters)}")      # 0
-print(f"Text chunks: {len(kg.text_chunks)}")  # > 0, preserves text chunking functionality
-
-# Still supports text chunk-based search and Q&A
-results = await agraph.search_text_chunks("query content")
-response = await agraph.chat("user question")
-```
-
-#### Use Case Comparison
-
-| Feature | Knowledge Graph Enabled | Knowledge Graph Disabled |
-|---------|-------------------------|---------------------------|
-| Text Chunking | ✅ | ✅ |
-| Entity Extraction | ✅ | ❌ |
-| Relation Extraction | ✅ | ❌ |
-| Cluster Analysis | ✅ | ❌ |
-| Semantic Search | ✅ | ✅ (text chunks only)|
-| Intelligent Q&A | ✅ | ✅ (based on text chunks)|
-| Build Speed | Slower | Fast |
-| Storage Overhead | Larger | Smaller |
-
-#### Performance and Resource Comparison
-
-```python
-# Test performance differences between two modes
-import time
-
-# Knowledge graph mode
-start = time.time()
-agraph_kg = AGraph(enable_knowledge_graph=True)
-kg_full = await agraph_kg.build_from_texts(large_texts)
-kg_time = time.time() - start
-print(f"Knowledge graph mode time: {kg_time:.2f}s")
-
-# Text-only mode
-start = time.time()
-agraph_text = AGraph(enable_knowledge_graph=False)
-kg_text = await agraph_text.build_from_texts(large_texts)
-text_time = time.time() - start
-print(f"Text-only mode time: {text_time:.2f}s")
-print(f"Speed improvement: {kg_time/text_time:.1f}x")
-```
-
-### Custom Configuration
-
-```python
-from agraph import get_settings
-
-settings = get_settings()
-# Customize LLM model
-settings.openai_model = "gpt-4"
-# Customize embedding model
-settings.embedding_model = "text-embedding-ada-002"
-# Customize text chunking size
-settings.chunk_size = 1000
-settings.chunk_overlap = 200
-```
-
-## Best Practices
-
-### 1. Choose the Right Construction Mode
-
-#### When to Enable Knowledge Graph
-
-```python
-# Scenarios suitable for enabling knowledge graph construction:
-scenarios_for_kg = [
-    "Need to analyze complex relationships between entities",
-    "Want to perform knowledge graph visualization",
-    "Need precise search based on entities and relationships",
-    "Want to perform knowledge reasoning and path finding",
-    "Documents contain rich structured information",
-    "Need to perform cluster analysis and topic discovery"
-]
-
-# Example: Analyzing company organizational structure documents
-agraph = AGraph(
-    collection_name="company_structure",
-    enable_knowledge_graph=True  # Need to extract personnel, department, position relationships
-)
-```
-
-#### When to Disable Knowledge Graph
-
-```python
-# Scenarios suitable for disabling knowledge graph construction:
-scenarios_for_text_only = [
-    "Pure document retrieval and similarity search",
-    "Large-scale document fast indexing",
-    "Resource-constrained environment deployment",
-    "Primarily keyword-based search",
-    "Relatively simple document structure",
-    "Need for rapid prototype validation"
-]
-
-# Example: Building FAQ knowledge base
-agraph = AGraph(
-    collection_name="faq_database",
-    enable_knowledge_graph=False  # Only need Q&A matching, no entity relationships
-)
-```
-
-#### Dynamic Mode Selection
-
-```python
-def choose_mode_by_content(texts):
-    """Dynamically choose construction mode based on document content"""
-
-    # Simple heuristic rules
-    total_length = sum(len(text) for text in texts)
-    avg_length = total_length / len(texts) if texts else 0
-
-    # Detect if contains structured information
-    structured_indicators = ["company", "department", "manager", "project", "product", "client"]
-    structured_score = sum(
-        1 for text in texts
-        for indicator in structured_indicators
-        if indicator in text
-    ) / len(texts)
-
-    if avg_length > 1000 and structured_score > 2:
-        return True  # Enable knowledge graph
-    else:
-        return False  # Text-only mode
-
-# Usage example
-enable_kg = choose_mode_by_content(document_texts)
-agraph = AGraph(
-    collection_name="adaptive_mode",
-    enable_knowledge_graph=enable_kg
-)
-```
-
-### 2. Document Preprocessing
-
-```python
-def preprocess_texts(texts):
-    """Text preprocessing best practices"""
-    processed = []
-    for text in texts:
-        # Clean whitespace
-        text = text.strip()
-        # Filter out too short texts
-        if len(text) < 50:
-            continue
-        # Normalize encoding
-        text = text.encode('utf-8', errors='ignore').decode('utf-8')
-        processed.append(text)
-    return processed
-
-sample_texts = preprocess_texts(raw_texts)
-```
-
-### 3. Error Handling
-
-```python
-async def robust_build():
-    try:
+        persist_directory=settings.workdir,  # 使用配置的工作目录
+        vector_store_type="chroma",  # 使用 Chroma 向量存储
+        use_openai_embeddings=True,  # 使用 OpenAI 嵌入
+        enable_knowledge_graph=True,  # 启用知识图谱功能
+    ) as agraph:
+        # 初始化 AGraph
+        await agraph.initialize()
+        print("✅ AGraph初始化成功")
+
+        # 从文本构建知识图谱
+        print("🏗️ 构建知识图谱...")
         knowledge_graph = await agraph.build_from_texts(
             texts=sample_texts,
-            graph_name="robust_graph",
-            use_cache=True
+            graph_name="我的知识图谱",
+            graph_description="基于文档构建的知识图谱",
+            use_cache=True,  # 启用缓存
+            save_to_vector_store=True,  # 保存到向量存储
         )
-        return knowledge_graph
-    except Exception as e:
-        print(f"Build failed: {e}")
-        # Fallback handling or retry logic
-        return None
+
+        print("✅ 知识图谱构建成功!")
+        print(f"   📊 实体: {len(knowledge_graph.entities)} 个")
+        print(f"   🔗 关系: {len(knowledge_graph.relations)} 个")
+        print(f"   📄 文本块: {len(knowledge_graph.text_chunks)} 个")
+
+        return agraph
 ```
 
-### 4. Performance Optimization
+## 语义搜索
+
+AGraph 提供强大的语义搜索功能，可以搜索实体、关系和文本内容：
+
+### 1. 搜索实体
 
 ```python
-# Batch processing of large datasets
-async def process_large_dataset(texts, batch_size=10):
+async def search_entities_example(agraph):
+    """搜索实体示例"""
+    search_term = "公司"
+    print(f"🔍 搜索实体 '{search_term}':")
+
+    entities = await agraph.search_entities(search_term, top_k=5)
+    for i, (entity, score) in enumerate(entities):
+        print(f"   {i+1}. {entity.name} ({entity.entity_type}) - 相似度: {score:.3f}")
+        if entity.description:
+            print(f"      描述: {entity.description[:100]}...")
+```
+
+### 2. 搜索文本内容
+
+```python
+async def search_text_example(agraph):
+    """搜索文本示例"""
+    search_term = "技术"
+    print(f"🔍 搜索文本 '{search_term}':")
+
+    text_chunks = await agraph.search_text_chunks(search_term, top_k=3)
+    for i, (chunk, score) in enumerate(text_chunks):
+        preview = chunk.content[:80] + "..." if len(chunk.content) > 80 else chunk.content
+        print(f"   {i+1}. {preview} - 相似度: {score:.3f}")
+```
+
+### 3. 搜索关系
+
+```python
+async def search_relations_example(agraph):
+    """搜索关系示例"""
+    search_term = "管理"
+    print(f"🔍 搜索关系 '{search_term}':")
+
+    relations = await agraph.search_relations(search_term, top_k=3)
+    for i, (relation, score) in enumerate(relations):
+        print(f"   {i+1}. {relation.source} -> {relation.target}")
+        print(f"      关系类型: {relation.relation_type}")
+        print(f"      相似度: {score:.3f}")
+```
+
+## 智能问答
+
+AGraph 的智能问答功能可以基于知识图谱回答用户问题：
+
+### 1. 基本问答
+
+```python
+async def basic_qa_example(agraph):
+    """基本问答示例"""
+    question = "公司的主要业务是什么？"
+    print(f"❓ 问题: {question}")
+
+    # 获取回答
+    response = await agraph.chat(question)
+    print(f"🤖 回答: {response['answer']}")
+
+    # 显示上下文信息
+    context = response['context']
+    entity_count = len(context.get('entities', []))
+    chunk_count = len(context.get('text_chunks', []))
+    print(f"   📊 使用了 {entity_count} 个实体, {chunk_count} 个文档片段")
+```
+
+### 2. 流式问答
+
+```python
+async def streaming_qa_example(agraph):
+    """流式问答示例"""
+    question = "公司的核心技术有哪些？"
+    print(f"❓ 问题: {question}")
+    print("🤖 回答: ", end="", flush=True)
+
+    # 流式获取回答
+    async for chunk_data in await agraph.chat(question, stream=True):
+        if chunk_data["chunk"]:
+            print(chunk_data["chunk"], end="", flush=True)
+        if chunk_data["finished"]:
+            print(f"\n✅ 完整回答: {chunk_data['answer']}")
+
+            # 显示检索统计
+            context = chunk_data['context']
+            entity_count = len(context.get('entities', []))
+            chunk_count = len(context.get('text_chunks', []))
+            print(f"   📊 检索了 {entity_count} 个实体, {chunk_count} 个文档")
+            break
+```
+
+## 高级功能
+
+### 1. 获取系统统计信息
+
+```python
+async def get_stats_example(agraph):
+    """获取系统统计信息"""
+    print("📊 系统统计信息:")
+    stats = await agraph.get_stats()
+
+    if 'vector_store' in stats:
+        vs_stats = stats['vector_store']
+        print("向量存储:")
+        print(f"   - 实体: {vs_stats.get('entities', 0)}")
+        print(f"   - 关系: {vs_stats.get('relations', 0)}")
+        print(f"   - 文本块: {vs_stats.get('text_chunks', 0)}")
+
+    if 'knowledge_graph' in stats:
+        kg_stats = stats['knowledge_graph']
+        print("知识图谱:")
+        print(f"   - 总实体数: {kg_stats.get('total_entities', 0)}")
+        print(f"   - 总关系数: {kg_stats.get('total_relations', 0)}")
+```
+
+### 2. 批量处理
+
+```python
+async def batch_processing_example(agraph):
+    """批量处理示例"""
+    questions = [
+        "公司的主要业务是什么？",
+        "团队规模如何？",
+        "有哪些核心技术？"
+    ]
+
+    print("🔄 批量问答处理:")
     results = []
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i+batch_size]
-        graph = await agraph.build_from_texts(
-            texts=batch,
-            graph_name=f"batch_{i//batch_size}",
-            use_cache=True
-        )
-        results.append(graph)
+
+    for i, question in enumerate(questions):
+        print(f"\n处理问题 {i+1}/{len(questions)}: {question}")
+        try:
+            response = await agraph.chat(question)
+            results.append({
+                'question': question,
+                'answer': response['answer'],
+                'context_size': len(response['context'].get('entities', []))
+            })
+        except Exception as e:
+            print(f"   ⚠️ 处理失败: {e}")
+            results.append({
+                'question': question,
+                'answer': None,
+                'error': str(e)
+            })
+
     return results
 ```
 
-### 5. Quality Monitoring
+## 完整示例
 
-```python
-async def monitor_quality():
-    stats = await agraph.get_stats()
-
-    # Check if entity count is reasonable
-    entity_count = stats['vector_store'].get('entities', 0)
-    text_chunks = stats['vector_store'].get('text_chunks', 0)
-
-    if entity_count == 0:
-        print("⚠️ Warning: No entities extracted")
-    elif entity_count / text_chunks < 0.1:
-        print("⚠️ Warning: Entity density too low, may need to adjust extraction parameters")
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Initialization Failure
-
-```python
-# Check API key
-import os
-if not os.getenv('OPENAI_API_KEY'):
-    print("❌ Please set OPENAI_API_KEY environment variable")
-
-# Check network connection
-try:
-    await agraph.initialize()
-except Exception as e:
-    print(f"Initialization failed: {e}")
-    # Possibly network issues or API quota problems
-```
-
-#### 2. Slow Build Speed
-
-```python
-# Enable caching
-knowledge_graph = await agraph.build_from_texts(
-    texts=sample_texts,
-    use_cache=True  # Important!
-)
-
-# Reduce text volume
-if len(sample_texts) > 100:
-    sample_texts = sample_texts[:100]  # Test with small dataset first
-```
-
-#### 3. Out of Memory
-
-```python
-# Process in batches
-batch_size = 5  # Adjust based on system memory
-for i in range(0, len(texts), batch_size):
-    batch = texts[i:i+batch_size]
-    # Process batch
-```
-
-#### 4. Knowledge Graph Mode Issues
-
-```python
-# Issue: No entities extracted in knowledge graph mode
-async def debug_kg_mode():
-    agraph = AGraph(enable_knowledge_graph=True)
-    kg = await agraph.build_from_texts(texts)
-
-    if len(kg.entities) == 0:
-        print("⚠️ No entities extracted, possible reasons:")
-        print("1. LLM API configuration issues")
-        print("2. Text content lacks structured information")
-        print("3. Entity confidence threshold too high")
-
-        # Solution: Lower threshold or switch to text mode
-        agraph_text = AGraph(enable_knowledge_graph=False)
-        kg_text = await agraph_text.build_from_texts(texts)
-        print(f"Text mode created {len(kg_text.text_chunks)} text chunks")
-
-# Issue: Empty vector database
-async def debug_empty_vectordb():
-    agraph = AGraph(enable_knowledge_graph=False)
-    kg = await agraph.build_from_texts(texts)
-
-    # Check build results
-    stats = await agraph.get_stats()
-    print(f"Vector store statistics: {stats}")
-
-    if stats.get('vector_store', {}).get('text_chunks', 0) == 0:
-        print("❌ Vector database is empty, check:")
-        print("1. Is texts empty or content too short")
-        print("2. Is save_to_vector_store set to True")
-        print("3. Is text chunking working properly")
-
-# Issue: Data inconsistency after mode switching
-async def handle_mode_switching():
-    # Clear old data
-    agraph = AGraph(collection_name="test", enable_knowledge_graph=True)
-    await agraph.clear_all()
-
-    # Rebuild
-    kg = await agraph.build_from_texts(texts)
-    print(f"Rebuild completed after mode switching")
-```
-
-### Debugging Tips
-
-```python
-# Enable verbose logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Check vector store status
-stats = await agraph.get_stats()
-print(f"Debug info: {stats}")
-
-# Test simple queries
-simple_entities = await agraph.search_entities("test", top_k=1)
-print(f"Test query results: {simple_entities}")
-```
-
-## Complete Examples
-
-### Basic Example
-
-Here's a complete working example:
+以下是一个完整的使用示例：
 
 ```python
 #!/usr/bin/env python3
+"""
+AGraph 完整使用示例
+"""
+
 import asyncio
+import sys
 from pathlib import Path
 from agraph import AGraph, get_settings
+from agraph.config import update_settings, save_config_to_workdir
 
-async def complete_example():
-    # Configuration
+async def main():
+    """主函数"""
+    print("🚀 AGraph 完整使用示例")
+    print("=" * 50)
+
+    # 1. 配置设置
+    project_root = Path(__file__).parent
+    workdir = str(project_root / "workdir" / "tutorial_cache")
+    update_settings({"workdir": workdir})
+
+    # 保存配置
+    try:
+        config_path = save_config_to_workdir()
+        print(f"✅ 配置已保存到: {config_path}")
+    except Exception as e:
+        print(f"⚠️ 配置保存失败: {e}")
+
     settings = get_settings()
-    settings.workdir = str(Path("workdir/tutorial"))
 
-    # Sample documents
+    # 2. 准备示例数据
     sample_texts = [
-        "TechCorp is an AI company founded in 2018. The company focuses on natural language processing and computer vision technologies.",
-        "The company headquarters is located in Beijing Zhongguancun, with a total of 120 employees, 80% of whom are R&D personnel.",
-        "TechCorp's main products include intelligent customer service systems, document analysis platforms, and image recognition APIs.",
-        "The company completed Series B funding in 2023, raising $50 million led by Sequoia Capital."
+        """
+        ABC科技公司是一家专注于人工智能技术的创新企业。
+        公司成立于2020年，总部位于北京，拥有50名技术专家。
+        主要业务包括自然语言处理、计算机视觉和机器学习算法开发。
+        """,
+        """
+        公司的核心技术团队由张博士领导，拥有丰富的AI研发经验。
+        主要产品包括智能客服系统、图像识别平台和推荐算法引擎。
+        客户覆盖金融、教育、医疗等多个行业。
+        """,
+        """
+        公司采用敏捷开发模式，重视技术创新和人才培养。
+        每年投入营收的30%用于研发，已获得15项技术专利。
+        未来计划扩展到深度学习和强化学习领域。
+        """
     ]
 
-    # Initialize and build
+    # 3. 创建和使用 AGraph
     async with AGraph(
-        collection_name="techcorp_knowledge",
+        collection_name="tutorial_demo",
         persist_directory=settings.workdir,
         vector_store_type="chroma",
-        use_openai_embeddings=True
+        use_openai_embeddings=True,
+        enable_knowledge_graph=True,
     ) as agraph:
+        # 初始化
         await agraph.initialize()
+        print("✅ AGraph 初始化成功")
 
-        # Build knowledge graph
+        # 构建知识图谱
+        print("\n🏗️ 构建知识图谱...")
         knowledge_graph = await agraph.build_from_texts(
             texts=sample_texts,
-            graph_name="TechCorp Knowledge Graph",
-            graph_description="Knowledge graph about TechCorp company",
+            graph_name="ABC科技公司知识图谱",
+            graph_description="关于ABC科技公司的综合信息",
             use_cache=True,
-            save_to_vector_store=True
+            save_to_vector_store=True,
         )
 
-        print(f"✅ Build completed: {len(knowledge_graph.entities)} entities, {len(knowledge_graph.relations)} relations")
+        print("✅ 知识图谱构建完成!")
+        print(f"   📊 实体: {len(knowledge_graph.entities)} 个")
+        print(f"   🔗 关系: {len(knowledge_graph.relations)} 个")
+        print(f"   📄 文本块: {len(knowledge_graph.text_chunks)} 个")
 
-        # Semantic search
-        entities = await agraph.search_entities("company", top_k=3)
-        print("\n🔍 Entity search results:")
-        for entity, score in entities:
-            print(f"  - {entity.name} ({entity.entity_type})")
+        # 语义搜索演示
+        print("\n🔍 语义搜索演示")
+        print("-" * 30)
 
-        # Intelligent Q&A
+        # 搜索实体
+        entities = await agraph.search_entities("公司", top_k=3)
+        print("搜索实体 '公司':")
+        for i, (entity, score) in enumerate(entities):
+            print(f"   {i+1}. {entity.name} ({entity.entity_type})")
+
+        # 搜索文本
+        text_chunks = await agraph.search_text_chunks("技术", top_k=2)
+        print("\n搜索文本 '技术':")
+        for i, (chunk, score) in enumerate(text_chunks):
+            preview = chunk.content[:60] + "..." if len(chunk.content) > 60 else chunk.content
+            print(f"   {i+1}. {preview}")
+
+        # 智能问答演示
+        print("\n💬 智能问答演示")
+        print("-" * 30)
+
         questions = [
-            "When was TechCorp founded?",
-            "How many employees does the company have?",
-            "What are the main products?"
+            "ABC科技公司的主要业务是什么？",
+            "公司有多少员工？",
+            "公司的核心技术有哪些？"
         ]
 
-        print("\n💬 Q&A demonstration:")
         for question in questions:
-            print(f"\n❓ {question}")
-            response = await agraph.chat(question)
-            print(f"🤖 {response}")
+            print(f"\n❓ 问题: {question}")
+            try:
+                response = await agraph.chat(question)
+                print(f"🤖 回答: {response['answer']}")
 
-        # System statistics
+                # 显示上下文统计
+                context = response['context']
+                entity_count = len(context.get('entities', []))
+                chunk_count = len(context.get('text_chunks', []))
+                print(f"   📊 使用了 {entity_count} 个实体, {chunk_count} 个文档片段")
+
+            except Exception as e:
+                print(f"🤖 回答: 抱歉，无法回答这个问题: {e}")
+
+        # 系统统计
+        print("\n📊 系统统计信息")
+        print("-" * 30)
         stats = await agraph.get_stats()
-        print(f"\n📊 System statistics: {stats}")
+
+        if 'vector_store' in stats:
+            vs_stats = stats['vector_store']
+            print("向量存储:")
+            print(f"   - 实体: {vs_stats.get('entities', 0)}")
+            print(f"   - 关系: {vs_stats.get('relations', 0)}")
+            print(f"   - 文本块: {vs_stats.get('text_chunks', 0)}")
+
+        print(f"\n系统状态: {agraph}")
+
+    print("\n✅ 教程演示完成!")
 
 if __name__ == "__main__":
-    asyncio.run(complete_example())
+    # 检查Python版本
+    if sys.version_info < (3, 7):
+        print("❌ 需要Python 3.7+版本")
+        sys.exit(1)
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⏹️ 演示被用户中断")
+    except Exception as e:
+        print(f"\n❌ 演示失败: {e}")
+        print("💡 提示: 请确保已正确安装agraph包并配置OpenAI API Key")
 ```
 
-### Knowledge Graph Mode Comparison Example
+## 常见问题
 
-This example demonstrates the difference between enabling and disabling knowledge graphs:
+### Q1: 如何处理不同编码的文件？
+A: AGraph 会自动尝试 UTF-8 和 GBK 编码。如果需要其他编码，可以在读取文件时指定编码格式。
 
-```python
-#!/usr/bin/env python3
-import asyncio
-import time
-from pathlib import Path
-from agraph import AGraph, get_settings
+### Q2: 如何优化知识图谱的构建速度？
+A:
+- 启用缓存功能 (`use_cache=True`)
+- 使用合适的文本分块大小
+- 考虑使用更快的向量存储后端
 
-async def compare_modes_example():
-    """Compare differences between knowledge graph mode and text-only mode"""
+### Q3: 如何处理大量文档？
+A:
+- 分批处理文档
+- 使用持久化存储避免重复构建
+- 监控内存使用情况
 
-    # Prepare test documents
-    documents = [
-        "Apple Inc. is an American multinational technology company founded by Steve Jobs, Steve Wozniak, and Ronald Wayne on April 1, 1976.",
-        "Microsoft Corporation is an American multinational technology company founded by Bill Gates and Paul Allen on April 4, 1975.",
-        "Google LLC is an American multinational technology company founded by Larry Page and Sergey Brin on September 4, 1998.",
-        "Tesla, Inc. is an American electric vehicle and energy company founded by Martin Eberhard and Marc Tarpenning in 2003."
-    ]
+### Q4: 搜索结果不准确怎么办？
+A:
+- 调整 `top_k` 参数
+- 检查文档质量和相关性
+- 考虑使用更精确的搜索词
 
-    print("🔄 Starting comparison of different build modes")
-    print("=" * 60)
+### Q5: 如何自定义实体和关系类型？
+A: AGraph 支持自定义实体和关系类型，详见 API 文档中的类型定义部分。
 
-    # Mode 1: Full knowledge graph construction
-    print("\n📊 Mode 1: Knowledge Graph Enabled")
-    start_time = time.time()
+## 下一步
 
-    async with AGraph(
-        collection_name="kg_mode_demo",
-        enable_knowledge_graph=True,
-        persist_directory="./demo_kg"
-    ) as agraph_kg:
-        await agraph_kg.initialize()
+现在您已经掌握了 AGraph 的基本用法，可以：
 
-        kg_full = await agraph_kg.build_from_texts(
-            texts=documents,
-            graph_name="Tech Companies Knowledge Graph",
-            save_to_vector_store=True
-        )
+1. 尝试使用自己的文档数据
+2. 探索更多的配置选项
+3. 集成到您的应用程序中
+4. 查看 API 文档了解更多高级功能
 
-        kg_build_time = time.time() - start_time
-
-        print(f"⏱️  Build time: {kg_build_time:.2f}s")
-        print(f"📈 Build results:")
-        print(f"   • Entities: {len(kg_full.entities)}")
-        print(f"   • Relations: {len(kg_full.relations)}")
-        print(f"   • Clusters: {len(kg_full.clusters)}")
-        print(f"   • Text chunks: {len(kg_full.text_chunks)}")
-
-        # Test entity search
-        entities = await agraph_kg.search_entities("company", top_k=3)
-        print(f"\n🔍 Entity search 'company' found {len(entities)} results:")
-        for entity, score in entities[:2]:
-            print(f"   • {entity.name} ({entity.entity_type}) - Similarity: {score:.3f}")
-
-        # Test intelligent Q&A
-        question = "When was Apple founded?"
-        response = await agraph_kg.chat(question)
-        print(f"\n💬 Q&A test: {question}")
-        print(f"🤖 Answer: {response['answer'][:100]}...")
-
-        stats_kg = await agraph_kg.get_stats()
-
-    # Mode 2: Text-only mode
-    print("\n" + "=" * 60)
-    print("📄 Mode 2: Knowledge Graph Disabled (Text-Only Mode)")
-    start_time = time.time()
-
-    async with AGraph(
-        collection_name="text_mode_demo",
-        enable_knowledge_graph=False,
-        persist_directory="./demo_text"
-    ) as agraph_text:
-        await agraph_text.initialize()
-
-        kg_text = await agraph_text.build_from_texts(
-            texts=documents,
-            graph_name="Tech Companies Document Library",
-            save_to_vector_store=True
-        )
-
-        text_build_time = time.time() - start_time
-
-        print(f"⏱️  Build time: {text_build_time:.2f}s")
-        print(f"📈 Build results:")
-        print(f"   • Entities: {len(kg_text.entities)}")
-        print(f"   • Relations: {len(kg_text.relations)}")
-        print(f"   • Clusters: {len(kg_text.clusters)}")
-        print(f"   • Text chunks: {len(kg_text.text_chunks)}")
-
-        # Test text chunk search
-        chunks = await agraph_text.search_text_chunks("Apple", top_k=3)
-        print(f"\n🔍 Text search 'Apple' found {len(chunks)} results:")
-        for chunk, score in chunks[:2]:
-            preview = chunk.content[:50] + "..." if len(chunk.content) > 50 else chunk.content
-            print(f"   • {preview} - Similarity: {score:.3f}")
-
-        # Test intelligent Q&A (based on text chunks)
-        question = "When was Apple founded?"
-        response = await agraph_text.chat(question)
-        print(f"\n💬 Q&A test: {question}")
-        print(f"🤖 Answer: {response['answer'][:100]}...")
-
-        stats_text = await agraph_text.get_stats()
-
-    # Performance comparison summary
-    print("\n" + "=" * 60)
-    print("📊 Performance Comparison Summary")
-    print(f"Build speed improvement: {kg_build_time/text_build_time:.1f}x (text mode is faster)")
-    print(f"Knowledge graph mode: {kg_build_time:.2f}s")
-    print(f"Text-only mode: {text_build_time:.2f}s")
-
-    print(f"\n💾 Storage comparison:")
-    if 'vector_store' in stats_kg and 'vector_store' in stats_text:
-        kg_total = sum(stats_kg['vector_store'].values())
-        text_total = sum(stats_text['vector_store'].values())
-        print(f"Knowledge graph mode storage items: {kg_total}")
-        print(f"Text-only mode storage items: {text_total}")
-
-    print(f"\n✨ Feature comparison:")
-    print("Knowledge graph mode: Supports entity search, relationship analysis, cluster discovery")
-    print("Text-only mode: Supports document retrieval, similarity search, fast Q&A")
-
-    print(f"\n🎯 Recommended use cases:")
-    print("• Knowledge graph mode → Complex applications requiring deep entity relationship analysis")
-    print("• Text-only mode → Lightweight applications for fast document retrieval and Q&A")
-
-if __name__ == "__main__":
-    asyncio.run(compare_modes_example())
-```
-
-Run this example:
-
-```bash
-python complete_example.py
-```
-
-## Summary
-
-AGraph provides a simple yet powerful interface for building and querying knowledge graphs.
-Through this tutorial, you have learned:
-
-- ✅ Environment setup and initialization
-- ✅ Building knowledge graphs from text
-- ✅ Semantic search and intelligent Q&A
-- ✅ **Knowledge Graph Construction Control** - New feature highlight!
-- ✅ Choosing the right construction mode (full KG vs text-only)
-- ✅ Performance optimization and error handling
-- ✅ Best practices and debugging techniques
-
-### 🎯 Key New Feature: Optional Knowledge Graph Construction
-
-This tutorial highlights important new features in AGraph v0.2+:
-
-- **Flexible Mode Selection**: Control build behavior through the `enable_knowledge_graph` parameter
-- **Text-Only Mode**: Fast document indexing, skipping complex entity relationship extraction
-- **Full KG Mode**: Deep analysis, extracting entities, relations, clusters
-- **Seamless Switching**: Same API, different processing logic
-- **Performance Optimization**: Choose the most suitable mode based on requirements
-
-### 📈 Usage Recommendations
-
-| Application Scenario | Recommended Mode | Advantages |
-|---------------------|------------------|------------|
-| Document Retrieval System | Text-only mode | Fast, lightweight |
-| FAQ Knowledge Base | Text-only mode | Simple and efficient |
-| Enterprise Knowledge Management | Full KG mode | Deep analysis |
-| Research Literature Analysis | Full KG mode | Relationship mining |
-| Rapid Prototype Validation | Text-only mode | Fast development |
-
-Now you can flexibly use AGraph in your own projects based on specific requirements!
-
-## Additional Resources
-
-- [API Reference Documentation](../source/modules.rst)
-- [Vector Database Tutorial](vectordb_tutorial.md)
-- [Import/Export Features](import_export_tutorial.md)
-- [Custom Vector Database Guide](custom_vectordb_guide.md)
+更多信息和示例，请查看项目的 `examples/` 目录。
