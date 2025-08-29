@@ -98,7 +98,7 @@ async def quickstart_demo():
                 texts=sample_texts,
                 graph_name=graph_name,
                 graph_description=graph_description,
-                use_cache=False,  # 启用缓存以加快后续构建速度
+                use_cache=True,  # 启用缓存以加快后续构建速度
                 save_to_vector_store=True,  # 保存到向量存储
             )
 

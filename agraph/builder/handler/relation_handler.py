@@ -74,8 +74,13 @@ class RelationHandler:
         for doc_id, doc_chunks in doc_chunks_map.items():
             doc_entities = doc_entities_map[doc_id]
 
-            # Generate cache key for this document's relations
-            doc_input = (doc_chunks, doc_entities)
+            # Generate cache key for this document's relations (use stable content-based keys)
+            doc_chunks_content = [c.content for c in doc_chunks]
+            doc_entities_content = [
+                (e.name, e.type) if hasattr(e, "name") and hasattr(e, "type") else str(e)
+                for e in doc_entities
+            ]
+            doc_input = (doc_chunks_content, doc_entities_content)
             doc_relations_key = (
                 f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
             )
@@ -168,8 +173,13 @@ class RelationHandler:
                         if chunk_id in chunk_map:
                             chunk_map[chunk_id].relations.add(relation.id)
 
-                # Cache relations for this document with entity context
-                doc_input = (doc_chunks, doc_entities)
+                # Cache relations for this document with entity context (use stable content-based keys)
+                doc_chunks_content = [c.content for c in doc_chunks]
+                doc_entities_content = [
+                    (e.name, e.type) if hasattr(e, "name") and hasattr(e, "type") else str(e)
+                    for e in doc_entities
+                ]
+                doc_input = (doc_chunks_content, doc_entities_content)
                 doc_relations_key = (
                     f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
                 )
