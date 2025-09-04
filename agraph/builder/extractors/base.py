@@ -5,9 +5,9 @@ Base classes for entity and relation extractors.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from ...base.entities import Entity
-from ...base.relations import Relation
-from ...base.text import TextChunk
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
+from ...base.models.text import TextChunk
 
 
 class EntityExtractor(ABC):

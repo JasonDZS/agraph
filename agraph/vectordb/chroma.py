@@ -18,10 +18,10 @@ except ImportError as e:
         "pip install '.[vectordb]' or pip install chromadb>=0.5.0"
     ) from e
 
-from ..base.clusters import Cluster
-from ..base.entities import Entity
-from ..base.relations import Relation
-from ..base.text import TextChunk
+from ..base.models.clusters import Cluster
+from ..base.models.entities import Entity
+from ..base.models.relations import Relation
+from ..base.models.text import TextChunk
 from ..config import get_settings
 from ..utils import get_type_value
 from .constants import COLLECTION_SUFFIXES, ERROR_MESSAGES, MAX_CONTENT_LENGTH_IN_METADATA

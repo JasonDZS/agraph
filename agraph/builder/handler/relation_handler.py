@@ -6,9 +6,9 @@ import asyncio
 import inspect
 from typing import Any, Dict, List
 
-from ...base.entities import Entity
-from ...base.relations import Relation
-from ...base.text import TextChunk
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
+from ...base.models.text import TextChunk
 from ...builder.cache import CacheManager
 from ...builder.extractors import RelationExtractor
 from ...config import BuildSteps, get_settings
@@ -66,25 +66,39 @@ class RelationHandler:
         for doc_id in doc_chunks_map:
             doc_entities_map[doc_id] = []
 
-        # Distribute entities to documents (simplified approach - in practice might need more sophisticated mapping)
+        # Distribute entities to documents based on text chunk references
         for entity in entities:
-            # For now, associate entity with all documents (this could be optimized)
-            for doc_id in doc_chunks_map:
-                doc_entities_map[doc_id].append(entity)
+            # Find which documents this entity belongs to based on text_chunks
+            entity_docs = set()
+            if hasattr(entity, 'text_chunks') and entity.text_chunks:
+                # Map entity to documents based on its text chunks
+                for chunk_id in entity.text_chunks:
+                    for chunk in chunks:
+                        if chunk.id == chunk_id:
+                            entity_docs.add(chunk.source)
+                            break
+            
+            # If entity has no text chunk references, associate with all documents
+            if not entity_docs:
+                entity_docs = set(doc_chunks_map.keys())
+            
+            # Add entity to relevant document mappings
+            for doc_id in entity_docs:
+                if doc_id in doc_entities_map:
+                    doc_entities_map[doc_id].append(entity)
         # pylint: disable=too-many-nested-blocks
         for doc_id, doc_chunks in doc_chunks_map.items():
             doc_entities = doc_entities_map[doc_id]
 
-            # Generate cache key for this document's relations (use stable content-based keys)
-            doc_chunks_content = [c.content for c in doc_chunks]
-            doc_entities_content = [
-                (e.name, e.type) if hasattr(e, "name") and hasattr(e, "type") else str(e)
+            # Generate stable cache key for this document's relations
+            doc_chunks_content = sorted([c.content.strip() for c in doc_chunks if c.content])
+            doc_entities_content = sorted([
+                (e.name.strip() if hasattr(e, "name") and e.name else "", 
+                 e.type.value if hasattr(e, "type") and hasattr(e.type, "value") else str(e.type) if hasattr(e, "type") else "")
                 for e in doc_entities
-            ]
-            doc_input = (doc_chunks_content, doc_entities_content)
-            doc_relations_key = (
-                f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
-            )
+            ])
+            doc_input = (tuple(doc_chunks_content), tuple(doc_entities_content))
+            doc_relations_key = f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
             cached_data = self.cache_manager.backend.get(doc_relations_key, dict)
 
             if cached_data is not None:
@@ -189,19 +203,14 @@ class RelationHandler:
                                     chunk_map[chunk_id].relations.add(relation.id)
 
                         # Cache relations for this document with entity context (use stable content-based keys)
-                        doc_chunks_content = [c.content for c in doc_chunks]
-                        doc_entities_content = [
-                            (
-                                (e.name, e.type)
-                                if hasattr(e, "name") and hasattr(e, "type")
-                                else str(e)
-                            )
+                        doc_chunks_content = sorted([c.content.strip() for c in doc_chunks if c.content])
+                        doc_entities_content = sorted([
+                            (e.name.strip() if hasattr(e, "name") and e.name else "", 
+                             e.type.value if hasattr(e, "type") and hasattr(e.type, "value") else str(e.type) if hasattr(e, "type") else "")
                             for e in doc_entities
-                        ]
-                        doc_input = (doc_chunks_content, doc_entities_content)
-                        doc_relations_key = (
-                            f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
-                        )
+                        ])
+                        doc_input = (tuple(doc_chunks_content), tuple(doc_entities_content))
+                        doc_relations_key = f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
                         # Save relations with entity context for proper deserialization
                         result_with_context = {
                             "result": doc_relations,

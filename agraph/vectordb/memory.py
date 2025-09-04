@@ -8,10 +8,10 @@ Uses simple cosine similarity for vector search.
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ..base.clusters import Cluster
-from ..base.entities import Entity
-from ..base.relations import Relation
-from ..base.text import TextChunk
+from ..base.models.clusters import Cluster
+from ..base.models.entities import Entity
+from ..base.models.relations import Relation
+from ..base.models.text import TextChunk
 from ..logger import logger
 from .constants import DEFAULT_EMBEDDING_DIMENSION, ERROR_MESSAGES
 from .embeddings import create_openai_embedding_function

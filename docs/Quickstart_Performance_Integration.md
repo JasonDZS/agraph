@@ -86,7 +86,7 @@ async with AGraph(
 You can also directly use the optimized classes:
 
 ```python
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
 
 # Direct instantiation with all optimization features
 kg = OptimizedKnowledgeGraph(name="My Optimized Graph")

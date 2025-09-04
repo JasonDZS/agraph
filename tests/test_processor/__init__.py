@@ -1,0 +1,3 @@
+"""
+Document processor tests module.
+"""

@@ -1,0 +1,216 @@
+{
+  "text_chunks_aba3ede4fa7a5a9c3e2b1d2737a0ec826556bc70adb3596bcda98f4611121008": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Alice works at OpenAI as a machine learning engineer. She collaborates with Bob on various AI projects.",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 103,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.315906",
+        "updated_at": "2025-09-04T17:50:53.315906"
+      }
+    }
+  ],
+  "text_chunks_9da611b5891030f2a11f56b817c04d9ec7278795e9a5490ca04415c38d86af7b": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_1_0",
+        "content": "Bob is a researcher who studies natural language processing. He frequently discusses technical topics with Alice.",
+        "title": "Document 1 Chunk 0",
+        "metadata": {},
+        "source": "document_1",
+        "start_index": 0,
+        "end_index": 113,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.316161",
+        "updated_at": "2025-09-04T17:50:53.316162"
+      }
+    }
+  ],
+  "text_chunks_6fde51b02afe080fd446f1e00a002829398930c3630b5cbf3deb839f47eebec5": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_2_0",
+        "content": "OpenAI is an artificial intelligence company founded by Sam Altman and others. The company focuses on developing safe AI systems.",
+        "title": "Document 2 Chunk 0",
+        "metadata": {},
+        "source": "document_2",
+        "start_index": 0,
+        "end_index": 129,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.316367",
+        "updated_at": "2025-09-04T17:50:53.316367"
+      }
+    }
+  ],
+  "text_chunking_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_82225fef401be557ed07e9688b83097e509c646219354246ebe5670013d4e7e6": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Alice works at OpenAI as a machine learning engineer. She collaborates with Bob on various AI projects.",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 103,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.315906",
+        "updated_at": "2025-09-04T17:50:53.315906"
+      }
+    },
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_1_0",
+        "content": "Bob is a researcher who studies natural language processing. He frequently discusses technical topics with Alice.",
+        "title": "Document 1 Chunk 0",
+        "metadata": {},
+        "source": "document_1",
+        "start_index": 0,
+        "end_index": 113,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.316161",
+        "updated_at": "2025-09-04T17:50:53.316162"
+      }
+    },
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_2_0",
+        "content": "OpenAI is an artificial intelligence company founded by Sam Altman and others. The company focuses on developing safe AI systems.",
+        "title": "Document 2 Chunk 0",
+        "metadata": {},
+        "source": "document_2",
+        "start_index": 0,
+        "end_index": 129,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T17:50:53.316367",
+        "updated_at": "2025-09-04T17:50:53.316367"
+      }
+    }
+  ],
+  "text_chunks_e1fbf390a91eab82a616a91e18a6cdadba422a88115a61ff81a6af79d24b2372": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Apple是一家科技公司，专注于消费电子产品的设计和制造。",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 29,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T18:11:07.305387",
+        "updated_at": "2025-09-04T18:11:07.305388"
+      }
+    }
+  ],
+  "text_chunks_4bda3ad26bf50fa63a1704756838b5552d27b1fbfbfd43862175312385501206": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_1_0",
+        "content": "Google开发了搜索引擎和Android操作系统。",
+        "title": "Document 1 Chunk 0",
+        "metadata": {},
+        "source": "document_1",
+        "start_index": 0,
+        "end_index": 26,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T18:11:07.305909",
+        "updated_at": "2025-09-04T18:11:07.305909"
+      }
+    }
+  ],
+  "text_chunking_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_7d9d0f9fc0918e89754912acd0be4b49e26e256e397825426fc1ccd1ecaa4733": [
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_0_0",
+        "content": "Apple是一家科技公司，专注于消费电子产品的设计和制造。",
+        "title": "Document 0 Chunk 0",
+        "metadata": {},
+        "source": "document_0",
+        "start_index": 0,
+        "end_index": 29,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T18:11:07.305387",
+        "updated_at": "2025-09-04T18:11:07.305388"
+      }
+    },
+    {
+      "_type": "TextChunk",
+      "_data": {
+        "id": "chunk_1_0",
+        "content": "Google开发了搜索引擎和Android操作系统。",
+        "title": "Document 1 Chunk 0",
+        "metadata": {},
+        "source": "document_1",
+        "start_index": 0,
+        "end_index": 26,
+        "chunk_type": "paragraph",
+        "language": "zh",
+        "confidence": 1.0,
+        "embedding": null,
+        "entities": [],
+        "relations": [],
+        "created_at": "2025-09-04T18:11:07.305909",
+        "updated_at": "2025-09-04T18:11:07.305909"
+      }
+    }
+  ]
+}

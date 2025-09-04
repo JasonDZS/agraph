@@ -3,7 +3,7 @@
 from typing import Any, Optional
 
 from ..agraph import AGraph
-from ..base.instances import register_reset_callback
+from ..base.infrastructure.instances import register_reset_callback
 from ..config import BuilderConfig, get_project_paths, get_settings, load_project_settings
 from .document_manager import DocumentManager
 

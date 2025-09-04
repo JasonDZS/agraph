@@ -4,10 +4,10 @@ Entity extraction handler for knowledge graph builder.
 
 import asyncio
 import inspect
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from ...base.entities import Entity
-from ...base.text import TextChunk
+from ...base.models.entities import Entity
+from ...base.models.text import TextChunk
 from ...builder.cache import CacheManager
 from ...builder.extractors import EntityExtractor
 from ...config import BuildSteps, get_settings
@@ -68,12 +68,9 @@ class EntityHandler:
                 all_entities.extend(cached_entities)
                 cached_entities_count += len(cached_entities)
 
-                # Update text chunks with cached entity references (bidirectional linking)
+                # Update text chunks with cached entity references and positioning
                 chunk_map = {chunk.id: chunk for chunk in doc_chunks}
-                for entity in cached_entities:
-                    for chunk_id in entity.text_chunks:
-                        if chunk_id in chunk_map:
-                            chunk_map[chunk_id].entities.add(entity.id)
+                self._integrate_positioning_info(cached_entities, chunk_map)
 
                 logger.debug(f"Using cached entities for {doc_id}: {len(cached_entities)} entities")
             else:
@@ -115,12 +112,9 @@ class EntityHandler:
                                 extraction_result if extraction_result is not None else []
                             )
 
-                        # Update text chunks with entity references (bidirectional linking)
+                        # Update text chunks with entity references and set positioning
                         chunk_map = {chunk.id: chunk for chunk in doc_chunks}
-                        for entity in doc_entities:
-                            for chunk_id in entity.text_chunks:
-                                if chunk_id in chunk_map:
-                                    chunk_map[chunk_id].entities.add(entity.id)
+                        self._integrate_positioning_info(doc_entities, chunk_map)
 
                         # Cache entities for this document
                         doc_entities_id = self.cache_manager.backend.generate_key(
@@ -179,4 +173,98 @@ class EntityHandler:
     async def _extract_all_entities(self, chunks: List[TextChunk]) -> List[Entity]:
         """Extract entities from all chunks without caching (fallback method)."""
         entities = await self.entity_extractor.extract(chunks)
+
+        # Integrate positioning info for non-cached extraction
+        chunk_map = {chunk.id: chunk for chunk in chunks}
+        self._integrate_positioning_info(entities, chunk_map)
+
         return entities
+
+    def _integrate_positioning_info(
+        self, entities: List[Entity], chunk_map: Dict[str, TextChunk]
+    ) -> None:
+        """Integrate positioning information from text chunks into entities.
+
+        This method attempts to find the entity text within the source text chunks
+        and sets positioning information based on text matching.
+
+        Args:
+            entities: List of entities to update with positioning info
+            chunk_map: Mapping of chunk IDs to TextChunk objects
+        """
+        from ...base.models.positioning import AlignmentStatus, CharInterval, Position
+
+        for entity in entities:
+            # Establish bidirectional linking
+            for chunk_id in entity.text_chunks:
+                if chunk_id in chunk_map:
+                    chunk_map[chunk_id].entities.add(entity.id)
+
+            # Set positioning information based on text matching
+            if entity.text_chunks and entity.name:
+                # Find the first chunk that contains this entity
+                for chunk_id in entity.text_chunks:
+                    if chunk_id in chunk_map:
+                        chunk = chunk_map[chunk_id]
+                        position = self._find_entity_position_in_chunk(entity, chunk)
+                        if position and position.is_positioned:
+                            entity.set_position(position)
+                            break  # Use first successful match
+
+    def _find_entity_position_in_chunk(
+        self, entity: Entity, chunk: TextChunk
+    ) -> Optional["Position"]:
+        """Find entity position within a text chunk.
+
+        Args:
+            entity: Entity to locate
+            chunk: Text chunk to search in
+
+        Returns:
+            Position object if entity is found, None otherwise
+        """
+        from ...base.models.positioning import AlignmentStatus, CharInterval, Position
+
+        if not entity.name or not chunk.content:
+            return None
+
+        entity_text = entity.name.lower().strip()
+        chunk_text = chunk.content.lower()
+
+        # Try exact match first
+        start_pos = chunk_text.find(entity_text)
+        if start_pos != -1:
+            end_pos = start_pos + len(entity_text)
+            char_interval = CharInterval(start_pos=start_pos, end_pos=end_pos)
+
+            # Calculate confidence based on entity name length and context
+            confidence = min(1.0, len(entity_text) / max(10, len(entity_text)))
+            confidence = max(0.3, confidence)  # Minimum confidence threshold
+
+            return Position(
+                char_interval=char_interval,
+                alignment_status=AlignmentStatus.MATCH_EXACT,
+                confidence=confidence,
+                source_context=f"Found in chunk {chunk.id}",
+            )
+
+        # Try matching aliases if exact match fails
+        for alias in entity.aliases:
+            if alias:
+                alias_text = alias.lower().strip()
+                start_pos = chunk_text.find(alias_text)
+                if start_pos != -1:
+                    end_pos = start_pos + len(alias_text)
+                    char_interval = CharInterval(start_pos=start_pos, end_pos=end_pos)
+
+                    confidence = min(0.8, len(alias_text) / max(10, len(alias_text)))
+                    confidence = max(0.2, confidence)
+
+                    return Position(
+                        char_interval=char_interval,
+                        alignment_status=AlignmentStatus.MATCH_FUZZY,
+                        confidence=confidence,
+                        source_context=f"Found alias '{alias}' in chunk {chunk.id}",
+                    )
+
+        return None

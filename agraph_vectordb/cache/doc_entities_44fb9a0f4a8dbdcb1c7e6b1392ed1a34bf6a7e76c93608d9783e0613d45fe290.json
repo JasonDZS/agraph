@@ -1,0 +1,86 @@
+[
+  {
+    "_type": "Entity",
+    "_data": {
+      "id": "7b7a1dd8-3564-4689-a748-fa0b2ccd7c0b",
+      "name": "Bob",
+      "entity_type": "person",
+      "description": "A researcher who studies natural language processing",
+      "properties": {},
+      "aliases": [],
+      "confidence": 0.95,
+      "source": "",
+      "text_chunks": [
+        "chunk_1_0"
+      ],
+      "created_at": "2025-09-04T17:51:02.078885",
+      "updated_at": "2025-09-04T17:51:02.079519",
+      "position": {
+        "char_interval": {
+          "start_pos": 0,
+          "end_pos": 3
+        },
+        "token_interval": null,
+        "alignment_status": "match_exact",
+        "confidence": 0.3,
+        "source_context": "Found in chunk chunk_1_0"
+      }
+    }
+  },
+  {
+    "_type": "Entity",
+    "_data": {
+      "id": "fed5e52a-f507-4d6e-abad-2435dc469830",
+      "name": "Alice",
+      "entity_type": "person",
+      "description": "Person who discusses technical topics with Bob",
+      "properties": {},
+      "aliases": [],
+      "confidence": 0.9,
+      "source": "",
+      "text_chunks": [
+        "chunk_1_0"
+      ],
+      "created_at": "2025-09-04T17:51:02.078965",
+      "updated_at": "2025-09-04T17:51:02.079590",
+      "position": {
+        "char_interval": {
+          "start_pos": 107,
+          "end_pos": 112
+        },
+        "token_interval": null,
+        "alignment_status": "match_exact",
+        "confidence": 0.5,
+        "source_context": "Found in chunk chunk_1_0"
+      }
+    }
+  },
+  {
+    "_type": "Entity",
+    "_data": {
+      "id": "0238a23f-aadc-4256-b64f-213d6cca0f43",
+      "name": "natural language processing",
+      "entity_type": "concept",
+      "description": "A field of study in computer science and artificial intelligence",
+      "properties": {},
+      "aliases": [],
+      "confidence": 0.85,
+      "source": "",
+      "text_chunks": [
+        "chunk_1_0"
+      ],
+      "created_at": "2025-09-04T17:51:02.078997",
+      "updated_at": "2025-09-04T17:51:02.079630",
+      "position": {
+        "char_interval": {
+          "start_pos": 32,
+          "end_pos": 59
+        },
+        "token_interval": null,
+        "alignment_status": "match_exact",
+        "confidence": 1.0,
+        "source_context": "Found in chunk chunk_1_0"
+      }
+    }
+  }
+]

@@ -5,10 +5,10 @@ Base class for clustering algorithms.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set
 
-from ...base.clusters import Cluster
-from ...base.entities import Entity
-from ...base.relations import Relation
-from ...base.types import ClusterType
+from ...base.core.types import ClusterType
+from ...base.models.clusters import Cluster
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
 
 
 class ClusterAlgorithm(ABC):

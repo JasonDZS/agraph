@@ -4,9 +4,9 @@ Cluster formation handler for knowledge graph builder.
 
 from typing import List
 
-from ...base.clusters import Cluster
-from ...base.entities import Entity
-from ...base.relations import Relation
+from ...base.models.clusters import Cluster
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
 from ...builder.cache import CacheManager
 from ...builder.clustering import ClusterAlgorithm
 from ...config import BuildSteps

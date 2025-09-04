@@ -6,7 +6,7 @@ This module provides common utility functions used across the package.
 
 from typing import Union
 
-from .base.types import ClusterType, EntityType, RelationType
+from .base.core.types import ClusterType, EntityType, RelationType
 
 
 def get_type_value(type_obj: Union[EntityType, RelationType, ClusterType, str]) -> str:

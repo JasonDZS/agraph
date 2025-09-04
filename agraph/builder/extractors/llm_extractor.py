@@ -9,10 +9,10 @@ from typing import Any, Dict, List, Optional
 
 from openai import AsyncOpenAI
 
-from ...base.entities import Entity
-from ...base.relations import Relation
-from ...base.text import TextChunk
-from ...base.types import EntityType, RelationType
+from ...base.core.types import EntityType, RelationType
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
+from ...base.models.text import TextChunk
 from ...config import get_settings
 from ...logger import logger
 from .base import EntityExtractor, RelationExtractor
@@ -21,28 +21,53 @@ from .base import EntityExtractor, RelationExtractor
 class LLMEntityExtractor(EntityExtractor):
     """LLM-based entity extractor."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config=None):
         """Initialize LLM entity extractor.
 
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary (backward compatibility)
+            builder_config: BuilderConfig instance with integrated LLM and OpenAI configs
         """
         super().__init__(config)
-        self.settings = get_settings()
-        self.llm_provider = (
-            config.get("llm_provider", self.settings.llm.provider)
-            if config
-            else self.settings.llm.provider
-        )
-        self.llm_model = (
-            config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
-        )
+        
+        # Use builder_config if provided, otherwise fall back to global settings
+        if builder_config:
+            self.llm_provider = builder_config.llm_provider
+            self.llm_model = builder_config.llm_model
+            self.llm_temperature = builder_config.llm_temperature
+            self.llm_max_tokens = builder_config.llm_max_tokens
+            
+            # Initialize AsyncOpenAI client with builder_config settings
+            self.client = AsyncOpenAI(
+                api_key=builder_config.openai_config.api_key,
+                base_url=builder_config.openai_config.api_base
+            )
+        else:
+            # Backward compatibility: use config dict or global settings
+            self.settings = get_settings()
+            self.llm_provider = (
+                config.get("llm_provider", self.settings.llm.provider)
+                if config
+                else self.settings.llm.provider
+            )
+            self.llm_model = (
+                config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
+            )
+            self.llm_temperature = (
+                config.get("llm_temperature", self.settings.llm.temperature) 
+                if config else self.settings.llm.temperature
+            )
+            self.llm_max_tokens = (
+                config.get("llm_max_tokens", self.settings.llm.max_tokens) 
+                if config else self.settings.llm.max_tokens
+            )
+            
+            # Initialize AsyncOpenAI client with global settings
+            self.client = AsyncOpenAI(
+                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
+            )
+        
         self.batch_size = config.get("batch_size", 5) if config else 5
-
-        # Initialize AsyncOpenAI client
-        self.client = AsyncOpenAI(
-            api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-        )
 
     async def extract(self, chunks: List[TextChunk]) -> List[Entity]:
         """Extract entities from text chunks."""
@@ -206,8 +231,8 @@ Requirements:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=self.settings.llm.temperature,
-                max_tokens=4096,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
             )
             content = response.choices[0].message.content
 
@@ -229,7 +254,7 @@ Requirements:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self) -> None:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.aclose()
 
@@ -237,28 +262,53 @@ Requirements:
 class LLMRelationExtractor(RelationExtractor):
     """LLM-based relation extractor."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config=None):
         """Initialize LLM relation extractor.
 
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary (backward compatibility)
+            builder_config: BuilderConfig instance with integrated LLM and OpenAI configs
         """
         super().__init__(config)
-        self.settings = get_settings()
-        self.llm_provider = (
-            config.get("llm_provider", self.settings.llm.provider)
-            if config
-            else self.settings.llm.provider
-        )
-        self.llm_model = (
-            config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
-        )
+        
+        # Use builder_config if provided, otherwise fall back to global settings
+        if builder_config:
+            self.llm_provider = builder_config.llm_provider
+            self.llm_model = builder_config.llm_model
+            self.llm_temperature = builder_config.llm_temperature
+            self.llm_max_tokens = builder_config.llm_max_tokens
+            
+            # Initialize AsyncOpenAI client with builder_config settings
+            self.client = AsyncOpenAI(
+                api_key=builder_config.openai_config.api_key,
+                base_url=builder_config.openai_config.api_base
+            )
+        else:
+            # Backward compatibility: use config dict or global settings
+            self.settings = get_settings()
+            self.llm_provider = (
+                config.get("llm_provider", self.settings.llm.provider)
+                if config
+                else self.settings.llm.provider
+            )
+            self.llm_model = (
+                config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
+            )
+            self.llm_temperature = (
+                config.get("llm_temperature", self.settings.llm.temperature) 
+                if config else self.settings.llm.temperature
+            )
+            self.llm_max_tokens = (
+                config.get("llm_max_tokens", self.settings.llm.max_tokens) 
+                if config else self.settings.llm.max_tokens
+            )
+            
+            # Initialize AsyncOpenAI client with global settings
+            self.client = AsyncOpenAI(
+                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
+            )
+        
         self.batch_size = config.get("batch_size", 5) if config else 5
-
-        # Initialize AsyncOpenAI client
-        self.client = AsyncOpenAI(
-            api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-        )
 
     async def extract(self, chunks: List[TextChunk], entities: List[Entity]) -> List[Relation]:
         """Extract relations from text chunks and entities."""
@@ -472,8 +522,8 @@ Requirements:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=self.settings.llm.temperature,
-                max_tokens=4096,
+                temperature=self.llm_temperature,
+                max_tokens=self.llm_max_tokens,
             )
 
             return response.choices[0].message.content or ""
@@ -491,6 +541,6 @@ Requirements:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self) -> None:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.aclose()

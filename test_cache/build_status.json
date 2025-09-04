@@ -1,0 +1,12 @@
+{
+  "current_step": "graph_assembly",
+  "last_completed_step": "graph_assembly",
+  "total_steps": 6,
+  "completed_steps": 6,
+  "progress": 100.0,
+  "is_completed": true,
+  "has_error": false,
+  "started_at": "2025-08-31T23:40:18.891287",
+  "updated_at": "2025-08-31T23:40:20.479020",
+  "error_message": null
+}

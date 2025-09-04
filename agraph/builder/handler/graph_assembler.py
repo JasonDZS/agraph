@@ -4,14 +4,19 @@ Knowledge graph assembly handler for knowledge graph builder.
 
 from typing import Any, Dict, List, Optional
 
-from ...base.clusters import Cluster
-from ...base.entities import Entity
-from ...base.interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
-from ...base.optimized_graph import OptimizedKnowledgeGraph
-from ...base.relations import Relation
+from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.managers.interfaces import (
+    ClusterManager,
+    EntityManager,
+    RelationManager,
+    TextChunkManager,
+)
+from ...base.models.clusters import Cluster
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
 
 # Import unified architecture components
-from ...base.text import TextChunk
+from ...base.models.text import TextChunk
 from ...builder.cache import CacheManager
 from ...config import BuildSteps
 from ...logger import logger

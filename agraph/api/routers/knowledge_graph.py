@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ...base.entities import Entity
+from ...base.models.entities import Entity
 from ...logger import logger
 from ...processor.factory import DocumentProcessorManager
 from ..dependencies import get_agraph_instance, get_document_manager

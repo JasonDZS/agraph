@@ -1,0 +1,260 @@
+{
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_c2b5c27f66b7a58e64bd13039b4638d9c647fa26c62551c0635cd84798f58e65": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "2a3bc019-1b9a-4db6-97d0-c3edda9c4c23",
+        "name": "Person Cluster: Bob, OpenAI, Alice",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 2 persons (3 entities total)",
+        "entities": [
+          "1c67639a-f030-4329-ae30-ebd85973b252",
+          "b39ba9fc-06e9-4290-a998-9f001cf89c4f",
+          "da066a1b-6630-4a5d-8f5f-9a176692cc28"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.062277",
+        "updated_at": "2025-09-04T17:51:10.062277"
+      }
+    },
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "386fcb7e-4fb3-446f-bc04-c0c5c0db4b17",
+        "name": "Person Cluster: natural language processing, Bob, Alice",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 concept, 2 persons (3 entities total)",
+        "entities": [
+          "0238a23f-aadc-4256-b64f-213d6cca0f43",
+          "7b7a1dd8-3564-4689-a748-fa0b2ccd7c0b",
+          "fed5e52a-f507-4d6e-abad-2435dc469830"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.062329",
+        "updated_at": "2025-09-04T17:51:10.062330"
+      }
+    },
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "15696507-ced5-46d9-a88c-fe68272ee054",
+        "name": "Concept Cluster: AI systems, OpenAI, Sam Altman",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 concept, 1 organization, 1 person (3 entities total)",
+        "entities": [
+          "68972ace-85cf-4010-8c0f-c4c1a431c9f2",
+          "63159819-5687-4020-91ef-4941b88cb3f2",
+          "48c97dee-f301-4a8f-99e9-2f950bd73118"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.062343",
+        "updated_at": "2025-09-04T17:51:10.062344"
+      }
+    }
+  ],
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_f65776bb61e086c7bdcddefc323f2d1454077ec076c33840baa15336117a979e": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "11957ba6-bc79-4472-884d-863109b8a3dc",
+        "name": "Person Cluster: Bob, OpenAI, Alice",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 2 persons (3 entities total)",
+        "entities": [
+          "1c67639a-f030-4329-ae30-ebd85973b252",
+          "b39ba9fc-06e9-4290-a998-9f001cf89c4f",
+          "da066a1b-6630-4a5d-8f5f-9a176692cc28"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.245968",
+        "updated_at": "2025-09-04T17:51:10.245968"
+      }
+    },
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "a455204f-fe07-4af2-8fa8-d7a5f9aaf8cd",
+        "name": "Person Cluster: natural language processing, Bob, Alice",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 concept, 2 persons (3 entities total)",
+        "entities": [
+          "0238a23f-aadc-4256-b64f-213d6cca0f43",
+          "7b7a1dd8-3564-4689-a748-fa0b2ccd7c0b",
+          "fed5e52a-f507-4d6e-abad-2435dc469830"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.245981",
+        "updated_at": "2025-09-04T17:51:10.245981"
+      }
+    },
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "5cca2831-523f-4737-957d-ce41702fe03b",
+        "name": "Concept Cluster: AI systems, OpenAI, Sam Altman",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 concept, 1 organization, 1 person (3 entities total)",
+        "entities": [
+          "68972ace-85cf-4010-8c0f-c4c1a431c9f2",
+          "63159819-5687-4020-91ef-4941b88cb3f2",
+          "48c97dee-f301-4a8f-99e9-2f950bd73118"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T17:51:10.245991",
+        "updated_at": "2025-09-04T17:51:10.245991"
+      }
+    }
+  ],
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_18a18f5ba397c5764ff795be04c87b987c75a0ca42e7d5c9a7142c5a2c15bab8": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "fd498bb9-48b0-4087-89ed-7d48e76975b9",
+        "name": "Organization Cluster: Google, Android",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 1 software (2 entities total)",
+        "entities": [
+          "d56b826f-9ab6-46f1-9fbe-6a5c22def179",
+          "82993a8e-4876-4f34-87af-a749ca8ca1e1"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T18:11:19.170160",
+        "updated_at": "2025-09-04T18:11:19.170160"
+      }
+    }
+  ],
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_a4ee58216453fb8288a67976a2cd8d827d27cc6ab6fedfab5ba9c05b83b7e29e": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "d2ea2d8e-cd74-4367-aa41-319b86b30fd8",
+        "name": "Organization Cluster: Google, Android",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 1 software (2 entities total)",
+        "entities": [
+          "d56b826f-9ab6-46f1-9fbe-6a5c22def179",
+          "82993a8e-4876-4f34-87af-a749ca8ca1e1"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T18:11:20.370481",
+        "updated_at": "2025-09-04T18:11:20.370482"
+      }
+    }
+  ],
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_0787145dfab3978ed455c1e5cb1166265f6fda93d0003c137220c15b326fc523": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "02b3c378-5fe3-44fc-adb7-f6a362496ab8",
+        "name": "Software Cluster: Android, Google",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 1 software (2 entities total)",
+        "entities": [
+          "82993a8e-4876-4f34-87af-a749ca8ca1e1",
+          "d56b826f-9ab6-46f1-9fbe-6a5c22def179"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T18:14:15.293318",
+        "updated_at": "2025-09-04T18:14:15.293319"
+      }
+    }
+  ],
+  "cluster_formation_9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d_30611a55607ac0f4380c114e5752887fdb53ea81504de84055b32c4b54cc9bca": [
+    {
+      "_type": "Cluster",
+      "_data": {
+        "id": "2baa4e47-273e-4522-be27-fb436fb381e4",
+        "name": "Software Cluster: Android, Google",
+        "cluster_type": "topic",
+        "description": "Cluster containing 1 organization, 1 software (2 entities total)",
+        "entities": [
+          "82993a8e-4876-4f34-87af-a749ca8ca1e1",
+          "d56b826f-9ab6-46f1-9fbe-6a5c22def179"
+        ],
+        "relations": [],
+        "centroid_entity_id": "",
+        "parent_cluster_id": "",
+        "child_clusters": [],
+        "cohesion_score": 0.0,
+        "properties": {},
+        "confidence": 0.8,
+        "source": "",
+        "text_chunks": [],
+        "created_at": "2025-09-04T18:14:16.507483",
+        "updated_at": "2025-09-04T18:14:16.507483"
+      }
+    }
+  ]
+}

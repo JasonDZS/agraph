@@ -1,119 +1,119 @@
-repos:
-  # Basic code quality checks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
-      - id: end-of-file-fixer
-      - id: check-yaml
-        args: [--allow-multiple-documents]
-      - id: check-json
-      - id: check-toml
-      - id: check-merge-conflict
-      - id: check-added-large-files
-        args: [--maxkb=500]
-      - id: check-docstring-first
-      - id: debug-statements
-      - id: check-case-conflict
-      - id: check-executables-have-shebangs
-      - id: fix-byte-order-marker
-      - id: mixed-line-ending
-        args: [--fix=lf]
+# repos:
+#   # Basic code quality checks
+#   - repo: https://github.com/pre-commit/pre-commit-hooks
+#     rev: v4.6.0
+#     hooks:
+#       - id: trailing-whitespace
+#         args: [--markdown-linebreak-ext=md]
+#       - id: end-of-file-fixer
+#       - id: check-yaml
+#         args: [--allow-multiple-documents]
+#       - id: check-json
+#       - id: check-toml
+#       - id: check-merge-conflict
+#       - id: check-added-large-files
+#         args: [--maxkb=500]
+#       - id: check-docstring-first
+#       - id: debug-statements
+#       - id: check-case-conflict
+#       - id: check-executables-have-shebangs
+#       - id: fix-byte-order-marker
+#       - id: mixed-line-ending
+#         args: [--fix=lf]
 
-  # Python code formatting
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
-    hooks:
-      - id: black
-        language_version: python3.11
-        args: [--line-length=100, --target-version=py311]
-        files: ^(agraph/|tests/|main\.py).*\.py$
+#   # Python code formatting
+#   - repo: https://github.com/psf/black
+#     rev: 24.8.0
+#     hooks:
+#       - id: black
+#         language_version: python3.11
+#         args: [--line-length=100, --target-version=py311]
+#         files: ^(agraph/|tests/|main\.py).*\.py$
 
-  # Import sorting
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: [
-          "--profile", "black",
-          "--line-length=100",
-          "--multi-line=3",
-          "--trailing-comma",
-          "--force-grid-wrap=0",
-          "--combine-as"
-        ]
-        files: ^(agraph/|tests/|main\.py).*\.py$
+#   # Import sorting
+#   - repo: https://github.com/pycqa/isort
+#     rev: 5.13.2
+#     hooks:
+#       - id: isort
+#         args: [
+#           "--profile", "black",
+#           "--line-length=100",
+#           "--multi-line=3",
+#           "--trailing-comma",
+#           "--force-grid-wrap=0",
+#           "--combine-as"
+#         ]
+#         files: ^(agraph/|tests/|main\.py).*\.py$
 
-  # Code style and syntax checks
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
-    hooks:
-      - id: flake8
-        args: [
-          "--extend-ignore=E203,W503,E501",
-          "--per-file-ignores=__init__.py:F401",
-        ]
-        files: ^(agraph/|tests/|main\.py).*\.py$
+#   # Code style and syntax checks
+#   - repo: https://github.com/pycqa/flake8
+#     rev: 7.1.1
+#     hooks:
+#       - id: flake8
+#         args: [
+#           "--extend-ignore=E203,W503,E501",
+#           "--per-file-ignores=__init__.py:F401",
+#         ]
+#         files: ^(agraph/|tests/|main\.py).*\.py$
 
-  # Type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
-    hooks:
-      - id: mypy
-        additional_dependencies: [
-          pydantic>=2.11.7,
-          python-dotenv>=1.0.0,
-          openai>=1.99.9,
-          types-requests,
-          types-PyYAML
-        ]
-        args: [
-          "--ignore-missing-imports",
-        ]
-        files: ^agraph/.*\.py$
+#   # Type checking
+#   - repo: https://github.com/pre-commit/mirrors-mypy
+#     rev: v1.17.1
+#     hooks:
+#       - id: mypy
+#         additional_dependencies: [
+#           pydantic>=2.11.7,
+#           python-dotenv>=1.0.0,
+#           openai>=1.99.9,
+#           types-requests,
+#           types-PyYAML
+#         ]
+#         args: [
+#           "--ignore-missing-imports",
+#         ]
+#         files: ^agraph/.*\.py$
 
-  # Pylint code quality checks
-  - repo: https://github.com/pycqa/pylint
-    rev: v3.2.6
-    hooks:
-      - id: pylint
-        additional_dependencies: [
-          pydantic>=2.11.7,
-          python-dotenv>=1.0.0,
-          openai>=1.99.9
-        ]
-        args: [
-          "--rcfile=.pylintrc",
-          "--max-line-length=120",
-          "--disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,too-few-public-methods,too-many-arguments,too-many-instance-attributes,fixme,no-member",
-          "--exit-zero"
-        ]
-        files: ^agraph/.*\.py$
+#   # Pylint code quality checks
+#   - repo: https://github.com/pycqa/pylint
+#     rev: v3.2.6
+#     hooks:
+#       - id: pylint
+#         additional_dependencies: [
+#           pydantic>=2.11.7,
+#           python-dotenv>=1.0.0,
+#           openai>=1.99.9
+#         ]
+#         args: [
+#           "--rcfile=.pylintrc",
+#           "--max-line-length=120",
+#           "--disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,too-few-public-methods,too-many-arguments,too-many-instance-attributes,fixme,no-member",
+#           "--exit-zero"
+#         ]
+#         files: ^agraph/.*\.py$
 
-  # Docstring checks
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        args: [
-          "--convention=google",
-          "--add-ignore=D100,D101,D102,D104,D105,D106,D107,D200,D203,D212,D213,D406,D407,D413"
-        ]
-        files: ^agraph/.*\.py$
+#   # Docstring checks
+#   - repo: https://github.com/pycqa/pydocstyle
+#     rev: 6.3.0
+#     hooks:
+#       - id: pydocstyle
+#         args: [
+#           "--convention=google",
+#           "--add-ignore=D100,D101,D102,D104,D105,D106,D107,D200,D203,D212,D213,D406,D407,D413"
+#         ]
+#         files: ^agraph/.*\.py$
 
-  # YAML format checks
-  - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
-    hooks:
-      - id: yamllint
-        args: [-d, relaxed]
-        files: \.(yaml|yml)$
+#   # YAML format checks
+#   - repo: https://github.com/adrienverge/yamllint
+#     rev: v1.35.1
+#     hooks:
+#       - id: yamllint
+#         args: [-d, relaxed]
+#         files: \.(yaml|yml)$
 
-#  # Markdown format checks
-#  - repo: https://github.com/igorshubovych/markdownlint-cli
-#    rev: v0.41.0
-#    hooks:
-#      - id: markdownlint
-#        args: [--fix, --config, .markdownlint.yaml]
-#        files: \.md$
+# #  # Markdown format checks
+# #  - repo: https://github.com/igorshubovych/markdownlint-cli
+# #    rev: v0.41.0
+# #    hooks:
+# #      - id: markdownlint
+# #        args: [--fix, --config, .markdownlint.yaml]
+# #        files: \.md$

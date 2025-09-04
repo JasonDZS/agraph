@@ -1,0 +1,9 @@
+{
+  "step_name": "entity_extraction",
+  "timestamp": "2025-09-04T18:14:16.470358",
+  "input_hash": "a204ff15b6098393d48bfc4c87b5d9943e8c2e939dbb7d3de774eef57eeb2636",
+  "config_hash": "9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d",
+  "version": "1.0",
+  "file_hashes": null,
+  "processing_time": null
+}

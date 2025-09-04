@@ -889,10 +889,10 @@ class CustomEntityManager(EntityManager):
 
 ```python
 # ✅ v0.2.0 推荐写法
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
-from agraph.base.entities import Entity
-from agraph.base.relations import Relation
-from agraph.base.types import EntityType, RelationType
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.models.entities import Entity
+from agraph.base.models.relations import Relation
+from agraph.base.core.types import EntityType, RelationType
 
 # 🚀 创建优化知识图谱（自动集成索引和缓存）
 kg = OptimizedKnowledgeGraph(name="高性能知识图谱")
@@ -947,7 +947,7 @@ print(f"缓存清理: {optimization['cache_cleanup']}")
 
 ```python
 # ❌ 已弃用写法（性能差，不推荐）
-from agraph.base.graph import KnowledgeGraph  # ⚠️ 已弃用
+from agraph.base.graphs.legacy import KnowledgeGraph  # ⚠️ 已弃用
 
 # 🐌 创建传统知识图谱（无优化）
 kg = KnowledgeGraph(name="传统知识图谱")  # ⚠️ 将在 v1.0.0 移除
@@ -964,8 +964,8 @@ search = kg.search_entities("张三", limit=10)          # 🐌 每次全量搜�
 # 🔄 迁移只需要改变导入和实例化，API 完全兼容
 
 # 步骤1: 更改导入
-# from agraph.base.graph import KnowledgeGraph  # ❌ 移除
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph  # ✅ 新增
+# from agraph.base.graphs.legacy import KnowledgeGraph  # ❌ 移除
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph  # ✅ 新增
 
 # 步骤2: 更改实例化
 # kg = KnowledgeGraph()  # ❌ 移除
@@ -1026,11 +1026,11 @@ if metrics['index_statistics']['hit_ratio'] < 0.9:
 #### 1. 优先使用 OptimizedKnowledgeGraph
 ```python
 # ✅ 推荐：自动获得 10-100x 性能提升
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
 kg = OptimizedKnowledgeGraph()
 
 # ❌ 避免：传统版本性能不足
-from agraph.base.graph import KnowledgeGraph  # 已弃用
+from agraph.base.graphs.legacy import KnowledgeGraph  # 已弃用
 ```
 
 #### 2. 利用索引化查询

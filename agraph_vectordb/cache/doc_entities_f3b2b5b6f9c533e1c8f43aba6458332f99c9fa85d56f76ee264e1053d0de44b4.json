@@ -1,0 +1,58 @@
+[
+  {
+    "_type": "Entity",
+    "_data": {
+      "id": "d56b826f-9ab6-46f1-9fbe-6a5c22def179",
+      "name": "Google",
+      "entity_type": "organization",
+      "description": "Multinational technology company specializing in internet-related services and products",
+      "properties": {},
+      "aliases": [],
+      "confidence": 0.95,
+      "source": "",
+      "text_chunks": [
+        "chunk_1_0"
+      ],
+      "created_at": "2025-09-04T18:11:14.073968",
+      "updated_at": "2025-09-04T18:11:14.074153",
+      "position": {
+        "char_interval": {
+          "start_pos": 0,
+          "end_pos": 6
+        },
+        "token_interval": null,
+        "alignment_status": "match_exact",
+        "confidence": 0.6,
+        "source_context": "Found in chunk chunk_1_0"
+      }
+    }
+  },
+  {
+    "_type": "Entity",
+    "_data": {
+      "id": "82993a8e-4876-4f34-87af-a749ca8ca1e1",
+      "name": "Android",
+      "entity_type": "software",
+      "description": "Mobile operating system developed by Google",
+      "properties": {},
+      "aliases": [],
+      "confidence": 0.9,
+      "source": "",
+      "text_chunks": [
+        "chunk_1_0"
+      ],
+      "created_at": "2025-09-04T18:11:14.074019",
+      "updated_at": "2025-09-04T18:11:14.074171",
+      "position": {
+        "char_interval": {
+          "start_pos": 14,
+          "end_pos": 21
+        },
+        "token_interval": null,
+        "alignment_status": "match_exact",
+        "confidence": 0.7,
+        "source_context": "Found in chunk chunk_1_0"
+      }
+    }
+  }
+]

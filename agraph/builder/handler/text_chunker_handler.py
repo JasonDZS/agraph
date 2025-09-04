@@ -5,7 +5,7 @@ Text chunking handler for knowledge graph builder.
 from pathlib import Path
 from typing import List, Optional, Union
 
-from ...base.text import TextChunk
+from ...base.models.text import TextChunk
 from ...builder.cache import CacheManager
 from ...chunker import TokenChunker
 from ...config import BuilderConfig, BuildSteps

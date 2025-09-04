@@ -1,0 +1,12 @@
+{
+  "current_step": "entity_extraction",
+  "last_completed_step": "text_chunking",
+  "total_steps": 6,
+  "completed_steps": 2,
+  "progress": 33.33333333333333,
+  "is_completed": false,
+  "has_error": false,
+  "started_at": "2025-09-04T16:42:44.371289",
+  "updated_at": "2025-09-04T16:57:23.361146",
+  "error_message": null
+}

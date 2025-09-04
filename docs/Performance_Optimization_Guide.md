@@ -92,10 +92,10 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 #### 1. 创建优化版知识图谱
 
 ```python
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
-from agraph.base.entities import Entity
-from agraph.base.relations import Relation
-from agraph.base.types import EntityType, RelationType
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.models.entities import Entity
+from agraph.base.models.relations import Relation
+from agraph.base.core.types import EntityType, RelationType
 
 # 创建优化版图谱
 kg = OptimizedKnowledgeGraph(name="高性能知识图谱")
@@ -168,7 +168,7 @@ kg.rebuild_indexes()
 #### 2. 自定义缓存策略
 
 ```python
-from agraph.base.cache import CacheManager, CacheStrategy
+from agraph.base.infrastructure.cache import CacheManager, CacheStrategy
 
 # 创建自定义缓存管理器
 custom_cache = CacheManager(
@@ -219,11 +219,11 @@ monitor_thread.start()
 
 ```python
 # 原有代码
-from agraph.base.graph import KnowledgeGraph
+from agraph.base.graphs.legacy import KnowledgeGraph
 kg = KnowledgeGraph()
 
 # 新优化版本 - 只需更改导入
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
 kg = OptimizedKnowledgeGraph()  # API 完全相同
 
 # 所有原有方法调用都保持不变
@@ -249,9 +249,9 @@ optimized_kg = OptimizedKnowledgeGraph()
 USE_OPTIMIZED_GRAPH = True  # 配置项
 
 if USE_OPTIMIZED_GRAPH:
-    from agraph.base.optimized_graph import OptimizedKnowledgeGraph as KG
+    from agraph.base.graphs.optimized import OptimizedKnowledgeGraph as KG
 else:
-    from agraph.base.graph import KnowledgeGraph as KG
+    from agraph.base.graphs.legacy import KnowledgeGraph as KG
 
 kg = KG()  # 使用统一接口
 ```
@@ -259,7 +259,7 @@ kg = KG()  # 使用统一接口
 **阶段3**: 完全迁移
 ```python
 # 完全切换到优化版本
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
 ```
 
 #### 3. 数据迁移
@@ -357,7 +357,7 @@ Cache speed improvement: 52.00x
 ### 自定义基准测试
 
 ```python
-from agraph.base.optimized_graph import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
 import time
 
 def custom_benchmark():
@@ -403,7 +403,7 @@ kg.cache_manager.max_size = 1000  # 减少缓存条目
 kg.cache_manager.cleanup_expired()
 
 # 重置缓存策略
-from agraph.base.cache import CacheStrategy
+from agraph.base.infrastructure.cache import CacheStrategy
 kg.cache_manager.strategy = CacheStrategy.TTL  # 只使用TTL策略
 ```
 

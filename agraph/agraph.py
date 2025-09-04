@@ -13,18 +13,23 @@ import os
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
-from .base.dao import MemoryDataAccessLayer
-from .base.entities import Entity
-from .base.graph import KnowledgeGraph
-from .base.interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
+from .base.core.result import Result
+from .base.graphs.legacy import KnowledgeGraph
+from .base.graphs.optimized import OptimizedKnowledgeGraph
+from .base.infrastructure.dao import MemoryDataAccessLayer
 
 # Import unified architecture components
-from .base.manager_factory import create_managers
-from .base.optimized_graph import OptimizedKnowledgeGraph
-from .base.relations import Relation
-from .base.result import Result
-from .base.text import TextChunk
-from .builder.builder import KnowledgeGraphBuilder
+from .base.managers.factory import create_managers
+from .base.managers.interfaces import (
+    ClusterManager,
+    EntityManager,
+    RelationManager,
+    TextChunkManager,
+)
+from .base.models.entities import Entity
+from .base.models.relations import Relation
+from .base.models.text import TextChunk
+from .builder.builder_v2 import KnowledgeGraphBuilderV2 as KnowledgeGraphBuilder
 from .chunker import TokenChunker
 from .config import BuilderConfig, Settings, get_settings
 from .logger import logger
@@ -71,11 +76,12 @@ class AGraph:
             config = BuilderConfig(
                 chunk_size=self.settings.text.max_chunk_size,
                 chunk_overlap=self.settings.text.chunk_overlap,
-                llm_provider=self.settings.llm.provider,
-                llm_model=self.settings.llm.model,
                 entity_confidence_threshold=0.7,
                 relation_confidence_threshold=0.6,
                 cache_dir=os.path.join(self.persist_directory, "cache"),
+                llm_config=self.settings.llm,
+                embedding_config=self.settings.embedding,
+                openai_config=self.settings.openai,
             )
         self.config = config
 
@@ -375,8 +381,41 @@ class AGraph:
             if self.knowledge_graph:
                 self.save_knowledge_graph_to_disk()
 
-            # Asynchronously save to vector store
-            if save_to_vector_store:
+            # Check if new content was built (not all from cache) before saving to vector store
+            should_save_to_vector_store = save_to_vector_store
+            if save_to_vector_store and use_cache:
+                # Check if builder has cache usage information
+                if hasattr(self.builder, 'last_build_context') and self.builder.last_build_context:
+                    context = self.builder.last_build_context
+                    from .config import BuildSteps
+                    
+                    # Check actual cache usage based on execution times
+                    # If major steps completed very quickly (< 1s), likely used cache
+                    new_content_built = False
+                    major_steps = [BuildSteps.ENTITY_EXTRACTION, BuildSteps.RELATION_EXTRACTION, BuildSteps.CLUSTER_FORMATION]
+                    
+                    for step in major_steps:
+                        if context.is_step_completed(step):
+                            execution_time = context.step_execution_times.get(step, float('inf'))
+                            # If execution time > 1 second, likely built new content
+                            # If execution time < 1 second, likely used cache
+                            if execution_time > 1.0:
+                                new_content_built = True
+                                logger.debug(f"Step {step} took {execution_time:.2f}s, indicating new content processing")
+                            else:
+                                logger.debug(f"Step {step} took {execution_time:.2f}s, indicating cache usage")
+                    
+                    if not new_content_built:
+                        should_save_to_vector_store = False
+                        logger.info("All major components loaded from cache, skipping vector store save")
+                    else:
+                        logger.info(f"New content detected, will save to vector store")
+                        
+                else:
+                    logger.debug("No build context available for cache analysis")
+
+            # Asynchronously save to vector store only if needed
+            if should_save_to_vector_store:
                 task = asyncio.create_task(self._save_to_vector_store())
                 self._background_tasks.append(task)
 

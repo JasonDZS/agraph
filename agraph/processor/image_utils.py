@@ -168,12 +168,12 @@ class ImagePreprocessor:
                     img = enhancer.enhance(brightness)
 
                 if contrast != 1.0:
-                    enhancer = ImageEnhance.Contrast(img)
-                    img = enhancer.enhance(contrast)
+                    contrast_enhancer = ImageEnhance.Contrast(img)
+                    img = contrast_enhancer.enhance(contrast)
 
                 if sharpness != 1.0:
-                    enhancer = ImageEnhance.Sharpness(img)
-                    img = enhancer.enhance(sharpness)
+                    sharpness_enhancer = ImageEnhance.Sharpness(img)
+                    img = sharpness_enhancer.enhance(sharpness)
 
                 img.save(output_path, optimize=True, quality=85)
                 return str(output_path)

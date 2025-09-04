@@ -7,12 +7,12 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
-from ...base.clusters import Cluster
-from ...base.entities import Entity
-from ...base.graph import KnowledgeGraph
-from ...base.optimized_graph import OptimizedKnowledgeGraph
-from ...base.relations import Relation
-from ...base.text import TextChunk
+from ...base.graphs.legacy import KnowledgeGraph
+from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.models.clusters import Cluster
+from ...base.models.entities import Entity
+from ...base.models.relations import Relation
+from ...base.models.text import TextChunk
 from ...config import CacheMetadata
 from .base import CacheBackend
 

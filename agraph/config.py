@@ -298,7 +298,9 @@ def update_settings(updates: Dict[str, Any]) -> Settings:
 
     # Invalidate cached instances to ensure new settings are used
     try:
-        from .base.instances import reset_instances  # pylint: disable=import-outside-toplevel
+        from .base.infrastructure.instances import (  # pylint: disable=import-outside-toplevel
+            reset_instances,
+        )
 
         reset_instances()  # Reset all instances for global settings update
     except ImportError:
@@ -591,13 +593,68 @@ class BuilderConfig:
     cluster_algorithm: str = "community_detection"
     min_cluster_size: int = 2
 
-    # LLM configuration
-    llm_provider: str = "openai"
-    llm_model: str = "gpt-3.5-turbo"
-
     # User interaction configuration
     enable_user_interaction: bool = True
     auto_save_edits: bool = True
+
+    # Integrated configuration instances
+    llm_config: LLMConfig = field(default_factory=LLMConfig)
+    embedding_config: EmbeddingConfig = field(default_factory=EmbeddingConfig)
+    openai_config: OpenAIConfig = field(default_factory=OpenAIConfig)
+
+    def __post_init__(self):
+        """Post-initialization to handle configuration integration."""
+        # Initialize default entity and relation types if empty
+        if not self.entity_types:
+            self.entity_types = GraphConfig().entity_types
+        if not self.relation_types:
+            self.relation_types = GraphConfig().relation_types
+
+    # Convenience properties for backward compatibility
+    @property
+    def llm_provider(self) -> str:
+        """Get LLM provider from integrated config."""
+        return self.llm_config.provider
+
+    @property
+    def llm_model(self) -> str:
+        """Get LLM model from integrated config."""
+        return self.llm_config.model
+
+    @property
+    def llm_temperature(self) -> float:
+        """Get LLM temperature from integrated config."""
+        return self.llm_config.temperature
+
+    @property
+    def llm_max_tokens(self) -> int:
+        """Get LLM max tokens from integrated config."""
+        return self.llm_config.max_tokens
+
+    @property
+    def embedding_provider(self) -> str:
+        """Get embedding provider from integrated config."""
+        return self.embedding_config.provider
+
+    @property
+    def embedding_model(self) -> str:
+        """Get embedding model from integrated config."""
+        return self.embedding_config.model
+
+    @property
+    def embedding_dimension(self) -> int:
+        """Get embedding dimension from integrated config."""
+        return self.embedding_config.dimension
+
+    @property
+    def embedding_max_token_size(self) -> int:
+        """Get embedding max token size from integrated config."""
+        return self.embedding_config.max_token_size
+
+    @property
+    def embedding_batch_size(self) -> int:
+        """Get embedding batch size from integrated config."""
+        return self.embedding_config.batch_size
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -614,16 +671,34 @@ class BuilderConfig:
             "relation_types": [str(rt) for rt in self.relation_types],
             "cluster_algorithm": self.cluster_algorithm,
             "min_cluster_size": self.min_cluster_size,
-            "llm_provider": self.llm_provider,
-            "llm_model": self.llm_model,
             "enable_user_interaction": self.enable_user_interaction,
             "auto_save_edits": self.auto_save_edits,
+            "llm_config": self.llm_config.model_dump(),
+            "embedding_config": self.embedding_config.model_dump(),
+            "openai_config": self.openai_config.model_dump(),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "BuilderConfig":
         """Create config from dictionary."""
-        config = cls()
+        # Extract nested config data
+        llm_config_data = data.pop("llm_config", {})
+        embedding_config_data = data.pop("embedding_config", {})
+        openai_config_data = data.pop("openai_config", {})
+        
+        # Create nested config instances
+        llm_config = LLMConfig(**llm_config_data) if llm_config_data else LLMConfig()
+        embedding_config = EmbeddingConfig(**embedding_config_data) if embedding_config_data else EmbeddingConfig()
+        openai_config = OpenAIConfig(**openai_config_data) if openai_config_data else OpenAIConfig()
+        
+        # Create base config
+        config = cls(
+            llm_config=llm_config,
+            embedding_config=embedding_config,
+            openai_config=openai_config
+        )
+        
+        # Set remaining fields
         for key, value in data.items():
             if hasattr(config, key):
                 setattr(config, key, value)
@@ -874,7 +949,9 @@ def update_project_settings(
 
     # Invalidate cached instances for this project to ensure new settings are used
     try:
-        from .base.instances import reset_instances  # pylint: disable=import-outside-toplevel
+        from .base.infrastructure.instances import (  # pylint: disable=import-outside-toplevel
+            reset_instances,
+        )
 
         reset_instances(project_name)
     except ImportError:

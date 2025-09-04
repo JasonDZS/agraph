@@ -1,0 +1,9 @@
+{
+  "step_name": "relation_extraction",
+  "timestamp": "2025-09-04T17:51:10.244639",
+  "input_hash": "7d6eb0585fea9cc6cf6bbdaa3e2e6bfc09a5705fe5a924eb14330b73aeca8791",
+  "config_hash": "9fd98d08f2bdec7df34773fe1474b801d9753caf6a37bfd8b6eb32307bcb198d",
+  "version": "1.0",
+  "file_hashes": null,
+  "processing_time": null
+}

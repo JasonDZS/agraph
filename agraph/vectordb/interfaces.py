@@ -8,10 +8,10 @@ allowing implementations to only depend on the interfaces they actually use.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ..base.clusters import Cluster
-from ..base.entities import Entity
-from ..base.relations import Relation
-from ..base.text import TextChunk
+from ..base.models.clusters import Cluster
+from ..base.models.entities import Entity
+from ..base.models.relations import Relation
+from ..base.models.text import TextChunk
 
 
 class VectorStoreCore(ABC):

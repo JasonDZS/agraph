@@ -1,0 +1,126 @@
+{
+  "result": [
+    {
+      "_type": "Relation",
+      "_data": {
+        "id": "f772f954-7bb3-45dc-a48e-4e30ce3484b7",
+        "head_entity_id": "da066a1b-6630-4a5d-8f5f-9a176692cc28",
+        "tail_entity_id": "b39ba9fc-06e9-4290-a998-9f001cf89c4f",
+        "relation_type": "works_for",
+        "properties": {},
+        "confidence": 1.0,
+        "source": "",
+        "description": "Alice works at OpenAI as a machine learning engineer",
+        "text_chunks": [
+          "chunk_0_0"
+        ],
+        "created_at": "2025-09-04T17:51:09.868264",
+        "updated_at": "2025-09-04T17:51:09.868297"
+      }
+    },
+    {
+      "_type": "Relation",
+      "_data": {
+        "id": "d1a3d47f-18e9-4879-ae9c-3f43e91616bb",
+        "head_entity_id": "da066a1b-6630-4a5d-8f5f-9a176692cc28",
+        "tail_entity_id": "1c67639a-f030-4329-ae30-ebd85973b252",
+        "relation_type": "references",
+        "properties": {},
+        "confidence": 1.0,
+        "source": "",
+        "description": "She collaborates with Bob on various AI projects",
+        "text_chunks": [
+          "chunk_0_0"
+        ],
+        "created_at": "2025-09-04T17:51:09.869124",
+        "updated_at": "2025-09-04T17:51:09.869126"
+      }
+    }
+  ],
+  "entities_context": [
+    {
+      "_type": "Entity",
+      "_data": {
+        "id": "da066a1b-6630-4a5d-8f5f-9a176692cc28",
+        "name": "Alice",
+        "entity_type": "person",
+        "description": "A person who works as a machine learning engineer",
+        "properties": {},
+        "aliases": [],
+        "confidence": 0.95,
+        "source": "",
+        "text_chunks": [
+          "chunk_0_0"
+        ],
+        "created_at": "2025-09-04T17:51:01.477834",
+        "updated_at": "2025-09-04T17:51:01.478116",
+        "position": {
+          "char_interval": {
+            "start_pos": 0,
+            "end_pos": 5
+          },
+          "token_interval": null,
+          "alignment_status": "match_exact",
+          "confidence": 0.5,
+          "source_context": "Found in chunk chunk_0_0"
+        }
+      }
+    },
+    {
+      "_type": "Entity",
+      "_data": {
+        "id": "b39ba9fc-06e9-4290-a998-9f001cf89c4f",
+        "name": "OpenAI",
+        "entity_type": "organization",
+        "description": "An artificial intelligence research organization",
+        "properties": {},
+        "aliases": [],
+        "confidence": 0.9,
+        "source": "",
+        "text_chunks": [
+          "chunk_0_0"
+        ],
+        "created_at": "2025-09-04T17:51:01.477863",
+        "updated_at": "2025-09-04T17:51:01.478141",
+        "position": {
+          "char_interval": {
+            "start_pos": 15,
+            "end_pos": 21
+          },
+          "token_interval": null,
+          "alignment_status": "match_exact",
+          "confidence": 0.6,
+          "source_context": "Found in chunk chunk_0_0"
+        }
+      }
+    },
+    {
+      "_type": "Entity",
+      "_data": {
+        "id": "1c67639a-f030-4329-ae30-ebd85973b252",
+        "name": "Bob",
+        "entity_type": "person",
+        "description": "A person who collaborates on AI projects",
+        "properties": {},
+        "aliases": [],
+        "confidence": 0.9,
+        "source": "",
+        "text_chunks": [
+          "chunk_0_0"
+        ],
+        "created_at": "2025-09-04T17:51:01.477873",
+        "updated_at": "2025-09-04T17:51:01.478159",
+        "position": {
+          "char_interval": {
+            "start_pos": 76,
+            "end_pos": 79
+          },
+          "token_interval": null,
+          "alignment_status": "match_exact",
+          "confidence": 0.3,
+          "source_context": "Found in chunk chunk_0_0"
+        }
+      }
+    }
+  ]
+}

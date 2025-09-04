@@ -6,14 +6,15 @@ with focus on entities, relations, and text processing capabilities.
 """
 
 from .agraph import AGraph
-from .base.clusters import Cluster
-from .base.entities import Entity
-from .base.graph import KnowledgeGraph  # DEPRECATED: Use OptimizedKnowledgeGraph instead
-from .base.optimized_graph import OptimizedKnowledgeGraph  # RECOMMENDED
-from .base.relations import Relation
-from .base.text import TextChunk
-from .base.types import ClusterType, EntityType, RelationType
-from .builder import BuilderConfig, KnowledgeGraphBuilder
+from .base.core.types import ClusterType, EntityType, RelationType
+from .base.graphs.legacy import KnowledgeGraph  # DEPRECATED: Use OptimizedKnowledgeGraph instead
+from .base.graphs.optimized import OptimizedKnowledgeGraph  # RECOMMENDED
+from .base.models.clusters import Cluster
+from .base.models.entities import Entity
+from .base.models.relations import Relation
+from .base.models.text import TextChunk
+from .builder.builder_v2 import KnowledgeGraphBuilderV2 as KnowledgeGraphBuilder
+from .config import BuilderConfig
 from .chunker import SimpleTokenChunker, TokenChunker
 from .config import Settings, get_settings
 
