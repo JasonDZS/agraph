@@ -11,21 +11,17 @@ from agraph.base.models.text import TextChunk
 from agraph.base.models.entities import Entity
 from agraph.base.models.relations import Relation
 from agraph.base.models.clusters import Cluster
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.core.types import EntityType, RelationType
-from agraph.builder.builder_v2 import KnowledgeGraphBuilderV2
-from agraph.builder.compatibility import (
-    BackwardCompatibleKnowledgeGraphBuilder,
-    MigrationHelper,
-    quick_migration_test
-)
+from agraph.builder.builder import KnowledgeGraphBuilder
+# Compatibility imports removed - tests focus on core functionality
 from agraph.builder.steps.context import BuildContext
 from agraph.builder.pipeline import BuildPipeline
 from agraph.config import BuilderConfig, BuildSteps
 
 
 class TestPipelineIntegration(unittest.TestCase):
-    """Test pipeline integration with KnowledgeGraphBuilderV2."""
+    """Test pipeline integration with KnowledgeGraphBuilder."""
     
     def setUp(self):
         """Set up test environment."""
@@ -49,7 +45,7 @@ class TestPipelineIntegration(unittest.TestCase):
     
     def test_pipeline_builder_initialization(self):
         """Test that pipeline builder initializes correctly."""
-        builder = KnowledgeGraphBuilderV2(
+        builder = KnowledgeGraphBuilder(
             config=self.config,
             enable_knowledge_graph=True
         )
@@ -102,7 +98,7 @@ class TestPipelineIntegration(unittest.TestCase):
     
     def test_pipeline_factory_creation(self):
         """Test pipeline factory creates correct pipelines."""
-        builder = KnowledgeGraphBuilderV2(config=self.config)
+        builder = KnowledgeGraphBuilder(config=self.config)
         
         # Test text-only pipeline creation
         text_pipeline = builder.pipeline_factory.create_text_only_pipeline(
@@ -127,7 +123,7 @@ class TestPipelineIntegration(unittest.TestCase):
     
     def test_custom_pipeline_creation(self):
         """Test custom pipeline creation with builder pattern."""
-        builder = KnowledgeGraphBuilderV2(config=self.config)
+        builder = KnowledgeGraphBuilder(config=self.config)
         
         # Create custom pipeline using builder pattern
         custom_pipeline = (builder.pipeline_builder
@@ -164,7 +160,7 @@ class TestMockPipelineExecution(unittest.TestCase):
         # This test would require extensive mocking of all handlers
         # For now, we'll test the structure
         
-        builder = KnowledgeGraphBuilderV2(config=self.config)
+        builder = KnowledgeGraphBuilder(config=self.config)
         context = BuildContext(
             texts=self.test_texts,
             graph_name="mock_test"
@@ -187,47 +183,8 @@ class TestMockPipelineExecution(unittest.TestCase):
         self.assertEqual(len(pipeline.get_step_names()), 5)
 
 
-class TestBackwardCompatibility(unittest.TestCase):
-    """Test backward compatibility features."""
-    
-    def setUp(self):
-        """Set up compatibility test environment."""
-        self.config = BuilderConfig()
-        self.config.llm_provider = "mock"
-        self.test_texts = ["Test text for compatibility testing."]
-    
-    def test_backward_compatible_wrapper(self):
-        """Test backward compatible wrapper functionality."""
-        # Test new implementation through wrapper
-        new_builder = BackwardCompatibleKnowledgeGraphBuilder(
-            use_legacy=False,
-            show_deprecation_warnings=False,
-            config=self.config
-        )
-        
-        self.assertIsInstance(new_builder._builder, KnowledgeGraphBuilderV2)
-        
-        # Test that wrapper delegates attributes correctly
-        self.assertIsNotNone(new_builder.cache_manager)
-        self.assertIsNotNone(new_builder.pipeline_factory)
-    
-    def test_migration_helper_structure(self):
-        """Test migration helper functionality structure."""
-        # Test that migration helper methods exist and are callable
-        self.assertTrue(callable(MigrationHelper.compare_implementations))
-        self.assertTrue(callable(MigrationHelper.generate_migration_report))
-        self.assertTrue(callable(MigrationHelper.create_migration_guide))
-        
-        # Test migration guide generation
-        guide = MigrationHelper.create_migration_guide()
-        self.assertIsInstance(guide, str)
-        self.assertIn("Migration Guide", guide)
-        self.assertIn("Step 1", guide)
-    
-    def test_quick_migration_test_structure(self):
-        """Test quick migration test function structure.""" 
-        # Test that quick migration test function exists
-        self.assertTrue(callable(quick_migration_test))
+# NOTE: Backward compatibility tests removed as part of legacy code cleanup
+# The new architecture uses KnowledgeGraphBuilder exclusively
 
 
 class TestPipelineMetrics(unittest.TestCase):
@@ -236,7 +193,7 @@ class TestPipelineMetrics(unittest.TestCase):
     def setUp(self):
         """Set up metrics test environment."""
         self.config = BuilderConfig()
-        self.builder = KnowledgeGraphBuilderV2(config=self.config)
+        self.builder = KnowledgeGraphBuilder(config=self.config)
     
     def test_pipeline_metrics_collection(self):
         """Test that pipeline metrics are collected."""
@@ -286,7 +243,7 @@ class TestErrorHandling(unittest.TestCase):
     def setUp(self):
         """Set up error handling test environment."""
         self.config = BuilderConfig()
-        self.builder = KnowledgeGraphBuilderV2(config=self.config)
+        self.builder = KnowledgeGraphBuilder(config=self.config)
     
     def test_build_context_error_tracking(self):
         """Test error tracking in build context."""

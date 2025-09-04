@@ -9,7 +9,7 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from pydantic import BaseModel, Field
 
@@ -23,11 +23,9 @@ from ..models.entities import Entity
 from ..models.relations import Relation
 from ..models.text import TextChunk
 
-if TYPE_CHECKING:
-    from .legacy import KnowledgeGraph
 
 
-class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
+class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
     """
     Optimized knowledge graph with indexing and caching support.
 
@@ -61,7 +59,7 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         validate_assignment = True
 
     def __init__(self, **data: Any) -> None:
-        """Initialize the OptimizedKnowledgeGraph with managers and optimization components."""
+        """Initialize the KnowledgeGraph with managers and optimization components."""
         super().__init__(**data)
 
         # Initialize optimization components
@@ -511,7 +509,7 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], **kwargs: Any) -> "OptimizedKnowledgeGraph":
+    def from_dict(cls, data: Dict[str, Any], **kwargs: Any) -> "KnowledgeGraph":
         """Create an optimized knowledge graph from dictionary data.
 
         Args:
@@ -519,7 +517,7 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
             **kwargs: Additional arguments
 
         Returns:
-            OptimizedKnowledgeGraph instance created from the dictionary data
+            KnowledgeGraph instance created from the dictionary data
         """
         # Create entities first
         entities = {}
@@ -587,7 +585,7 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         return self.to_dict()
 
     @classmethod
-    def _import_data(cls, data: Dict[str, Any], **kwargs: Any) -> "OptimizedKnowledgeGraph":
+    def _import_data(cls, data: Dict[str, Any], **kwargs: Any) -> "KnowledgeGraph":
         """Import data from dictionary format (backup method for ImportExportMixin)."""
         return cls.from_dict(data, **kwargs)
 
@@ -615,13 +613,11 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 
         self.touch()
 
-    def merge(self, other: Union["OptimizedKnowledgeGraph", "KnowledgeGraph"]) -> None:
+    def merge(self, other: "KnowledgeGraph") -> None:
         """Merge another knowledge graph into this one (with index updates).
 
         Args:
-            other: Another KnowledgeGraph or OptimizedKnowledgeGraph to merge
-
-        Note: Accepts both KnowledgeGraph and OptimizedKnowledgeGraph instances
+            other: Another KnowledgeGraph to merge
         """
         # Merge entities and update indexes
         for entity in other.entities.values():

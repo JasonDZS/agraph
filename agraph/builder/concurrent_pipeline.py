@@ -7,8 +7,7 @@ import time
 from typing import Any, Dict, List, Set, Union
 from dataclasses import dataclass, field
 
-from ..base.graphs.legacy import KnowledgeGraph
-from ..base.graphs.optimized import OptimizedKnowledgeGraph
+from ..base.graphs.optimized import KnowledgeGraph
 from ..logger import logger
 from .cache import CacheManager
 from .concurrency_config import get_concurrency_manager
@@ -171,7 +170,7 @@ class ConcurrentPipeline(BuildPipeline):
         
         return result
     
-    async def execute(self, context: BuildContext) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    async def execute(self, context: BuildContext) -> KnowledgeGraph:
         """
         Execute the pipeline with concurrent step processing.
         

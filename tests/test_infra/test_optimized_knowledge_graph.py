@@ -1,7 +1,7 @@
 """
-Tests for OptimizedKnowledgeGraph - comprehensive coverage of optimized graph functionality.
+Tests for KnowledgeGraph - comprehensive coverage of optimized graph functionality.
 
-This test module covers all OptimizedKnowledgeGraph functionality including:
+This test module covers all KnowledgeGraph functionality including:
 - Graph initialization and configuration
 - Entity management operations (CRUD)
 - Relation management operations (CRUD)
@@ -22,7 +22,7 @@ import unittest
 from datetime import datetime
 
 from agraph.base.core.types import ClusterType, EntityType, RelationType
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.infrastructure.cache import CacheStrategy
 from agraph.base.models.clusters import Cluster
 from agraph.base.models.entities import Entity
@@ -31,11 +31,11 @@ from agraph.base.models.text import TextChunk
 
 
 class TestOptimizedKnowledgeGraphInitialization(unittest.TestCase):
-    """Test OptimizedKnowledgeGraph initialization and configuration."""
+    """Test KnowledgeGraph initialization and configuration."""
 
     def test_default_initialization(self):
-        """Test default initialization of OptimizedKnowledgeGraph."""
-        kg = OptimizedKnowledgeGraph()
+        """Test default initialization of KnowledgeGraph."""
+        kg = KnowledgeGraph()
 
         # Verify basic properties
         self.assertIsNotNone(kg.id)
@@ -62,7 +62,7 @@ class TestOptimizedKnowledgeGraphInitialization(unittest.TestCase):
         custom_description = "A test knowledge graph"
         custom_metadata = {"test": True, "version": "1.0"}
 
-        kg = OptimizedKnowledgeGraph(
+        kg = KnowledgeGraph(
             name=custom_name, description=custom_description, metadata=custom_metadata
         )
 
@@ -84,7 +84,7 @@ class TestOptimizedKnowledgeGraphInitialization(unittest.TestCase):
         relations = {"relation_1": relation}
 
         # Initialize with existing data
-        kg = OptimizedKnowledgeGraph(entities=entities, relations=relations)
+        kg = KnowledgeGraph(entities=entities, relations=relations)
 
         # Verify indexes were built
         person_entities = kg.index_manager.get_entities_by_type("person")
@@ -98,11 +98,11 @@ class TestOptimizedKnowledgeGraphInitialization(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphEntityManagement(unittest.TestCase):
-    """Test entity management operations in OptimizedKnowledgeGraph."""
+    """Test entity management operations in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_add_entity(self):
         """Test adding entities to the knowledge graph."""
@@ -215,11 +215,11 @@ class TestOptimizedKnowledgeGraphEntityManagement(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphRelationManagement(unittest.TestCase):
-    """Test relation management operations in OptimizedKnowledgeGraph."""
+    """Test relation management operations in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
         # Add test entities
         self.entity1 = Entity(id="entity_1", name="Entity 1", entity_type=EntityType.PERSON)
@@ -345,11 +345,11 @@ class TestOptimizedKnowledgeGraphRelationManagement(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphClusterManagement(unittest.TestCase):
-    """Test cluster management in OptimizedKnowledgeGraph."""
+    """Test cluster management in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
         # Add test entities
         self.entity1 = Entity(id="entity_1", name="Entity 1", entity_type=EntityType.PERSON)
@@ -445,11 +445,11 @@ class TestOptimizedKnowledgeGraphClusterManagement(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphTextChunkManagement(unittest.TestCase):
-    """Test text chunk management in OptimizedKnowledgeGraph."""
+    """Test text chunk management in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
         # Add test entities
         self.entity1 = Entity(id="entity_1", name="Entity 1", entity_type=EntityType.PERSON)
@@ -534,11 +534,11 @@ class TestOptimizedKnowledgeGraphTextChunkManagement(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphAnalysis(unittest.TestCase):
-    """Test graph analysis functionality in OptimizedKnowledgeGraph."""
+    """Test graph analysis functionality in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures with sample data."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
         # Create test data
         self.entities = []
@@ -630,7 +630,7 @@ class TestOptimizedKnowledgeGraphPerformance(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_get_performance_metrics(self):
         """Test performance metrics collection."""
@@ -705,11 +705,11 @@ class TestOptimizedKnowledgeGraphPerformance(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphValidation(unittest.TestCase):
-    """Test validation functionality in OptimizedKnowledgeGraph."""
+    """Test validation functionality in KnowledgeGraph."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_is_valid_basic(self):
         """Test basic graph validation."""
@@ -778,7 +778,7 @@ class TestOptimizedKnowledgeGraphSerialization(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph(name="Test Graph", description="Test Description")
+        self.kg = KnowledgeGraph(name= "Test Graph", description= "Test Description")
 
         # Add sample data
         entity1 = Entity(id="entity_1", name="Entity 1", entity_type=EntityType.PERSON)
@@ -819,7 +819,7 @@ class TestOptimizedKnowledgeGraphSerialization(unittest.TestCase):
         original_data = self.kg.to_dict()
 
         # Create new instance from dictionary
-        new_kg = OptimizedKnowledgeGraph.from_dict(original_data)
+        new_kg = KnowledgeGraph.from_dict(original_data)
 
         # Verify recreation
         self.assertEqual(new_kg.name, self.kg.name)
@@ -845,7 +845,7 @@ class TestOptimizedKnowledgeGraphSerialization(unittest.TestCase):
 
         # Perform roundtrip
         data = self.kg.to_dict()
-        reconstructed_kg = OptimizedKnowledgeGraph.from_dict(data)
+        reconstructed_kg = KnowledgeGraph.from_dict(data)
 
         # Verify complete reconstruction
         self.assertEqual(len(reconstructed_kg.entities), len(self.kg.entities))
@@ -866,8 +866,8 @@ class TestOptimizedKnowledgeGraphMerging(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg1 = OptimizedKnowledgeGraph(name="Graph 1")
-        self.kg2 = OptimizedKnowledgeGraph(name="Graph 2")
+        self.kg1 = KnowledgeGraph(name= "Graph 1")
+        self.kg2 = KnowledgeGraph(name= "Graph 2")
 
     def test_merge_basic(self):
         """Test basic graph merging."""
@@ -947,7 +947,7 @@ class TestOptimizedKnowledgeGraphUtilityOperations(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_clear_operation(self):
         """Test clearing all graph data."""
@@ -1006,7 +1006,7 @@ class TestOptimizedKnowledgeGraphUtilityOperations(unittest.TestCase):
         self.assertEqual(data["metadata"]["tags"], ["test", "demo"])
 
         # Verify metadata is restored from dict
-        new_kg = OptimizedKnowledgeGraph.from_dict(data)
+        new_kg = KnowledgeGraph.from_dict(data)
         self.assertEqual(new_kg.metadata["version"], "1.0")
         self.assertEqual(new_kg.metadata["tags"], ["test", "demo"])
 
@@ -1016,7 +1016,7 @@ class TestOptimizedKnowledgeGraphEdgeCases(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_removing_nonexistent_items(self):
         """Test removing non-existent items."""
@@ -1086,11 +1086,11 @@ class TestOptimizedKnowledgeGraphEdgeCases(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphIntegration(unittest.TestCase):
-    """Integration tests combining multiple OptimizedKnowledgeGraph features."""
+    """Integration tests combining multiple KnowledgeGraph features."""
 
     def test_complete_workflow(self):
         """Test a complete workflow using multiple features."""
-        kg = OptimizedKnowledgeGraph(name="Integration Test Graph")
+        kg = KnowledgeGraph(name= "Integration Test Graph")
 
         # 1. Add entities
         person = Entity(id="person_1", name="John Doe", entity_type=EntityType.PERSON)
@@ -1138,7 +1138,7 @@ class TestOptimizedKnowledgeGraphIntegration(unittest.TestCase):
 
         # 8. Test serialization preserves everything
         data = kg.to_dict()
-        reconstructed = OptimizedKnowledgeGraph.from_dict(data)
+        reconstructed = KnowledgeGraph.from_dict(data)
 
         reconstructed_stats = reconstructed.get_graph_statistics()
         self.assertEqual(stats["total_entities"], reconstructed_stats["total_entities"])
@@ -1146,7 +1146,7 @@ class TestOptimizedKnowledgeGraphIntegration(unittest.TestCase):
 
     def test_optimization_under_load(self):
         """Test optimization features under simulated load."""
-        kg = OptimizedKnowledgeGraph()
+        kg = KnowledgeGraph()
 
         # Create moderate load
         for i in range(100):

@@ -603,11 +603,11 @@ def export_to_json(self, file_path: Union[str, Path]) -> None:
 
 # 🚀 导入（自动重建索引）
 @classmethod
-def from_dict(cls, data: Dict[str, Any]) -> "OptimizedKnowledgeGraph":
+def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeGraph":
     """导入后自动重建所有索引和缓存"""
 
 @classmethod
-def import_from_json(cls, file_path: Union[str, Path]) -> "OptimizedKnowledgeGraph":
+def import_from_json(cls, file_path: Union[str, Path]) -> "KnowledgeGraph":
     """导入并优化：自动索引重建，立即可用"""
 ```
 
@@ -617,7 +617,7 @@ def export_to_graphml(self, file_path: Union[str, Path]) -> None:
     """导出 GraphML，包含索引和缓存性能注释"""
 
 @classmethod
-def import_from_graphml(cls, file_path: Union[str, Path]) -> "OptimizedKnowledgeGraph":
+def import_from_graphml(cls, file_path: Union[str, Path]) -> "KnowledgeGraph":
     """从 GraphML 导入并自动优化"""
 
 # 🆕 新增高性能二进制格式
@@ -625,7 +625,7 @@ def export_to_binary(self, file_path: Union[str, Path]) -> None:
     """导出二进制格式，包含预构建索引，加载速度提升 10x"""
 
 @classmethod
-def import_from_binary(cls, file_path: Union[str, Path]) -> "OptimizedKnowledgeGraph":
+def import_from_binary(cls, file_path: Union[str, Path]) -> "KnowledgeGraph":
     """从二进制文件快速加载，包含预构建索引"""
 ```
 
@@ -814,7 +814,7 @@ self.cache_manager.invalidate_by_tags({"entities"})  # 只失效相关缓存
 ### 🔍 优化搜索系统
 
 ```python
-# 🚀 OptimizedKnowledgeGraph 搜索（缓存化）
+# 🚀 KnowledgeGraph 搜索（缓存化）
 @cached(ttl=300, tags={"entities", "search"})
 def search_entities(self, query: str) -> List[Entity]:
     """智能缓存搜索：首次 8ms，缓存命中 0.3ms"""
@@ -889,35 +889,35 @@ class CustomEntityManager(EntityManager):
 
 ```python
 # ✅ v0.2.0 推荐写法
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.models.entities import Entity
 from agraph.base.models.relations import Relation
 from agraph.base.core.types import EntityType, RelationType
 
 # 🚀 创建优化知识图谱（自动集成索引和缓存）
-kg = OptimizedKnowledgeGraph(name="高性能知识图谱")
+kg = KnowledgeGraph(name = "高性能知识图谱")
 
 # 创建实体
 person = Entity(
-    name="张三",
-    entity_type=EntityType.PERSON,
-    description="软件工程师"
+    name = "张三",
+    entity_type = EntityType.PERSON,
+    description = "软件工程师"
 )
 company = Entity(
-    name="科技公司",
-    entity_type=EntityType.ORGANIZATION
+    name = "科技公司",
+    entity_type = EntityType.ORGANIZATION
 )
 
 # ⚡ 添加实体（自动索引更新）
-kg.add_entity(person)     # O(1) + 索引更新
-kg.add_entity(company)    # O(1) + 索引更新
+kg.add_entity(person)  # O(1) + 索引更新
+kg.add_entity(company)  # O(1) + 索引更新
 
 # 创建关系
 relation = Relation(
-    head_entity=person,
-    tail_entity=company,
-    relation_type=RelationType.WORKS_FOR,
-    confidence=0.9
+    head_entity = person,
+    tail_entity = company,
+    relation_type = RelationType.WORKS_FOR,
+    confidence = 0.9
 )
 
 # ⚡ 添加关系（自动双向索引）
@@ -925,8 +925,8 @@ kg.add_relation(relation)  # O(1) + 双向索引更新
 
 # 🚀 高性能查询（索引化 + 缓存）
 entities = kg.get_entities_by_type(EntityType.PERSON)  # ⚡ O(1) 74x faster
-relations = kg.get_entity_relations(person.id)         # ⚡ O(1) 140x faster
-search_results = kg.search_entities("张三")             # 🚀 缓存命中 30x faster
+relations = kg.get_entity_relations(person.id)  # ⚡ O(1) 140x faster
+search_results = kg.search_entities("张三")  # 🚀 缓存命中 30x faster
 
 # 📊 性能监控
 stats = kg.get_graph_statistics()  # 🚀 缓存化统计 20x faster
@@ -965,15 +965,15 @@ search = kg.search_entities("张三", limit=10)          # 🐌 每次全量搜�
 
 # 步骤1: 更改导入
 # from agraph.base.graphs.legacy import KnowledgeGraph  # ❌ 移除
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph  # ✅ 新增
+from agraph.base.graphs.optimized import KnowledgeGraph  # ✅ 新增
 
 # 步骤2: 更改实例化
 # kg = KnowledgeGraph()  # ❌ 移除
-kg = OptimizedKnowledgeGraph()  # ✅ 替换
+kg = KnowledgeGraph()  # ✅ 替换
 
 # 步骤3: 业务代码无需更改，自动获得 10-100x 性能提升！
-kg.add_entity(entity)         # ✅ API 完全兼容
-kg.add_relation(relation)     # ✅ API 完全兼容
+kg.add_entity(entity)  # ✅ API 完全兼容
+kg.add_relation(relation)  # ✅ API 完全兼容
 stats = kg.get_graph_statistics()  # ✅ API 完全兼容 + 20x 性能提升
 ```
 
@@ -1024,10 +1024,12 @@ if metrics['index_statistics']['hit_ratio'] < 0.9:
 ### 🚀 性能优化最佳实践
 
 #### 1. 优先使用 OptimizedKnowledgeGraph
+
 ```python
 # ✅ 推荐：自动获得 10-100x 性能提升
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
-kg = OptimizedKnowledgeGraph()
+from agraph.base.graphs.optimized import KnowledgeGraph
+
+kg = KnowledgeGraph()
 
 # ❌ 避免：传统版本性能不足
 from agraph.base.graphs.legacy import KnowledgeGraph  # 已弃用

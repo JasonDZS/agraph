@@ -5,8 +5,7 @@ Build context for managing state and data throughout the build pipeline.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Union
 
-from ...base.graphs.legacy import KnowledgeGraph
-from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.graphs.optimized import KnowledgeGraph
 from ...base.models.clusters import Cluster
 from ...base.models.entities import Entity
 from ...base.models.relations import Relation
@@ -42,7 +41,7 @@ class BuildContext:
     entities: Optional[List[Entity]] = None
     relations: Optional[List[Relation]] = None
     clusters: Optional[List[Cluster]] = None
-    knowledge_graph: Optional[Union[KnowledgeGraph, OptimizedKnowledgeGraph]] = None
+    knowledge_graph: Optional[KnowledgeGraph] = None
     
     # Step execution state
     current_step: Optional[str] = None
@@ -204,7 +203,7 @@ class BuildContext:
         elif step_name == BuildSteps.CLUSTER_FORMATION and isinstance(result, list):
             self.clusters = result
         elif step_name == BuildSteps.GRAPH_ASSEMBLY:
-            if isinstance(result, (KnowledgeGraph, OptimizedKnowledgeGraph)):
+            if isinstance(result, KnowledgeGraph):
                 self.knowledge_graph = result
     
     def validate_state(self) -> List[str]:

@@ -4,7 +4,7 @@ Knowledge graph assembly handler for knowledge graph builder.
 
 from typing import Any, Dict, List, Optional
 
-from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.graphs.optimized import KnowledgeGraph
 from ...base.managers.interfaces import (
     ClusterManager,
     EntityManager,
@@ -82,7 +82,7 @@ class GraphAssembler:
         graph_name: str,
         graph_description: str,
         use_cache: bool = True,
-    ) -> OptimizedKnowledgeGraph:
+    ) -> KnowledgeGraph:
         """Assemble final knowledge graph with unified architecture support.
 
         Args:
@@ -107,7 +107,7 @@ class GraphAssembler:
 
         if use_cache:
             cached_result = self.cache_manager.get_step_result(
-                BuildSteps.GRAPH_ASSEMBLY, cache_input, OptimizedKnowledgeGraph
+                BuildSteps.GRAPH_ASSEMBLY, cache_input, KnowledgeGraph
             )
             if cached_result is not None:
                 logger.info("Using cached knowledge graph assembly results")
@@ -120,7 +120,7 @@ class GraphAssembler:
             f"Creating optimized knowledge graph '{kg_name}' with description: {kg_description}"
         )
 
-        kg = OptimizedKnowledgeGraph(
+        kg = KnowledgeGraph(
             name=kg_name,
             description=kg_description,
         )
@@ -225,7 +225,7 @@ class GraphAssembler:
 
     def _traditional_assembly(
         self,
-        kg: OptimizedKnowledgeGraph,
+        kg: KnowledgeGraph,
         entities: List[Entity],
         relations: List[Relation],
         clusters: List[Cluster],

@@ -44,7 +44,7 @@ from .events import (
     IntegrityCheckListener,
     JSONFileBackend,
 )
-from .graphs import KnowledgeGraph, OptimizedKnowledgeGraph
+from .graphs import KnowledgeGraph
 from .infrastructure import (
     CacheManager,
     CacheStrategy,
@@ -100,7 +100,6 @@ __all__ = [
     "Cluster",
     "TextChunk",
     "KnowledgeGraph",
-    "OptimizedKnowledgeGraph",
     # Managers (Legacy - for backward compatibility)
     "EntityManager",
     "RelationManager",

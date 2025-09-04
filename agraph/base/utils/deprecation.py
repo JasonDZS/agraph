@@ -114,8 +114,8 @@ class DeprecationManager:
             # Phase 1: Soft warnings (v0.2.0)
             "KnowledgeGraph": {
                 "level": DeprecationLevel.INFO,
-                "reason": "Replaced by OptimizedKnowledgeGraph with 10-100x performance improvement",
-                "alternative": "OptimizedKnowledgeGraph",
+                "reason": "Replaced by KnowledgeGraph with 10-100x performance improvement",
+                "alternative": "KnowledgeGraph",
                 "removal_version": "1.0.0",
             },
             "EntityManager": {

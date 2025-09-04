@@ -7,18 +7,17 @@ with focus on entities, relations, and text processing capabilities.
 
 from .agraph import AGraph
 from .base.core.types import ClusterType, EntityType, RelationType
-from .base.graphs.legacy import KnowledgeGraph  # DEPRECATED: Use OptimizedKnowledgeGraph instead
-from .base.graphs.optimized import OptimizedKnowledgeGraph  # RECOMMENDED
+from .base.graphs.optimized import KnowledgeGraph
 from .base.models.clusters import Cluster
 from .base.models.entities import Entity
 from .base.models.relations import Relation
 from .base.models.text import TextChunk
-from .builder.builder_v2 import KnowledgeGraphBuilderV2 as KnowledgeGraphBuilder
+from .builder.builder import KnowledgeGraphBuilder
 from .config import BuilderConfig
 from .chunker import SimpleTokenChunker, TokenChunker
 from .config import Settings, get_settings
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"
 __author__ = "JasonDZS"
 __email__ = "dizhensheng@sz.tsinghua.edu.cn"
 
@@ -27,8 +26,7 @@ __all__ = [
     "Entity",
     "Relation",
     "Cluster",
-    "KnowledgeGraph",  # DEPRECATED
-    "OptimizedKnowledgeGraph",  # RECOMMENDED
+    "KnowledgeGraph",
     "TextChunk",
     "EntityType",
     "RelationType",

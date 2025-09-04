@@ -31,7 +31,7 @@ When you run `examples/agraph_quickstart.py`, you now automatically get:
 # Before: GraphAssembler created regular KnowledgeGraph
 kg = KnowledgeGraph(name=kg_name, description=kg_description)
 
-# After: GraphAssembler creates OptimizedKnowledgeGraph
+# After: GraphAssembler creates KnowledgeGraph
 kg = OptimizedKnowledgeGraph(name=kg_name, description=kg_description)
 ```
 
@@ -76,7 +76,7 @@ async with AGraph(
     collection_name="my_collection",
     enable_knowledge_graph=True
 ) as agraph:
-    # All graph operations now use OptimizedKnowledgeGraph
+    # All graph operations now use KnowledgeGraph
     kg = await agraph.build_from_texts(texts)
     entities = kg.get_entities_by_type(EntityType.PERSON)  # Now O(1) instead of O(n)
     stats = kg.get_graph_statistics()  # Now cached
@@ -86,10 +86,10 @@ async with AGraph(
 You can also directly use the optimized classes:
 
 ```python
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 
 # Direct instantiation with all optimization features
-kg = OptimizedKnowledgeGraph(name="My Optimized Graph")
+kg = KnowledgeGraph(name = "My Optimized Graph")
 ```
 
 ## Performance Monitoring

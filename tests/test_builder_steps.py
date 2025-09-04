@@ -10,7 +10,7 @@ from agraph.base.models.text import TextChunk
 from agraph.base.models.entities import Entity
 from agraph.base.models.relations import Relation
 from agraph.base.models.clusters import Cluster
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.core.types import EntityType, RelationType
 from agraph.builder.cache import CacheManager
 from agraph.builder.steps.base import BuildStep, StepResult, StepError
@@ -206,7 +206,7 @@ class TestBuildPipeline(unittest.TestCase):
     async def test_pipeline_execution_success(self):
         """Test successful pipeline execution."""
         # Mock the final step to return a knowledge graph
-        mock_kg = Mock(spec=OptimizedKnowledgeGraph)
+        mock_kg = Mock(spec=KnowledgeGraph)
         mock_kg.name = "test_graph"
         mock_kg.entities = {}
         mock_kg.relations = {}
@@ -272,7 +272,7 @@ class TestBuildPipeline(unittest.TestCase):
         step2 = MockBuildStep(BuildSteps.ENTITY_EXTRACTION, self.cache_manager)
         
         # Override to set knowledge graph for successful completion
-        mock_kg = Mock(spec=OptimizedKnowledgeGraph)
+        mock_kg = Mock(spec=KnowledgeGraph)
         mock_kg.name = "test"
         mock_kg.entities = {}
         mock_kg.relations = {}

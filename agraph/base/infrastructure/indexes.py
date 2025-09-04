@@ -13,8 +13,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, TypeVar, U
 from ..core.types import EntityType
 
 if TYPE_CHECKING:
-    from ..graphs.legacy import KnowledgeGraph
-    from ..graphs.optimized import OptimizedKnowledgeGraph
+    from ..graphs.optimized import KnowledgeGraph
 
 
 # Type variable for generic function types
@@ -427,7 +426,7 @@ class IndexManager:
         _clear()
 
     def rebuild_indexes(
-        self, knowledge_graph: Union["KnowledgeGraph", "OptimizedKnowledgeGraph"]
+        self, knowledge_graph: "KnowledgeGraph"
     ) -> None:
         """Rebuild all indexes from the knowledge graph data."""
 

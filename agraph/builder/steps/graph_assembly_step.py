@@ -4,8 +4,7 @@ Graph assembly step implementation.
 
 from typing import Any, Union
 
-from ...base.graphs.legacy import KnowledgeGraph
-from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.graphs.optimized import KnowledgeGraph
 from ...base.models.clusters import Cluster
 from ...base.models.entities import Entity
 from ...base.models.relations import Relation
@@ -30,7 +29,7 @@ class GraphAssemblyStep(BuildStep):
         super().__init__(BuildSteps.GRAPH_ASSEMBLY, cache_manager)
         self.graph_assembler = graph_assembler
     
-    async def _execute_step(self, context: BuildContext) -> StepResult[Union[KnowledgeGraph, OptimizedKnowledgeGraph]]:
+    async def _execute_step(self, context: BuildContext) -> StepResult[KnowledgeGraph]:
         """
         Execute graph assembly logic.
         
@@ -88,9 +87,9 @@ class GraphAssemblyStep(BuildStep):
             )
             
             # Validate the result
-            if not isinstance(knowledge_graph, (KnowledgeGraph, OptimizedKnowledgeGraph)):
+            if not isinstance(knowledge_graph, KnowledgeGraph):
                 return StepResult.failure_result(
-                    f"Graph assembly returned invalid type: expected KnowledgeGraph or OptimizedKnowledgeGraph, "
+                    f"Graph assembly returned invalid type: expected OptimizedKnowledgeGraph, "
                     f"got {type(knowledge_graph)}"
                 )
             
@@ -104,8 +103,8 @@ class GraphAssemblyStep(BuildStep):
                 "total_text_chunks": len(knowledge_graph.text_chunks) if hasattr(knowledge_graph, 'text_chunks') else 0
             }
             
-            # Calculate additional metrics if it's OptimizedKnowledgeGraph
-            if isinstance(knowledge_graph, OptimizedKnowledgeGraph):
+            # Calculate additional metrics if it's KnowledgeGraph
+            if isinstance(knowledge_graph, KnowledgeGraph):
                 # Get performance metrics if available
                 if hasattr(knowledge_graph, 'get_performance_metrics'):
                     try:
@@ -169,4 +168,4 @@ class GraphAssemblyStep(BuildStep):
     
     def _get_expected_result_type(self) -> type:
         """Get expected result type for cache deserialization."""
-        return OptimizedKnowledgeGraph  # Default to optimized version
+        return KnowledgeGraph  # Default to optimized version

@@ -92,25 +92,25 @@ class OptimizedKnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 #### 1. 创建优化版知识图谱
 
 ```python
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.models.entities import Entity
 from agraph.base.models.relations import Relation
 from agraph.base.core.types import EntityType, RelationType
 
 # 创建优化版图谱
-kg = OptimizedKnowledgeGraph(name="高性能知识图谱")
+kg = KnowledgeGraph(name = "高性能知识图谱")
 
 # 正常使用，API 保持兼容
-person = Entity(name="张三", entity_type=EntityType.PERSON)
-company = Entity(name="ABC公司", entity_type=EntityType.ORGANIZATION)
+person = Entity(name = "张三", entity_type = EntityType.PERSON)
+company = Entity(name = "ABC公司", entity_type = EntityType.ORGANIZATION)
 
 kg.add_entity(person)
 kg.add_entity(company)
 
 relation = Relation(
-    head_entity=person,
-    tail_entity=company,
-    relation_type=RelationType.WORKS_FOR
+    head_entity = person,
+    tail_entity = company,
+    relation_type = RelationType.WORKS_FOR
 )
 kg.add_relation(relation)
 ```
@@ -220,11 +220,13 @@ monitor_thread.start()
 ```python
 # 原有代码
 from agraph.base.graphs.legacy import KnowledgeGraph
+
 kg = KnowledgeGraph()
 
 # 新优化版本 - 只需更改导入
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
-kg = OptimizedKnowledgeGraph()  # API 完全相同
+from agraph.base.graphs.optimized import KnowledgeGraph
+
+kg = KnowledgeGraph()  # API 完全相同
 
 # 所有原有方法调用都保持不变
 kg.add_entity(entity)
@@ -244,12 +246,13 @@ optimized_kg = OptimizedKnowledgeGraph()
 ```
 
 **阶段2**: 生产环境切换
+
 ```python
 # 使用特性开关控制
 USE_OPTIMIZED_GRAPH = True  # 配置项
 
 if USE_OPTIMIZED_GRAPH:
-    from agraph.base.graphs.optimized import OptimizedKnowledgeGraph as KG
+    from agraph.base.graphs.optimized import KnowledgeGraph as KG
 else:
     from agraph.base.graphs.legacy import KnowledgeGraph as KG
 
@@ -257,9 +260,10 @@ kg = KG()  # 使用统一接口
 ```
 
 **阶段3**: 完全迁移
+
 ```python
 # 完全切换到优化版本
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 ```
 
 #### 3. 数据迁移
@@ -357,15 +361,16 @@ Cache speed improvement: 52.00x
 ### 自定义基准测试
 
 ```python
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 import time
+
 
 def custom_benchmark():
     """自定义性能基准测试"""
-    kg = OptimizedKnowledgeGraph()
+    kg = KnowledgeGraph()
 
     # 准备测试数据
-    entities = [Entity(name=f"Test_{i}", entity_type=EntityType.CONCEPT)
+    entities = [Entity(name = f"Test_{i}", entity_type = EntityType.CONCEPT)
                 for i in range(5000)]
 
     # 测试批量添加性能
@@ -382,6 +387,7 @@ def custom_benchmark():
     print(f"批量添加 {len(entities)} 个实体: {add_time:.4f} 秒")
     print(f"查询 {len(results)} 个实体: {query_time:.4f} 秒")
     print(f"每秒处理能力: {len(entities) / add_time:.0f} entities/sec")
+
 
 custom_benchmark()
 ```

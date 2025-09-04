@@ -8,8 +8,7 @@ architecture internally for better maintainability and extensibility.
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
-from ..base.graphs.legacy import KnowledgeGraph
-from ..base.graphs.optimized import OptimizedKnowledgeGraph
+from ..base.graphs.optimized import KnowledgeGraph
 from ..base.infrastructure.dao import MemoryDataAccessLayer
 
 # Import unified architecture components
@@ -42,7 +41,7 @@ from .steps.context import BuildContext
 T = TypeVar("T")
 
 
-class KnowledgeGraphBuilderV2:
+class KnowledgeGraphBuilder:
     """
     Refactored KnowledgeGraphBuilder using pipeline architecture.
     
@@ -135,7 +134,7 @@ class KnowledgeGraphBuilderV2:
         self.last_build_context: Optional[BuildContext] = None
 
         logger.info(
-            f"KnowledgeGraphBuilderV2 initialized - "
+            f"KnowledgeGraphBuilder initialized - "
             f"Enable KG: {enable_knowledge_graph}, "
             f"LLM Provider: {self.config.llm_provider}, "
             f"LLM Model: {self.config.llm_model}, "
@@ -153,7 +152,7 @@ class KnowledgeGraphBuilderV2:
         graph_description: str = "",
         use_cache: bool = True,
         from_step: Optional[str] = None,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """
         Build knowledge graph from document files using pipeline architecture.
 
@@ -221,7 +220,7 @@ class KnowledgeGraphBuilderV2:
         graph_description: str = "",
         use_cache: bool = True,
         from_step: Optional[str] = None,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """
         Build knowledge graph from text strings using pipeline architecture.
 
@@ -452,7 +451,7 @@ class KnowledgeGraphBuilderV2:
         if hasattr(self.relation_extractor, "aclose"):
             await self.relation_extractor.aclose()
 
-    async def __aenter__(self) -> "KnowledgeGraphBuilderV2":
+    async def __aenter__(self) -> "KnowledgeGraphBuilder":
         """Async context manager entry."""
         return self
 
@@ -460,6 +459,3 @@ class KnowledgeGraphBuilderV2:
         """Async context manager exit."""
         await self.aclose()
 
-
-# For backward compatibility, we can alias the new class
-KnowledgeGraphBuilder = KnowledgeGraphBuilderV2

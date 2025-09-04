@@ -18,7 +18,7 @@ import time
 import unittest
 
 from agraph.base.core.types import EntityType
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.infrastructure.indexes import IndexManager, IndexType
 from agraph.base.models.clusters import Cluster
 from agraph.base.models.entities import Entity
@@ -254,7 +254,7 @@ class TestIndexManager(unittest.TestCase):
     def test_rebuild_indexes(self):
         """Test rebuilding indexes from knowledge graph data."""
         # Create a knowledge graph with data
-        kg = OptimizedKnowledgeGraph()
+        kg = KnowledgeGraph()
 
         # Add test entities
         entity1 = Entity(id="entity_1", name="Test Entity 1", entity_type=EntityType.PERSON)
@@ -504,11 +504,11 @@ class TestIndexManagerIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
         self.index_manager = self.kg.index_manager
 
     def test_integration_with_optimized_knowledge_graph(self):
-        """Test IndexManager integration with OptimizedKnowledgeGraph."""
+        """Test IndexManager integration with KnowledgeGraph."""
         # Add entities through knowledge graph
         entity1 = Entity(id="entity_1", name="Test Person", entity_type=EntityType.PERSON)
         entity2 = Entity(id="entity_2", name="Test Org", entity_type=EntityType.ORGANIZATION)

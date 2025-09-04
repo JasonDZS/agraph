@@ -14,8 +14,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
 from .base.core.result import Result
-from .base.graphs.legacy import KnowledgeGraph
-from .base.graphs.optimized import OptimizedKnowledgeGraph
+from .base.graphs.optimized import KnowledgeGraph
 from .base.infrastructure.dao import MemoryDataAccessLayer
 
 # Import unified architecture components
@@ -29,7 +28,7 @@ from .base.managers.interfaces import (
 from .base.models.entities import Entity
 from .base.models.relations import Relation
 from .base.models.text import TextChunk
-from .builder.builder_v2 import KnowledgeGraphBuilderV2 as KnowledgeGraphBuilder
+from .builder.builder import KnowledgeGraphBuilder as KnowledgeGraphBuilder
 from .chunker import TokenChunker
 from .config import BuilderConfig, Settings, get_settings
 from .logger import logger
@@ -88,7 +87,7 @@ class AGraph:
         # Initialize components
         self.vector_store: Optional[VectorStore] = None
         self.builder: Optional[KnowledgeGraphBuilder] = None
-        self.knowledge_graph: Optional[Union[KnowledgeGraph, OptimizedKnowledgeGraph]] = None
+        self.knowledge_graph: Optional[KnowledgeGraph] = None
         self._is_initialized = False
         self._background_tasks: List[asyncio.Task] = []
 
@@ -265,7 +264,7 @@ class AGraph:
         graph_description: str = "Built by AGraph",
         use_cache: bool = True,
         save_to_vector_store: bool = True,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """Build knowledge graph from documents.
 
         Args:
@@ -341,7 +340,7 @@ class AGraph:
         graph_description: str = "Built by AGraph from texts",
         use_cache: bool = True,
         save_to_vector_store: bool = True,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """Build knowledge graph from text list.
 
         Args:
@@ -442,7 +441,7 @@ class AGraph:
         graph_description: str,
         use_cache: bool,
         save_to_vector_store: bool,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """Build knowledge graph with text chunks only from documents (no entities/relations/clusters)."""
         # Process document path parameters
         if isinstance(documents, (str, Path)):
@@ -525,7 +524,7 @@ class AGraph:
         graph_description: str,
         use_cache: bool,
         save_to_vector_store: bool,
-    ) -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    ) -> KnowledgeGraph:
         """Build knowledge graph with text chunks only from texts (no entities/relations/clusters)."""
         logger.info(f"Starting text-only processing from {len(texts)} texts: {graph_name}")
 

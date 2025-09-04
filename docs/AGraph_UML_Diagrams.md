@@ -1753,11 +1753,13 @@ sequenceDiagram
 ```python
 # ❌ 弃用写法 (v1.0.0 将移除)
 from agraph.base.graphs.legacy import KnowledgeGraph
+
 kg = KnowledgeGraph()
 
 # ✅ 推荐写法 (v0.2.0+)
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
-kg = OptimizedKnowledgeGraph()
+from agraph.base.graphs.optimized import KnowledgeGraph
+
+kg = KnowledgeGraph()
 ```
 
 ### 🔄 无缝迁移

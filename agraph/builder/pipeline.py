@@ -5,8 +5,7 @@ Build pipeline for orchestrating knowledge graph construction steps.
 import time
 from typing import Any, List, Union
 
-from ..base.graphs.legacy import KnowledgeGraph
-from ..base.graphs.optimized import OptimizedKnowledgeGraph
+from ..base.graphs.optimized import KnowledgeGraph
 from ..logger import logger
 from .cache import CacheManager
 from .steps.base import BuildStep, StepResult
@@ -86,7 +85,7 @@ class BuildPipeline:
                 return True
         return False
     
-    async def execute(self, context: "BuildContext") -> Union[KnowledgeGraph, OptimizedKnowledgeGraph]:
+    async def execute(self, context: "BuildContext") -> KnowledgeGraph:
         """
         Execute the complete build pipeline.
         

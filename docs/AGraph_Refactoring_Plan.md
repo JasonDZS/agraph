@@ -98,7 +98,7 @@
 - [x] **P0: 解决循环引用问题** `[6h]` ✅ **已通过优化实现解决**
   - [x] ~~修改 Relation 类使用 entity_id 而非对象引用~~ ✅ **通过优化版本避免**
     ```python
-    # 注意: 通过 OptimizedKnowledgeGraph 的智能索引管理避免了循环引用问题
+    # 注意: 通过 KnowledgeGraph 的智能索引管理避免了循环引用问题
     # OptimizedRelationManager 使用高效的索引结构管理关系
     # 避免了对象间的直接循环引用
     ```
@@ -140,7 +140,7 @@ Phase 1.2 的内存管理问题通过 Phase 1.1 的性能优化实现得到了�
 - [x] **P0: 修复时间戳竞态条件** `[3h]` ✅ **已完成**
   - [x] 使用原子操作更新时间戳 ✅ **已在优化版本中实现**
     ```python
-    # 已在 OptimizedKnowledgeGraph 中实现线程安全的时间戳更新
+    # 已在 KnowledgeGraph 中实现线程安全的时间戳更新
     # 通过锁机制确保 touch() 操作的原子性
     def touch(self) -> None:
         # 在锁保护下更新时间戳
@@ -312,8 +312,8 @@ Phase 1.2 的内存管理问题通过 Phase 1.1 的性能优化实现得到了�
             self._deprecation_config = {
                 "KnowledgeGraph": {
                     "level": DeprecationLevel.INFO,
-                    "reason": "Replaced by OptimizedKnowledgeGraph with 10-100x performance improvement",
-                    "alternative": "OptimizedKnowledgeGraph",
+                    "reason": "Replaced by KnowledgeGraph with 10-100x performance improvement",
+                    "alternative": "KnowledgeGraph",
                     "removal_version": "1.0.0"
                 }
             }

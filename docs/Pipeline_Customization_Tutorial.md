@@ -45,11 +45,11 @@ kg = await builder.build_from_text(texts, graph_name=\"tech_companies\")
 如果您希望明确使用新的管道功能：
 
 ```python
-from agraph.builder.builder_v2 import KnowledgeGraphBuilderV2
+from agraph.builder.builder import KnowledgeGraphBuilder
 
-builder = KnowledgeGraphBuilderV2()
+builder = KnowledgeGraphBuilder()
 texts = [\"Apple Inc. is a technology company.\", \"Microsoft was founded by Bill Gates.\"]
-kg = await builder.build_from_text(texts, graph_name=\"tech_companies\")
+kg = await builder.build_from_text(texts, graph_name =\"tech_companies\")
 
 # 获取额外的管道指标
 metrics = builder.get_pipeline_metrics()
@@ -98,9 +98,9 @@ graph LR
 ### 1. 预设管道类型
 
 ```python
-from agraph.builder.builder_v2 import KnowledgeGraphBuilderV2
+from agraph.builder.builder import KnowledgeGraphBuilder
 
-builder = KnowledgeGraphBuilderV2()
+builder = KnowledgeGraphBuilder()
 
 # 1. 标准管道 (包含文档处理)
 documents = [\"document1.pdf\", \"document2.docx\"]
@@ -115,7 +115,7 @@ minimal_pipeline = builder.create_minimal_pipeline()
 # 适用于快速原型或简单文本处理
 
 # 4. 禁用知识图谱功能的管道
-builder_simple = KnowledgeGraphBuilderV2(enable_knowledge_graph=False)
+builder_simple = KnowledgeGraphBuilder(enable_knowledge_graph = False)
 kg = await builder_simple.build_from_text(texts)  # 仅处理文本块
 ```
 
@@ -148,10 +148,10 @@ builder.clear_cache(from_step=\"relation_extraction\")  # 清理特定步骤后�
 ### 1. 使用工厂方法
 
 ```python
-from agraph.builder.builder_v2 import KnowledgeGraphBuilderV2
+from agraph.builder.builder import KnowledgeGraphBuilder
 from agraph.config import BuildSteps
 
-builder = KnowledgeGraphBuilderV2()
+builder = KnowledgeGraphBuilder()
 
 # 创建仅包含特定步骤的管道
 custom_config = {
@@ -166,8 +166,8 @@ custom_pipeline = builder.create_custom_pipeline(custom_config)
 from agraph.builder.steps.context import BuildContext
 
 context = BuildContext(
-    texts=[\"Custom pipeline text processing...\"],
-    graph_name=\"custom_graph\"
+    texts = [\"Custom pipeline text processing...\"],
+graph_name =\"custom_graph\"
 )
 
 kg = await custom_pipeline.execute(context)
@@ -446,12 +446,12 @@ if cache_size > threshold:
 
 ```python
 # 使用异步上下文管理器确保资源清理
-async with KnowledgeGraphBuilderV2() as builder:
+async with KnowledgeGraphBuilder() as builder:
     kg = await builder.build_from_text(texts)
     # 自动清理资源
 
 # 或手动管理资源
-builder = KnowledgeGraphBuilderV2()
+builder = KnowledgeGraphBuilder()
 try:
     kg = await builder.build_from_text(texts)
 finally:
@@ -463,7 +463,7 @@ finally:
 ```python
 # 批量处理多个文档集合
 async def process_multiple_datasets(datasets: List[List[str]]) -> List[OptimizedKnowledgeGraph]:
-    builder = KnowledgeGraphBuilderV2()
+    builder = KnowledgeGraphBuilder()
     results = []
     
     for i, texts in enumerate(datasets):
@@ -489,10 +489,11 @@ async def process_multiple_datasets(datasets: List[List[str]]) -> List[Optimized
 ### 常见问题和解决方案
 
 #### 1. 导入错误
+
 ```python
-# 错误: ImportError: cannot import name 'KnowledgeGraphBuilderV2'
+# 错误: ImportError: cannot import name 'KnowledgeGraphBuilder'
 # 解决: 确保使用正确的导入路径
-from agraph.builder.builder_v2 import KnowledgeGraphBuilderV2
+from agraph.builder.builder import KnowledgeGraphBuilder
 
 # 或使用兼容性导入
 from agraph.builder import KnowledgeGraphBuilder  # 自动使用新架构

@@ -17,9 +17,8 @@ import time
 from pathlib import Path
 from agraph import AGraph, get_settings
 from agraph.config import update_settings, save_config_to_workdir
-# Import pipeline components for advanced features demonstration
+# Import pipeline components for advanced features demonstration  
 from agraph import KnowledgeGraphBuilder
-from agraph.builder import LegacyKnowledgeGraphBuilder
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent

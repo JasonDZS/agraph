@@ -7,8 +7,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
-from ...base.graphs.legacy import KnowledgeGraph
-from ...base.graphs.optimized import OptimizedKnowledgeGraph
+from ...base.graphs.optimized import KnowledgeGraph
 from ...base.models.clusters import Cluster
 from ...base.models.entities import Entity
 from ...base.models.relations import Relation
@@ -267,7 +266,7 @@ class FileCacheBackend(CacheBackend):
     def _serialize_data(self, data: Any) -> Any:
         """Serialize data for JSON storage."""
         if isinstance(
-            data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph, OptimizedKnowledgeGraph)
+            data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph)
         ):
             return {"_type": data.__class__.__name__, "_data": data.to_dict()}
         if isinstance(data, list):
@@ -295,8 +294,6 @@ class FileCacheBackend(CacheBackend):
                 return TextChunk.from_dict(obj_data)  # type: ignore
             if obj_type == "KnowledgeGraph":
                 return KnowledgeGraph.from_dict(obj_data)  # type: ignore
-            if obj_type == "OptimizedKnowledgeGraph":
-                return OptimizedKnowledgeGraph.from_dict(obj_data)  # type: ignore
 
         if isinstance(data, list) and expected_type in [list, List]:
             # For lists, we need to handle entity resolution differently

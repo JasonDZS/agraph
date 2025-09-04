@@ -1,5 +1,5 @@
 """
-Tests for core infrastructure components - IndexManager, CacheManager, and OptimizedKnowledgeGraph.
+Tests for core infrastructure components - IndexManager, CacheManager, and KnowledgeGraph.
 
 This is a simplified test suite focusing on the most critical functionality.
 """
@@ -7,7 +7,7 @@ This is a simplified test suite focusing on the most critical functionality.
 import time
 import unittest
 
-from agraph.base.graphs.optimized import OptimizedKnowledgeGraph
+from agraph.base.graphs.optimized import KnowledgeGraph
 from agraph.base.infrastructure.cache import CacheManager, CacheStrategy
 from agraph.base.infrastructure.indexes import IndexManager
 from agraph.base.models.entities import Entity
@@ -114,11 +114,11 @@ class TestCacheManagerCore(unittest.TestCase):
 
 
 class TestOptimizedKnowledgeGraphCore(unittest.TestCase):
-    """Core OptimizedKnowledgeGraph functionality tests."""
+    """Core KnowledgeGraph functionality tests."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = OptimizedKnowledgeGraph()
+        self.kg = KnowledgeGraph()
 
     def test_entity_operations(self):
         """Test entity CRUD operations."""
@@ -215,7 +215,7 @@ class TestOptimizedKnowledgeGraphCore(unittest.TestCase):
         self.assertEqual(len(data["entities"]), 1)
 
         # Deserialize
-        new_kg = OptimizedKnowledgeGraph.from_dict(data)
+        new_kg = KnowledgeGraph.from_dict(data)
         self.assertEqual(len(new_kg.entities), 1)
         self.assertIn("entity_1", new_kg.entities)
 

@@ -41,12 +41,12 @@ AGraph v0.2.0 引入了全新的统一架构和优化版本，提供了 **10-100
 # 旧版本 (已弃用)
 from agraph import KnowledgeGraph
 
-kg = KnowledgeGraph(name="My Graph")
+kg = KnowledgeGraph(name = "My Graph")
 
 # 新版本 (推荐)
-from agraph import OptimizedKnowledgeGraph
+from agraph import KnowledgeGraph
 
-kg = OptimizedKnowledgeGraph(name="My Graph")
+kg = KnowledgeGraph(name = "My Graph")
 ```
 
 **就这么简单！** 其他代码完全不需要修改。
@@ -56,10 +56,10 @@ kg = OptimizedKnowledgeGraph(name="My Graph")
 如果您有大量代码使用 `KnowledgeGraph`，可以使用类型别名：
 
 ```python
-from agraph import OptimizedKnowledgeGraph as KnowledgeGraph
+from agraph import KnowledgeGraph as KnowledgeGraph
 
 # 现有代码无需任何修改
-kg = KnowledgeGraph(name="My Graph")
+kg = KnowledgeGraph(name = "My Graph")
 kg.add_entity(entity)
 # ... 其他代码保持不变
 ```
@@ -70,16 +70,18 @@ kg.add_entity(entity)
 
 ```python
 # 第一步: 导入两个版本
-from agraph import KnowledgeGraph, OptimizedKnowledgeGraph
+from agraph import KnowledgeGraph, KnowledgeGraph
+
 
 # 第二步: 新功能使用优化版本
 def create_new_graph():
-    return OptimizedKnowledgeGraph(name="New Graph")
+    return KnowledgeGraph(name = "New Graph")
+
 
 # 第三步: 逐步替换旧代码
 def migrate_existing_function():
     # kg = KnowledgeGraph()  # 旧版本
-    kg = OptimizedKnowledgeGraph()  # 新版本
+    kg = KnowledgeGraph()  # 新版本
     return kg
 ```
 
@@ -92,7 +94,7 @@ def migrate_existing_function():
 from agraph import AGraph
 
 async with AGraph() as agraph:
-    # 内部已自动使用 OptimizedKnowledgeGraph
+    # 内部已自动使用 KnowledgeGraph
     # 和统一架构，享受所有性能提升
     kg = await agraph.build_from_texts(texts)
 ```
@@ -104,22 +106,22 @@ async with AGraph() as agraph:
 迁移后，运行这个简单测试确保一切正常：
 
 ```python
-from agraph import OptimizedKnowledgeGraph, Entity, Relation
+from agraph import KnowledgeGraph, Entity, Relation
 
 # 创建图谱
-kg = OptimizedKnowledgeGraph(name="Test Graph")
+kg = KnowledgeGraph(name = "Test Graph")
 
 # 添加实体
-entity1 = Entity(name="Apple", entity_type="organization")
-entity2 = Entity(name="iPhone", entity_type="product")
+entity1 = Entity(name = "Apple", entity_type = "organization")
+entity2 = Entity(name = "iPhone", entity_type = "product")
 kg.add_entity(entity1)
 kg.add_entity(entity2)
 
 # 添加关系
 relation = Relation(
-    head_entity=entity1.entity_id,
-    tail_entity=entity2.entity_id,
-    relation_type="produces"
+    head_entity = entity1.entity_id,
+    tail_entity = entity2.entity_id,
+    relation_type = "produces"
 )
 kg.add_relation(relation)
 
@@ -135,15 +137,16 @@ print("✅ 迁移验证成功！")
 
 ```python
 import time
-from agraph import KnowledgeGraph, OptimizedKnowledgeGraph
+from agraph import KnowledgeGraph, KnowledgeGraph
+
 
 def benchmark_graph_operations(GraphClass, name):
     start = time.time()
-    kg = GraphClass(name=f"Benchmark {name}")
+    kg = GraphClass(name = f"Benchmark {name}")
 
     # 添加大量实体
     for i in range(1000):
-        entity = Entity(name=f"Entity_{i}", entity_type="person")
+        entity = Entity(name = f"Entity_{i}", entity_type = "person")
         kg.add_entity(entity)
 
     # 查询性能测试
@@ -152,9 +155,10 @@ def benchmark_graph_operations(GraphClass, name):
     end = time.time()
     print(f"{name}: {end - start:.4f} 秒, 找到 {len(entities_by_type)} 个实体")
 
+
 # 对比测试
 benchmark_graph_operations(KnowledgeGraph, "传统版本")
-benchmark_graph_operations(OptimizedKnowledgeGraph, "优化版本")
+benchmark_graph_operations(KnowledgeGraph, "优化版本")
 ```
 
 ## ⚠️ 注意事项
@@ -223,7 +227,7 @@ A: OptimizedKnowledgeGraph 提供完全的向后兼容。如有问题，可以�
 from agraph import KnowledgeGraph
 
 # ✅ 推荐使用
-from agraph import OptimizedKnowledgeGraph
+from agraph import KnowledgeGraph
 ```
 
 ### 2. 批量迁移脚本
@@ -232,10 +236,10 @@ from agraph import OptimizedKnowledgeGraph
 
 ```bash
 # 使用 sed 批量替换
-find . -name "*.py" -exec sed -i 's/KnowledgeGraph/OptimizedKnowledgeGraph/g' {} +
+find . -name "*.py" -exec sed -i 's/KnowledgeGraph/KnowledgeGraph/g' {} +
 
 # 更新导入语句
-find . -name "*.py" -exec sed -i 's/from agraph import KnowledgeGraph/from agraph import OptimizedKnowledgeGraph/g' {} +
+find . -name "*.py" -exec sed -i 's/from agraph import KnowledgeGraph/from agraph import KnowledgeGraph/g' {} +
 ```
 
 ### 3. 代码审查
