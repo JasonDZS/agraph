@@ -118,6 +118,18 @@ class ProjectService {
     );
   }
 
+  /**
+   * Recover project settings from backup config.json file
+   */
+  async recoverProjectSettings(
+    projectName: string
+  ): Promise<ApiResponse<ProjectResponse>> {
+    return apiClient.post<ProjectResponse>(
+      `${this.baseEndpoint}/${encodeURIComponent(projectName)}/recover-settings`,
+      {}
+    );
+  }
+
   async getProjectStats(projectName?: string): Promise<ApiResponse<any>> {
     const endpoint = projectName
       ? `${this.baseEndpoint}/${encodeURIComponent(projectName)}/stats`

@@ -380,9 +380,7 @@ class BatchOperationContext(BatchContext):
                 # Explicit commit for transaction context
                 commit_result = tx_context.commit()
                 if not commit_result.is_ok():
-                    raise BatchOperationError(
-                        f"Transaction commit failed: {commit_result.error_message}"
-                    )
+                    raise BatchOperationError(f"Transaction commit failed: {commit_result.error_message}")
 
                 self.committed = True
                 self._transaction_active = False
@@ -467,9 +465,7 @@ class BatchOperationContext(BatchContext):
 # Utility functions for common batch operations
 
 
-def create_entity_batch_operation(
-    operation_type: BatchOperationType, entity_data: Dict[str, Any]
-) -> BatchOperation:
+def create_entity_batch_operation(operation_type: BatchOperationType, entity_data: Dict[str, Any]) -> BatchOperation:
     """Create a batch operation for entity management."""
     return BatchOperation(
         operation_type=operation_type,
@@ -493,9 +489,7 @@ def create_relation_batch_operation(
     )
 
 
-def create_cluster_batch_operation(
-    operation_type: BatchOperationType, cluster_data: Dict[str, Any]
-) -> BatchOperation:
+def create_cluster_batch_operation(operation_type: BatchOperationType, cluster_data: Dict[str, Any]) -> BatchOperation:
     """Create a batch operation for cluster management."""
     return BatchOperation(
         operation_type=operation_type,
@@ -506,9 +500,7 @@ def create_cluster_batch_operation(
     )
 
 
-def create_text_chunk_batch_operation(
-    operation_type: BatchOperationType, chunk_data: Dict[str, Any]
-) -> BatchOperation:
+def create_text_chunk_batch_operation(operation_type: BatchOperationType, chunk_data: Dict[str, Any]) -> BatchOperation:
     """Create a batch operation for text chunk management."""
     return BatchOperation(
         operation_type=operation_type,
@@ -530,9 +522,7 @@ class TransactionAwareBatchContext(BatchOperationContext):
     - Performance monitoring
     """
 
-    def __init__(
-        self, dao: DataAccessLayer, transaction_manager: Optional["TransactionManager"] = None
-    ):
+    def __init__(self, dao: DataAccessLayer, transaction_manager: Optional["TransactionManager"] = None):
         super().__init__(dao)
         self.transaction_manager = transaction_manager
         self.current_transaction: Optional["Transaction"] = None
@@ -554,11 +544,10 @@ class TransactionAwareBatchContext(BatchOperationContext):
             return Result.fail(ErrorCode.DEPENDENCY_ERROR, "TransactionManager not available")
 
         if self.current_transaction:
-            return Result.fail(
-                ErrorCode.INVALID_OPERATION, "Transaction already active for this batch context"
-            )
+            return Result.fail(ErrorCode.INVALID_OPERATION, "Transaction already active for this batch context")
 
         # Import here to avoid circular imports
+        # pylint: disable=import-outside-toplevel
         from .transaction import IsolationLevel
 
         if isolation_level is None:
@@ -590,9 +579,7 @@ class TransactionAwareBatchContext(BatchOperationContext):
             return Result.fail(ErrorCode.INVALID_OPERATION, "No active transaction")
 
         if savepoint_name not in self.savepoints:
-            return Result.fail(
-                ErrorCode.NOT_FOUND, f"Savepoint '{savepoint_name}' not found in batch context"
-            )
+            return Result.fail(ErrorCode.NOT_FOUND, f"Savepoint '{savepoint_name}' not found in batch context")
 
         # Rollback in transaction
         tx_result = self.current_transaction.rollback_to_savepoint(savepoint_name)
@@ -603,14 +590,13 @@ class TransactionAwareBatchContext(BatchOperationContext):
             self.operations = self.operations[:savepoint_index]
 
             # Remove later savepoints
-            self.savepoints = {
-                name: index for name, index in self.savepoints.items() if index <= savepoint_index
-            }
+            self.savepoints = {name: index for name, index in self.savepoints.items() if index <= savepoint_index}
 
         return tx_result
 
     def add_operation_with_transaction(self, operation: BatchOperation) -> Result[BatchOperation]:
         """Add an operation that will be executed within the current transaction."""
+        # pylint: disable=too-many-return-statements
         if self.committed or self.rolled_back:
             return Result.fail(
                 ErrorCode.INVALID_OPERATION,
@@ -625,21 +611,61 @@ class TransactionAwareBatchContext(BatchOperationContext):
             if operation.operation_type == BatchOperationType.ADD:
                 if operation.target_type == "entity" and operation.data:
                     entity = Entity.from_dict(operation.data)
-                    return self.current_transaction.add_entity(entity)
-                elif operation.target_type == "relation" and operation.data:
+                    result = self.current_transaction.add_entity(entity)
+                    return (
+                        Result.ok(operation)
+                        if result.is_ok()
+                        else Result.fail(
+                            result.error_code or ErrorCode.INTERNAL_ERROR,
+                            result.error_message or "Failed to add entity",
+                        )
+                    )
+                if operation.target_type == "relation" and operation.data:
                     relation = Relation.from_dict(operation.data)
-                    return self.current_transaction.add_relation(relation)
+                    relation_result = self.current_transaction.add_relation(relation)
+                    return (
+                        Result.ok(operation)
+                        if relation_result.is_ok()
+                        else Result.fail(
+                            relation_result.error_code or ErrorCode.INTERNAL_ERROR,
+                            relation_result.error_message or "Failed to add relation",
+                        )
+                    )
 
             elif operation.operation_type == BatchOperationType.REMOVE:
                 if operation.target_type == "entity" and operation.target_id:
-                    return self.current_transaction.remove_entity(operation.target_id)
-                elif operation.target_type == "relation" and operation.target_id:
-                    return self.current_transaction.remove_relation(operation.target_id)
+                    remove_entity_result = self.current_transaction.remove_entity(operation.target_id)
+                    return (
+                        Result.ok(operation)
+                        if remove_entity_result.is_ok()
+                        else Result.fail(
+                            remove_entity_result.error_code or ErrorCode.INTERNAL_ERROR,
+                            remove_entity_result.error_message or "Failed to remove entity",
+                        )
+                    )
+                if operation.target_type == "relation" and operation.target_id:
+                    remove_relation_result = self.current_transaction.remove_relation(operation.target_id)
+                    return (
+                        Result.ok(operation)
+                        if remove_relation_result.is_ok()
+                        else Result.fail(
+                            remove_relation_result.error_code or ErrorCode.INTERNAL_ERROR,
+                            remove_relation_result.error_message or "Failed to remove relation",
+                        )
+                    )
 
             elif operation.operation_type == BatchOperationType.UPDATE:
                 if operation.target_type == "entity" and operation.data:
                     entity = Entity.from_dict(operation.data)
-                    return self.current_transaction.update_entity(entity)
+                    result = self.current_transaction.update_entity(entity)
+                    return (
+                        Result.ok(operation)
+                        if result.is_ok()
+                        else Result.fail(
+                            result.error_code or ErrorCode.INTERNAL_ERROR,
+                            result.error_message or "Failed to update entity",
+                        )
+                    )
 
         return Result.ok(operation)
 
@@ -655,10 +681,8 @@ class TransactionAwareBatchContext(BatchOperationContext):
 
         try:
             # If we have a transaction, commit it (this will execute all operations)
-            if self.current_transaction:
-                tx_commit_result = self.transaction_manager.commit_transaction(
-                    self.current_transaction.id
-                )
+            if self.current_transaction and self.transaction_manager:
+                tx_commit_result = self.transaction_manager.commit_transaction(self.current_transaction.id)
 
                 if not tx_commit_result.is_ok():
                     return Result.fail(
@@ -704,15 +728,16 @@ class TransactionAwareBatchContext(BatchOperationContext):
                         ],
                     }
                 )
-            else:
-                # Fall back to regular batch commit
-                regular_result = self.commit()
-                return Result.ok(regular_result)
+            # Fall back to regular batch commit
+            regular_result = self.commit()
+            return Result.ok(regular_result)
 
         except Exception as e:
             # Rollback transaction if something goes wrong
-            if self.current_transaction and not self.current_transaction.status.value.endswith(
-                "ed"
+            if (
+                self.current_transaction
+                and self.transaction_manager
+                and not self.current_transaction.status.value.endswith("ed")
             ):
                 self.transaction_manager.rollback_transaction(self.current_transaction.id)
 
@@ -722,10 +747,8 @@ class TransactionAwareBatchContext(BatchOperationContext):
         """Rollback both the batch operations and the transaction."""
         try:
             # Rollback transaction first
-            if self.current_transaction:
-                tx_rollback_result = self.transaction_manager.rollback_transaction(
-                    self.current_transaction.id
-                )
+            if self.current_transaction and self.transaction_manager:
+                tx_rollback_result = self.transaction_manager.rollback_transaction(self.current_transaction.id)
 
                 if not tx_rollback_result.is_ok():
                     return Result.fail(
@@ -752,6 +775,7 @@ class TransactionAwareBatchContext(BatchOperationContext):
         Automatically begins a transaction, commits on success, or rolls back on exception.
         """
         # Import here to avoid circular imports
+        # pylint: disable=import-outside-toplevel
         from .transaction import TransactionException
 
         tx_result = self.begin_transaction(isolation_level, timeout_seconds)
@@ -765,9 +789,7 @@ class TransactionAwareBatchContext(BatchOperationContext):
             if not self.committed and not self.rolled_back:
                 commit_result = self.commit_with_transaction()
                 if not commit_result.is_ok():
-                    raise TransactionException(
-                        f"Failed to commit batch: {commit_result.error_message}"
-                    )
+                    raise TransactionException(f"Failed to commit batch: {commit_result.error_message}")
 
         except Exception as e:
             # Auto-rollback on exception
@@ -782,13 +804,11 @@ class TransactionAwareBatchContext(BatchOperationContext):
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get enhanced batch operation metrics."""
-        base_metrics = {
+        base_metrics: Dict[str, Any] = {
             "total_operations": len(self.operations),
             "committed": self.committed,
             "rolled_back": self.rolled_back,
-            "batch_duration": (
-                time.time() - self.start_time if not (self.committed or self.rolled_back) else 0
-            ),
+            "batch_duration": (time.time() - self.start_time if not (self.committed or self.rolled_back) else 0),
             "transaction_active": self.current_transaction is not None,
         }
 
@@ -796,9 +816,9 @@ class TransactionAwareBatchContext(BatchOperationContext):
             tx_info = self.current_transaction.get_info()
             base_metrics.update(
                 {
-                    "transaction_id": tx_info.transaction_id,
-                    "transaction_status": tx_info.status.value,
-                    "isolation_level": tx_info.isolation_level.value,
+                    "transaction_id": str(tx_info.transaction_id),
+                    "transaction_status": str(tx_info.status.value),
+                    "isolation_level": str(tx_info.isolation_level.value),
                     "locks_held": len(tx_info.locks_held),
                 }
             )

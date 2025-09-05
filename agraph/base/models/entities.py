@@ -12,7 +12,7 @@ from ...utils import get_type_value
 from ..core.base import GraphNodeBase, TextChunkMixin
 from ..core.mixins import PropertyMixin
 from ..core.types import EntityType, EntityTypeType
-from .positioning import PositionMixin
+from .positioning import Position, PositionMixin
 
 
 class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin, PositionMixin):
@@ -103,8 +103,6 @@ class Entity(GraphNodeBase, TextChunkMixin, PropertyMixin, PositionMixin):
         Returns:
             Entity instance created from the dictionary data
         """
-        from .positioning import Position  # Import here to avoid circular imports
-
         entity_type_value = data.get("entity_type", "UNKNOWN")
         try:
             entity_type = EntityType(entity_type_value)

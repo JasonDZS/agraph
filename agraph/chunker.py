@@ -18,9 +18,7 @@ class TokenChunker:
     chunks that don't exceed the specified token limit.
     """
 
-    def __init__(
-        self, chunk_size: int = 1000, chunk_overlap: int = 200, model: str = "gpt-3.5-turbo"
-    ):
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200, model: str = "gpt-3.5-turbo"):
         """
         Initialize the TokenChunker.
 
@@ -113,9 +111,7 @@ class TokenChunker:
                     # If this part alone exceeds chunk size, split it further
                     if self.count_tokens(part) > self.chunk_size:
                         # Recursively split this part with remaining separators
-                        sub_chunks = self._split_text_recursive(
-                            part, separators[separators.index(separator) + 1 :]
-                        )
+                        sub_chunks = self._split_text_recursive(part, separators[separators.index(separator) + 1 :])
                         chunks.extend(sub_chunks)
                         current_chunk = ""
                     else:

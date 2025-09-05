@@ -53,19 +53,13 @@ class TransactionStatus(Enum):
 class DeadlockException(Exception):
     """Exception raised when a deadlock is detected."""
 
-    pass
-
 
 class TransactionException(Exception):
     """Base exception for transaction-related errors."""
 
-    pass
-
 
 class IsolationViolationException(TransactionException):
     """Exception raised when isolation requirements are violated."""
-
-    pass
 
 
 @dataclass
@@ -98,9 +92,7 @@ class DeadlockDetector:
     """Deadlock detection using wait-for graph algorithm."""
 
     def __init__(self) -> None:
-        self._wait_for_graph: Dict[str, Set[str]] = (
-            {}
-        )  # transaction -> set of transactions it's waiting for
+        self._wait_for_graph: Dict[str, Set[str]] = {}  # transaction -> set of transactions it's waiting for
         self._lock = RLock()
 
     def add_wait_edge(self, waiting_tx: str, holding_tx: str) -> None:
@@ -168,9 +160,7 @@ class LockManager:
     """Advanced lock manager with deadlock detection and various lock types."""
 
     def __init__(self) -> None:
-        self._locks: Dict[str, Dict[str, LockInfo]] = (
-            {}
-        )  # resource_key -> {transaction_id -> LockInfo}
+        self._locks: Dict[str, Dict[str, LockInfo]] = {}  # resource_key -> {transaction_id -> LockInfo}
         self._lock = RLock()
         self._condition = Condition(self._lock)
         self._deadlock_detector = DeadlockDetector()
@@ -191,9 +181,7 @@ class LockManager:
 
             while True:
                 # Check if lock can be acquired
-                can_acquire, conflicting_transactions = self._can_acquire_lock(
-                    resource_key, transaction_id, lock_type
-                )
+                can_acquire, conflicting_transactions = self._can_acquire_lock(resource_key, transaction_id, lock_type)
 
                 if can_acquire:
                     # Acquire the lock
@@ -245,9 +233,7 @@ class LockManager:
                 for conflicting_tx in conflicting_transactions:
                     self._deadlock_detector.remove_wait_edge(transaction_id, conflicting_tx)
 
-    def _can_acquire_lock(
-        self, resource_key: str, transaction_id: str, lock_type: str
-    ) -> tuple[bool, Set[str]]:
+    def _can_acquire_lock(self, resource_key: str, transaction_id: str, lock_type: str) -> tuple[bool, Set[str]]:
         """Check if a lock can be acquired and return conflicting transactions."""
         if resource_key not in self._locks:
             return True, set()
@@ -274,15 +260,12 @@ class LockManager:
             if lock_type == "read" and lock_info.lock_type == "read":
                 # Read-read compatibility
                 continue
-            else:
-                # Any other combination is incompatible
-                conflicting_transactions.add(other_tx_id)
+            # Any other combination is incompatible
+            conflicting_transactions.add(other_tx_id)
 
         return len(conflicting_transactions) == 0, conflicting_transactions
 
-    def release_lock(
-        self, transaction_id: str, resource_type: str, resource_id: str
-    ) -> Result[bool]:
+    def release_lock(self, transaction_id: str, resource_type: str, resource_id: str) -> Result[bool]:
         """Release a lock held by a transaction."""
         resource_key = self._get_resource_key(resource_type, resource_id)
 
@@ -425,9 +408,7 @@ class Transaction:
 
     def remove_entity(self, entity_id: str) -> Result[bool]:
         """Remove an entity within the transaction."""
-        result = self._execute_operation(
-            BatchOperationType.REMOVE, "remove_entity", "entity", entity_id
-        )
+        result = self._execute_operation(BatchOperationType.REMOVE, "remove_entity", "entity", entity_id)
         return Result.ok(True) if result.is_ok() else result
 
     def update_entity(self, entity: "Entity") -> Result["Entity"]:
@@ -452,9 +433,7 @@ class Transaction:
 
     def remove_relation(self, relation_id: str) -> Result[bool]:
         """Remove a relation within the transaction."""
-        result = self._execute_operation(
-            BatchOperationType.REMOVE, "remove_relation", "relation", relation_id
-        )
+        result = self._execute_operation(BatchOperationType.REMOVE, "remove_relation", "relation", relation_id)
         return Result.ok(True) if result.is_ok() else result
 
     def _execute_operation(
@@ -474,15 +453,11 @@ class Transaction:
                 )
 
             if not self.batch_context:
-                return Result.fail(
-                    ErrorCode.INVALID_OPERATION, "Transaction not properly initialized"
-                )
+                return Result.fail(ErrorCode.INVALID_OPERATION, "Transaction not properly initialized")
 
             # Check timeout
             if self.started_at and (time.time() - self.started_at) > self.timeout_seconds:
-                return Result.fail(
-                    ErrorCode.TIMEOUT, f"Transaction timeout after {self.timeout_seconds} seconds"
-                )
+                return Result.fail(ErrorCode.TIMEOUT, f"Transaction timeout after {self.timeout_seconds} seconds")
 
             # Acquire appropriate locks based on isolation level and operation type
             if target_id:
@@ -541,9 +516,7 @@ class Transaction:
                 )
 
             if savepoint_name in self.savepoints:
-                return Result.fail(
-                    ErrorCode.DUPLICATE_ENTRY, f"Savepoint '{savepoint_name}' already exists"
-                )
+                return Result.fail(ErrorCode.DUPLICATE_ENTRY, f"Savepoint '{savepoint_name}' already exists")
 
             self.savepoints[savepoint_name] = len(self.operations)
 
@@ -575,11 +548,9 @@ class Transaction:
             self.operations = self.operations[:savepoint_index]
 
             # Remove later savepoints
-            self.savepoints = {
-                name: index for name, index in self.savepoints.items() if index <= savepoint_index
-            }
+            self.savepoints = {name: index for name, index in self.savepoints.items() if index <= savepoint_index}
 
-            # TODO: In a full implementation, you'd also rollback any locks
+            # NOTE: In a full implementation, you'd also rollback any locks
             # acquired for the removed operations
 
             return Result.ok(
@@ -602,9 +573,7 @@ class Transaction:
                 )
 
             if not self.batch_context:
-                return Result.fail(
-                    ErrorCode.INVALID_OPERATION, "Transaction not properly initialized"
-                )
+                return Result.fail(ErrorCode.INVALID_OPERATION, "Transaction not properly initialized")
 
             self.status = TransactionStatus.PREPARING
 
@@ -631,11 +600,8 @@ class Transaction:
                             "operations_count": len(self.operations),
                         },
                     )
-                else:
-                    self.status = TransactionStatus.FAILED
-                    return Result.fail(
-                        ErrorCode.INTERNAL_ERROR, "Transaction commit failed", metadata=result
-                    )
+                self.status = TransactionStatus.FAILED
+                return Result.fail(ErrorCode.INTERNAL_ERROR, "Transaction commit failed", metadata=result)
 
             except Exception as e:
                 self.status = TransactionStatus.FAILED
@@ -740,19 +706,15 @@ class TransactionManager:
 
             begin_result = transaction.begin()
             if not begin_result.is_ok():
-                return begin_result
+                return Result.fail(
+                    begin_result.error_code or ErrorCode.INTERNAL_ERROR,
+                    begin_result.error_message or "Failed to begin transaction",
+                )
 
             self.active_transactions[transaction.id] = transaction
             self.stats["total_transactions"] += 1
 
-            return Result.ok(
-                transaction,
-                metadata={
-                    "transaction_id": transaction.id,
-                    "isolation_level": isolation_level.value,
-                    "timeout_seconds": timeout_seconds,
-                },
-            )
+            return Result.ok(transaction)
 
     def get_transaction(self, transaction_id: str) -> Optional[Transaction]:
         """Get an active transaction by ID."""
@@ -806,9 +768,7 @@ class TransactionManager:
         # Update average duration
         if transaction.finished_at and transaction.started_at:
             duration = transaction.finished_at - transaction.started_at
-            total_finished = (
-                self.stats["committed_transactions"] + self.stats["aborted_transactions"]
-            )
+            total_finished = self.stats["committed_transactions"] + self.stats["aborted_transactions"]
             if total_finished > 0:
                 current_avg = self.stats["average_transaction_duration"]
                 self.stats["average_transaction_duration"] = (
@@ -827,6 +787,9 @@ class TransactionManager:
             raise TransactionException(f"Failed to begin transaction: {tx_result.error_message}")
 
         transaction = tx_result.data
+        if transaction is None:
+            raise TransactionException("Transaction creation returned None")
+
         try:
             yield transaction
 
@@ -834,13 +797,11 @@ class TransactionManager:
             if transaction.status == TransactionStatus.ACTIVE:
                 commit_result = self.commit_transaction(transaction.id)
                 if not commit_result.is_ok():
-                    raise TransactionException(
-                        f"Failed to commit transaction: {commit_result.error_message}"
-                    )
+                    raise TransactionException(f"Failed to commit transaction: {commit_result.error_message}")
 
         except Exception as e:
             # Auto-rollback on exception
-            if transaction.status == TransactionStatus.ACTIVE:
+            if transaction and transaction.status == TransactionStatus.ACTIVE:
                 rollback_result = self.rollback_transaction(transaction.id)
                 if not rollback_result.is_ok():
                     # Log the rollback failure but don't mask the original exception
@@ -870,6 +831,7 @@ class TransactionManager:
 
     def detect_and_resolve_deadlocks(self) -> Result[List[str]]:
         """Manually trigger deadlock detection and resolution."""
+        # pylint: disable=protected-access
         cycle = self.lock_manager._deadlock_detector.detect_deadlock()
         if cycle:
             self.stats["deadlocks_detected"] += 1
@@ -886,9 +848,7 @@ class TransactionManager:
 
             if youngest_tx:
                 self.rollback_transaction(youngest_tx.id)
-                return Result.ok(
-                    cycle, metadata={"resolved_by_aborting": youngest_tx.id, "cycle": cycle}
-                )
+                return Result.ok(cycle, metadata={"resolved_by_aborting": youngest_tx.id, "cycle": cycle})
 
         return Result.ok([])
 

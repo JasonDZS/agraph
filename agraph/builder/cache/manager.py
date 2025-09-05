@@ -7,13 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
-from ...config import (
-    BuilderConfig,
-    BuildStatus,
-    BuildSteps,
-    CacheMetadata,
-    DocumentProcessingStatus,
-)
+from ...config import BuilderConfig, BuildStatus, BuildSteps, CacheMetadata, DocumentProcessingStatus
 from ...logger import logger
 from .base import CacheBackend
 from .file_cache import FileCacheBackend
@@ -36,9 +30,7 @@ class CacheManager:
         self._build_status: Optional[BuildStatus] = None
         self._document_status_cache: Dict[str, DocumentProcessingStatus] = {}
 
-    def get_step_result(
-        self, step_name: str, input_data: Any, expected_type: Type[T]
-    ) -> Optional[T]:
+    def get_step_result(self, step_name: str, input_data: Any, expected_type: Type[T]) -> Optional[T]:
         """Get cached result for a step.
 
         Args:
@@ -111,11 +103,7 @@ class CacheManager:
 
         # For relation extraction step, we need to save entities as context
         # so that relations can be properly deserialized
-        if (
-            step_name == BuildSteps.RELATION_EXTRACTION
-            and isinstance(input_data, tuple)
-            and len(input_data) == 2
-        ):
+        if step_name == BuildSteps.RELATION_EXTRACTION and isinstance(input_data, tuple) and len(input_data) == 2:
             _, entities = input_data  # Only need entities for context
             # Save result with entities context for proper relation deserialization
             result_with_context = {"result": result, "entities_context": entities}
@@ -287,9 +275,7 @@ class CacheManager:
         logger.debug(f"File hash calculated: {file_hash[:16]}... for {file_path}")
         return file_hash
 
-    def get_document_status(
-        self, file_path: Union[str, Path]
-    ) -> Optional[DocumentProcessingStatus]:
+    def get_document_status(self, file_path: Union[str, Path]) -> Optional[DocumentProcessingStatus]:
         """Get document processing status."""
         file_key = str(file_path)
         logger.debug(f"Getting document status for: {file_path}")
@@ -312,9 +298,7 @@ class CacheManager:
         logger.debug(f"No document status found for: {file_path}")
         return None
 
-    def update_document_status(
-        self, file_path: Union[str, Path], status: DocumentProcessingStatus
-    ) -> None:
+    def update_document_status(self, file_path: Union[str, Path], status: DocumentProcessingStatus) -> None:
         """Update document processing status."""
         file_key = str(file_path)
         logger.debug(
@@ -344,9 +328,7 @@ class CacheManager:
             return False
 
         if status.processing_status != "completed":
-            logger.debug(
-                f"Document processing not completed (status: {status.processing_status}): {file_path}"
-            )
+            logger.debug(f"Document processing not completed (status: {status.processing_status}): {file_path}")
             return False
 
         # Check if file has been modified since last processing
@@ -374,9 +356,7 @@ class CacheManager:
             else:
                 unprocessed.append(doc_path)
 
-        logger.info(
-            f"Document analysis complete: {len(processed)} processed, {len(unprocessed)} unprocessed"
-        )
+        logger.info(f"Document analysis complete: {len(processed)} processed, {len(unprocessed)} unprocessed")
         return processed, unprocessed
 
     def get_cached_document_results(self, documents: List[Union[str, Path]]) -> Dict[str, str]:
@@ -396,9 +376,7 @@ class CacheManager:
                     cache_hits += 1
                     logger.debug(f"Retrieved cached text for document: {doc_path}")
                 else:
-                    logger.warning(
-                        f"Status indicates completed but no cached text found for: {doc_path}"
-                    )
+                    logger.warning(f"Status indicates completed but no cached text found for: {doc_path}")
 
         logger.info(f"Cache retrieval complete: {cache_hits}/{len(documents)} hits")
         return results
@@ -495,9 +473,7 @@ class CacheManager:
                     del self._document_status_cache[file_key]
                     logger.debug(f"Removed from memory cache: {file_path}")
 
-                logger.info(
-                    f"Document cache cleared for {file_path}: {deleted_count} entries deleted"
-                )
+                logger.info(f"Document cache cleared for {file_path}: {deleted_count} entries deleted")
 
             if not status:
                 logger.debug(f"No cache entries found for document: {file_path}")

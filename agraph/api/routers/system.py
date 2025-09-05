@@ -24,9 +24,7 @@ async def get_stats(agraph: Any = Depends(get_agraph_instance_dependency)) -> St
     try:
         stats = await agraph.get_stats()
 
-        return StatsResponse(
-            status=ResponseStatus.SUCCESS, message="Statistics retrieved successfully", data=stats
-        )
+        return StatsResponse(status=ResponseStatus.SUCCESS, message="Statistics retrieved successfully", data=stats)
 
     except Exception as e:
         logger.error(f"Failed to get statistics: {e}")
@@ -92,9 +90,7 @@ async def clear_cache(
             agraph.builder.clear_cache(from_step=request.from_step)
             return BaseResponse(status=ResponseStatus.SUCCESS, message="Cache cleared successfully")
 
-        return BaseResponse(
-            status=ResponseStatus.SUCCESS, message="Builder not initialized, no cache to clear"
-        )
+        return BaseResponse(status=ResponseStatus.SUCCESS, message="Builder not initialized, no cache to clear")
 
     except Exception as e:
         logger.error(f"Failed to clear cache: {e}")
@@ -108,9 +104,7 @@ async def clear_all_data(agraph: Any = Depends(get_agraph_instance_dependency)) 
         success = await agraph.clear_all()
 
         if success:
-            return BaseResponse(
-                status=ResponseStatus.SUCCESS, message="All data cleared successfully"
-            )
+            return BaseResponse(status=ResponseStatus.SUCCESS, message="All data cleared successfully")
 
         return BaseResponse(status=ResponseStatus.ERROR, message="Failed to clear all data")
 

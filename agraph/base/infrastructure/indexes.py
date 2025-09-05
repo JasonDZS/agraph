@@ -108,9 +108,7 @@ class IndexManager:
 
         _add()
 
-    def remove_entity_from_type_index(
-        self, entity_id: str, entity_type: Union[EntityType, str]
-    ) -> None:
+    def remove_entity_from_type_index(self, entity_id: str, entity_type: Union[EntityType, str]) -> None:
         """Remove an entity from the type index."""
 
         @self._with_write_lock
@@ -137,9 +135,7 @@ class IndexManager:
         return _get()
 
     # Entity-Relation Index Operations
-    def add_relation_to_index(
-        self, relation_id: str, head_entity_id: str, tail_entity_id: str
-    ) -> None:
+    def add_relation_to_index(self, relation_id: str, head_entity_id: str, tail_entity_id: str) -> None:
         """Add a relation to the entity-relation indexes."""
 
         @self._with_write_lock
@@ -299,9 +295,7 @@ class IndexManager:
 
         _remove()
 
-    def _remove_entity_from_text_chunk_index_internal(
-        self, entity_id: str, text_chunk_id: str
-    ) -> None:
+    def _remove_entity_from_text_chunk_index_internal(self, entity_id: str, text_chunk_id: str) -> None:
         """Internal method to remove entity-text chunk relationship without acquiring locks."""
         self._entity_text_chunks_index[entity_id].discard(text_chunk_id)
         self._text_chunk_entities_index[text_chunk_id].discard(entity_id)
@@ -344,7 +338,7 @@ class IndexManager:
 
     # Bulk Operations
     def remove_entity_from_all_indexes(
-        self, entity_id: str, entity_type: Union[EntityType, str] = None
+        self, entity_id: str, entity_type: Optional[Union[EntityType, str]] = None
     ) -> Dict[str, Set[str]]:
         """Remove an entity from all indexes and return what was removed."""
 
@@ -400,8 +394,7 @@ class IndexManager:
                 "index_hits": self._stats["index_hits"],
                 "index_misses": self._stats["index_misses"],
                 "hit_ratio": (
-                    self._stats["index_hits"]
-                    / (self._stats["index_hits"] + self._stats["index_misses"])
+                    self._stats["index_hits"] / (self._stats["index_hits"] + self._stats["index_misses"])
                     if (self._stats["index_hits"] + self._stats["index_misses"]) > 0
                     else 0.0
                 ),
@@ -425,9 +418,7 @@ class IndexManager:
 
         _clear()
 
-    def rebuild_indexes(
-        self, knowledge_graph: "KnowledgeGraph"
-    ) -> None:
+    def rebuild_indexes(self, knowledge_graph: "KnowledgeGraph") -> None:
         """Rebuild all indexes from the knowledge graph data."""
 
         @self._with_write_lock

@@ -77,8 +77,7 @@ class HTMLProcessor(DocumentProcessor):
             from bs4 import BeautifulSoup  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise ProcessingError(
-                "beautifulsoup4 is required for HTML processing. "
-                "Install with: pip install beautifulsoup4"
+                "beautifulsoup4 is required for HTML processing. " "Install with: pip install beautifulsoup4"
             ) from exc
 
         try:
@@ -104,9 +103,7 @@ class HTMLProcessor(DocumentProcessor):
         except Exception as e:
             raise ProcessingError(f"Failed to process HTML file {file_path}: {str(e)}") from e
 
-    def _read_html_with_encoding_fallback(
-        self, file_path: Union[str, Path], preferred_encoding: str
-    ) -> str:
+    def _read_html_with_encoding_fallback(self, file_path: Union[str, Path], preferred_encoding: str) -> str:
         """Read HTML file with encoding detection and fallback.
 
         Args:
@@ -433,11 +430,7 @@ class HTMLProcessor(DocumentProcessor):
         # Analyze heading structure
         headings = soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
         if headings:
-            heading_levels = [
-                int(h.name[1])
-                for h in headings
-                if hasattr(h, "name") and h.name and len(h.name) > 1
-            ]
+            heading_levels = [int(h.name[1]) for h in headings if hasattr(h, "name") and h.name and len(h.name) > 1]
             if heading_levels:
                 metadata["heading_levels"] = list(set(heading_levels))
                 metadata["max_heading_level"] = max(heading_levels)

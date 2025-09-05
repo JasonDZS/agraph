@@ -22,11 +22,7 @@ from ..config import BuilderConfig, BuildSteps
 from ..logger import logger
 from ..processor.factory import DocumentProcessorFactory
 from .cache import CacheManager
-from .clustering import (
-    ClusterAlgorithm,
-    CommunityDetectionAlgorithm,
-    HierarchicalClusteringAlgorithm,
-)
+from .clustering import ClusterAlgorithm, CommunityDetectionAlgorithm, HierarchicalClusteringAlgorithm
 from .extractors import EntityExtractor, LLMEntityExtractor, LLMRelationExtractor, RelationExtractor
 from .handler.cluster_handler import ClusterHandler
 from .handler.document_processor import DocumentProcessor
@@ -35,7 +31,7 @@ from .handler.graph_assembler import GraphAssembler
 from .handler.relation_handler import RelationHandler
 from .handler.text_chunker_handler import TextChunkerHandler
 from .pipeline import BuildPipeline
-from .pipeline_factory import PipelineFactory, PipelineBuilder
+from .pipeline_factory import PipelineBuilder, PipelineFactory
 from .steps.context import BuildContext
 
 T = TypeVar("T")
@@ -44,10 +40,12 @@ T = TypeVar("T")
 class KnowledgeGraphBuilder:
     """
     Refactored KnowledgeGraphBuilder using pipeline architecture.
-    
+
     This version maintains backward compatibility while using the new
     step-based pipeline architecture internally.
     """
+
+    # pylint: disable=too-many-public-methods
 
     def __init__(
         self,
@@ -90,14 +88,14 @@ class KnowledgeGraphBuilder:
             config={
                 "min_confidence": self.config.entity_confidence_threshold,
             },
-            builder_config=self.config
+            builder_config=self.config,
         )
 
         self.relation_extractor = relation_extractor or LLMRelationExtractor(
             config={
                 "min_confidence": self.config.relation_confidence_threshold,
             },
-            builder_config=self.config
+            builder_config=self.config,
         )
 
         self.cluster_algorithm = cluster_algorithm or self._create_cluster_algorithm()
@@ -107,9 +105,7 @@ class KnowledgeGraphBuilder:
 
         # Initialize handlers (same as original)
         self.document_processor = DocumentProcessor(self.cache_manager, self.processor_factory)
-        self.text_chunker_handler = TextChunkerHandler(
-            self.cache_manager, self.config, self.chunker
-        )
+        self.text_chunker_handler = TextChunkerHandler(self.cache_manager, self.config, self.chunker)
         self.entity_handler = EntityHandler(self.cache_manager, self.entity_extractor)
         self.relation_handler = RelationHandler(self.cache_manager, self.relation_extractor)
         self.cluster_handler = ClusterHandler(self.cache_manager, self.cluster_algorithm)
@@ -126,10 +122,10 @@ class KnowledgeGraphBuilder:
 
         # Initialize pipeline factory
         self.pipeline_factory = PipelineFactory(self.cache_manager)
-        
+
         # Pipeline builder for custom pipelines
         self.pipeline_builder = PipelineBuilder(self.cache_manager)
-        
+
         # Store last build context for cache optimization
         self.last_build_context: Optional[BuildContext] = None
 
@@ -180,7 +176,7 @@ class KnowledgeGraphBuilder:
                 graph_description=graph_description,
                 use_cache=use_cache,
                 from_step=from_step,
-                enable_knowledge_graph=self.enable_knowledge_graph
+                enable_knowledge_graph=self.enable_knowledge_graph,
             )
 
             # Create pipeline with document processing
@@ -191,7 +187,7 @@ class KnowledgeGraphBuilder:
                 cluster_handler=self.cluster_handler,
                 graph_assembler=self.graph_assembler,
                 include_document_processing=True,
-                document_processor=self.document_processor
+                document_processor=self.document_processor,
             )
 
             # Execute pipeline
@@ -205,7 +201,7 @@ class KnowledgeGraphBuilder:
                 f"Name: '{knowledge_graph.name}', Entities: {len(knowledge_graph.entities)}, "
                 f"Relations: {len(knowledge_graph.relations)}"
             )
-            
+
             return knowledge_graph
 
         except Exception as e:
@@ -235,9 +231,7 @@ class KnowledgeGraphBuilder:
             Constructed knowledge graph
         """
         # Adjust from_step for text-only pipeline (skip document processing)
-        actual_from_step = (
-            from_step if from_step != BuildSteps.DOCUMENT_PROCESSING else BuildSteps.TEXT_CHUNKING
-        )
+        actual_from_step = from_step if from_step != BuildSteps.DOCUMENT_PROCESSING else BuildSteps.TEXT_CHUNKING
 
         logger.info(
             f"Starting knowledge graph build from {len(texts)} text strings - "
@@ -252,7 +246,7 @@ class KnowledgeGraphBuilder:
                 graph_description=graph_description,
                 use_cache=use_cache,
                 from_step=actual_from_step,
-                enable_knowledge_graph=self.enable_knowledge_graph
+                enable_knowledge_graph=self.enable_knowledge_graph,
             )
 
             # Mark document processing as completed since we skip it
@@ -260,7 +254,7 @@ class KnowledgeGraphBuilder:
                 context.mark_step_completed(
                     BuildSteps.DOCUMENT_PROCESSING,
                     0.0,  # No execution time
-                    texts  # Document processing "result" is the input texts
+                    texts,  # Document processing "result" is the input texts
                 )
 
             # Create text-only pipeline
@@ -269,7 +263,7 @@ class KnowledgeGraphBuilder:
                 entity_handler=self.entity_handler,
                 relation_handler=self.relation_handler,
                 cluster_handler=self.cluster_handler,
-                graph_assembler=self.graph_assembler
+                graph_assembler=self.graph_assembler,
             )
 
             # Execute pipeline
@@ -283,7 +277,7 @@ class KnowledgeGraphBuilder:
                 f"Name: '{knowledge_graph.name}', Entities: {len(knowledge_graph.entities)}, "
                 f"Relations: {len(knowledge_graph.relations)}"
             )
-            
+
             return knowledge_graph
 
         except Exception as e:
@@ -319,9 +313,7 @@ class KnowledgeGraphBuilder:
 
     def update_relations(self, relations: List[Relation]) -> None:
         """Update relations and invalidate dependent steps."""
-        self.cache_manager.save_step_result(
-            BuildSteps.RELATION_EXTRACTION, "user_edited", relations
-        )
+        self.cache_manager.save_step_result(BuildSteps.RELATION_EXTRACTION, "user_edited", relations)
         self.cache_manager.invalidate_dependent_steps(BuildSteps.RELATION_EXTRACTION)
 
     def get_clusters_for_editing(self) -> List[Cluster]:
@@ -334,9 +326,7 @@ class KnowledgeGraphBuilder:
         self.cache_manager.invalidate_dependent_steps(BuildSteps.CLUSTER_FORMATION)
 
     # Cache and status management methods (unchanged from original)
-    def save_step_result(
-        self, step_name: str, result: Any, metadata: Optional[Dict] = None
-    ) -> None:
+    def save_step_result(self, step_name: str, result: Any, metadata: Optional[Dict] = None) -> None:
         """Save step result to cache."""
         # metadata parameter is for future extensibility
         self.cache_manager.save_step_result(step_name, "manual", result)
@@ -368,9 +358,7 @@ class KnowledgeGraphBuilder:
         cache_info["document_processing"] = self.cache_manager.get_document_processing_summary()
         return cache_info
 
-    def get_document_processing_status(
-        self, file_path: Optional[Union[str, Path]] = None
-    ) -> Dict[str, Any]:
+    def get_document_processing_status(self, file_path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
         """Get document processing status information."""
         if file_path:
             # Get status for specific document
@@ -393,10 +381,10 @@ class KnowledgeGraphBuilder:
     def create_custom_pipeline(self, step_config: Dict[str, Any]) -> BuildPipeline:
         """
         Create a custom pipeline with specific step configuration.
-        
+
         Args:
             step_config: Configuration dictionary specifying which steps to include
-            
+
         Returns:
             Configured BuildPipeline
         """
@@ -404,24 +392,18 @@ class KnowledgeGraphBuilder:
 
     def create_minimal_pipeline(self) -> BuildPipeline:
         """Create a minimal pipeline with only essential steps."""
-        return self.pipeline_factory.create_minimal_pipeline(
-            self.text_chunker_handler,
-            self.graph_assembler
-        )
+        return self.pipeline_factory.create_minimal_pipeline(self.text_chunker_handler, self.graph_assembler)
 
     def get_pipeline_metrics(self) -> Dict[str, Any]:
         """
         Get metrics from the last executed pipeline.
-        
+
         Returns:
             Pipeline execution metrics
         """
         # This would be enhanced to store and return actual pipeline metrics
         # For now, return basic cache manager metrics
-        return {
-            "cache_info": self.get_cache_info(),
-            "build_status": self.get_build_status()
-        }
+        return {"cache_info": self.get_cache_info(), "build_status": self.get_build_status()}
 
     # Helper methods (unchanged from original)
     def _create_cluster_algorithm(self) -> ClusterAlgorithm:
@@ -435,9 +417,7 @@ class KnowledgeGraphBuilder:
 
         return CommunityDetectionAlgorithm(algorithm_config)
 
-    def _get_cached_step_result(
-        self, step_name: str, input_data: Any, expected_type: Type[T]
-    ) -> Optional[T]:
+    def _get_cached_step_result(self, step_name: str, input_data: Any, expected_type: Type[T]) -> Optional[T]:
         """Get cached result for a step."""
         return self.cache_manager.get_step_result(step_name, input_data, expected_type)
 
@@ -455,7 +435,8 @@ class KnowledgeGraphBuilder:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]
+    ) -> None:
         """Async context manager exit."""
         await self.aclose()
-

@@ -778,7 +778,7 @@ class TestOptimizedKnowledgeGraphSerialization(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg = KnowledgeGraph(name= "Test Graph", description= "Test Description")
+        self.kg = KnowledgeGraph(name="Test Graph", description="Test Description")
 
         # Add sample data
         entity1 = Entity(id="entity_1", name="Entity 1", entity_type=EntityType.PERSON)
@@ -866,8 +866,8 @@ class TestOptimizedKnowledgeGraphMerging(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.kg1 = KnowledgeGraph(name= "Graph 1")
-        self.kg2 = KnowledgeGraph(name= "Graph 2")
+        self.kg1 = KnowledgeGraph(name="Graph 1")
+        self.kg2 = KnowledgeGraph(name="Graph 2")
 
     def test_merge_basic(self):
         """Test basic graph merging."""
@@ -1090,7 +1090,7 @@ class TestOptimizedKnowledgeGraphIntegration(unittest.TestCase):
 
     def test_complete_workflow(self):
         """Test a complete workflow using multiple features."""
-        kg = KnowledgeGraph(name= "Integration Test Graph")
+        kg = KnowledgeGraph(name="Integration Test Graph")
 
         # 1. Add entities
         person = Entity(id="person_1", name="John Doe", entity_type=EntityType.PERSON)

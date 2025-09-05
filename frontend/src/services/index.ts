@@ -7,6 +7,7 @@ export { knowledgeGraphService } from './knowledgeGraphService';
 export { chatService } from './chatService';
 export { searchService } from './searchService';
 export { configService } from './configService';
+export { configManager } from './configManager';
 
 // Export state management utilities
 export {
@@ -42,7 +43,15 @@ export type {
   SearchSuggestion,
 } from './searchService';
 // Config service types
-export type { ConfigResponse, ConfigUpdateRequest } from '@/types/config';
+export type {
+  ConfigResponse,
+  ConfigUpdateRequest,
+  BackupStatus,
+  ConfigFileRequest,
+  ConfigFileResponse,
+  BuilderConfig,
+  ProjectSettings
+} from '@/types/config';
 
 // Service manager for centralized control
 class ServiceManager {

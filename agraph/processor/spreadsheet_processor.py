@@ -79,9 +79,7 @@ class SpreadsheetProcessor(DocumentProcessor):
             return self._process_excel_file(file_path, **kwargs)
         raise ProcessingError(f"Unsupported file extension: {file_path.suffix}")
 
-    def _process_csv_file(
-        self, file_path: Path, **kwargs: Any
-    ) -> str:  # pylint: disable=too-many-locals
+    def _process_csv_file(self, file_path: Path, **kwargs: Any) -> str:  # pylint: disable=too-many-locals
         """Process CSV files with automatic delimiter detection and encoding fallback.
 
         Args:
@@ -140,9 +138,7 @@ class SpreadsheetProcessor(DocumentProcessor):
                         return self._process_csv_file(file_path, encoding=alt_encoding, **kwargs)
                     except UnicodeDecodeError:
                         continue
-            raise ProcessingError(
-                f"Could not decode CSV file {file_path} with any supported encoding"
-            ) from exc
+            raise ProcessingError(f"Could not decode CSV file {file_path} with any supported encoding") from exc
         except Exception as e:
             raise ProcessingError(f"Failed to process CSV file {file_path}: {str(e)}") from e
 
@@ -199,9 +195,7 @@ class SpreadsheetProcessor(DocumentProcessor):
         except Exception as e:
             raise ProcessingError(f"Failed to process Excel file {file_path}: {str(e)}") from e
 
-    def _process_all_excel_sheets(
-        self, file_path: Path, max_rows: int, include_headers: bool
-    ) -> str:
+    def _process_all_excel_sheets(self, file_path: Path, max_rows: int, include_headers: bool) -> str:
         """Process all sheets in an Excel file.
 
         Args:
@@ -215,9 +209,7 @@ class SpreadsheetProcessor(DocumentProcessor):
         try:
             import pandas as pd  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
-            raise ProcessingError(
-                "pandas is required for Excel processing. Install with: pip install pandas"
-            ) from exc
+            raise ProcessingError("pandas is required for Excel processing. Install with: pip install pandas") from exc
 
         excel_file = pd.ExcelFile(file_path)
         all_content = []

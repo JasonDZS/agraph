@@ -26,9 +26,7 @@ class DocumentProcessor:
         self.cache_manager = cache_manager
         self.processor_factory = processor_factory
 
-    def process_documents(
-        self, documents: List[Union[str, Path]], use_cache: bool = True
-    ) -> List[str]:
+    def process_documents(self, documents: List[Union[str, Path]], use_cache: bool = True) -> List[str]:
         """Process documents and extract text content with incremental updates.
 
         Args:
@@ -47,8 +45,7 @@ class DocumentProcessor:
         processed_docs, unprocessed_docs = self.cache_manager.get_processed_documents(documents)
 
         logger.info(
-            f"Document analysis: {len(processed_docs)} already processed, "
-            f"{len(unprocessed_docs)} need processing"
+            f"Document analysis: {len(processed_docs)} already processed, " f"{len(unprocessed_docs)} need processing"
         )
 
         # Get cached results for processed documents
@@ -81,9 +78,7 @@ class DocumentProcessor:
                         texts.append(content)
 
                         # Save result with status tracking
-                        self.cache_manager.save_document_processing_result(
-                            doc_path, content, processing_time
-                        )
+                        self.cache_manager.save_document_processing_result(doc_path, content, processing_time)
 
                         logger.debug(
                             f"Successfully processed document {doc_path} - "
@@ -124,9 +119,7 @@ class DocumentProcessor:
                 processor = self.processor_factory.get_processor(str(doc_path))
                 content = processor.process(str(doc_path))
                 texts.append(content)
-                logger.debug(
-                    f"Successfully processed document {doc_path} - content length: {len(content)} chars"
-                )
+                logger.debug(f"Successfully processed document {doc_path} - content length: {len(content)} chars")
             except Exception as e:
                 logger.error(f"Error processing document {doc_path}: {e}")
                 continue

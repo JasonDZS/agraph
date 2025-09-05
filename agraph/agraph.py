@@ -19,18 +19,13 @@ from .base.infrastructure.dao import MemoryDataAccessLayer
 
 # Import unified architecture components
 from .base.managers.factory import create_managers
-from .base.managers.interfaces import (
-    ClusterManager,
-    EntityManager,
-    RelationManager,
-    TextChunkManager,
-)
+from .base.managers.interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
 from .base.models.entities import Entity
 from .base.models.relations import Relation
 from .base.models.text import TextChunk
-from .builder.builder import KnowledgeGraphBuilder as KnowledgeGraphBuilder
+from .builder.builder import KnowledgeGraphBuilder
 from .chunker import TokenChunker
-from .config import BuilderConfig, Settings, get_settings
+from .config import BuildSteps, Settings, get_settings
 from .logger import logger
 from .processor import DocumentProcessorFactory
 from .vectordb.factory import VectorStoreFactory, create_chroma_store
@@ -38,51 +33,56 @@ from .vectordb.interfaces import VectorStore
 
 
 class AGraph:
-    """Unified knowledge graph system supporting construction, storage and conversation functions."""
+    """Unified knowledge graph system supporting construction, storage and conversation functions.
+
+    Simplified initialization: only requires a Settings instance for all configuration.
+    All other parameters are optional overrides for specific use cases.
+
+    Example:
+        # Simple initialization with just settings
+        settings = get_settings()  # or custom Settings instance
+        agraph = AGraph(settings=settings)
+
+        # Or with optional overrides
+        agraph = AGraph(settings=settings, collection_name="custom_collection")
+    """
 
     def __init__(
         self,
-        collection_name: str = "agraph_knowledge",
-        persist_directory: Optional[str] = None,
-        vector_store_type: str = "chroma",
-        config: Optional[BuilderConfig] = None,
-        use_openai_embeddings: bool = True,
-        enable_knowledge_graph: bool = True,
         settings: Optional[Settings] = None,
+        collection_name: Optional[str] = None,
+        persist_directory: Optional[str] = None,
+        vector_store_type: Optional[str] = None,
+        enable_knowledge_graph: Optional[bool] = None,
         **_kwargs: Any,
     ) -> None:
-        """Initialize AGraph system.
+        """Initialize AGraph system with unified settings configuration.
 
         Args:
-            collection_name: Collection name.
-            persist_directory: Storage persistence directory.
-            vector_store_type: Vector store type ('chroma', 'memory').
-            config: Builder configuration.
-            use_openai_embeddings: Whether to use OpenAI embeddings.
-            enable_knowledge_graph: Whether to enable knowledge graph construction.
-            settings: Settings instance to use (if None, will load default settings).
-            **kwargs: Other parameters.
+            settings: Settings instance (primary configuration source).
+            collection_name: Override collection name (optional).
+            persist_directory: Override storage persistence directory (optional).
+            vector_store_type: Override vector store type (optional).
+            enable_knowledge_graph: Override KG enablement (optional).
+            **kwargs: Other parameters (for backward compatibility).
         """
-        self.collection_name = collection_name
-        self.persist_directory = persist_directory or "./agraph_vectordb"
-        self.vector_store_type = vector_store_type
-        self.use_openai_embeddings = use_openai_embeddings
-        self.enable_knowledge_graph = enable_knowledge_graph
-        self.settings = settings or get_settings()
+        # Initialize settings with automatic config file handling
+        self.settings = self._initialize_settings(settings)
 
-        # Initialize configuration
-        if config is None:
-            config = BuilderConfig(
-                chunk_size=self.settings.text.max_chunk_size,
-                chunk_overlap=self.settings.text.chunk_overlap,
-                entity_confidence_threshold=0.7,
-                relation_confidence_threshold=0.6,
-                cache_dir=os.path.join(self.persist_directory, "cache"),
-                llm_config=self.settings.llm,
-                embedding_config=self.settings.embedding,
-                openai_config=self.settings.openai,
-            )
-        self.config = config
+        # Derive configurations from settings with optional overrides
+        self.collection_name = collection_name or "agraph_knowledge"
+        self.persist_directory = persist_directory or self.settings.workdir
+        self.vector_store_type = vector_store_type or "chroma"
+        self.enable_knowledge_graph = enable_knowledge_graph if enable_knowledge_graph is not None else True
+
+        # Derive other configurations from settings
+        self.use_openai_embeddings = self.settings.embedding.provider == "openai"
+
+        # Initialize configuration from settings
+        self.config = self.settings.builder
+
+        # Update builder configuration with AGraph-specific settings
+        self.config.cache_dir = os.path.join(self.persist_directory, "cache")
 
         # Initialize components
         self.vector_store: Optional[VectorStore] = None
@@ -97,8 +97,75 @@ class AGraph:
         self._use_unified_architecture = True  # Flag to control architecture usage
 
         logger.info(
-            f"AGraph initialization completed, collection: {collection_name}, persist_dir: {self.persist_directory}, enable_kg: {enable_knowledge_graph}"
+            f"AGraph initialization completed, collection: {self.collection_name}, persist_dir: {self.persist_directory}, enable_kg: {self.enable_knowledge_graph}"
         )
+
+    def _initialize_settings(self, settings: Optional[Settings] = None) -> Settings:
+        """Initialize settings with automatic config file handling.
+
+        Priority:
+        1. If settings parameter is provided, use it and save to its workdir
+        2. If config.json exists in workdir, load from it
+        3. Use default settings and save to workdir/config.json
+
+        Args:
+            settings: Optional settings instance
+
+        Returns:
+            Settings instance
+        """
+        final_settings = None
+
+        if settings is not None:
+            logger.info("Using provided settings instance")
+            final_settings = settings
+        else:
+            # Try to load from workdir/config.json
+            default_settings = get_settings()
+            config_paths_to_try = [
+                # 1. Current directory (highest priority when no settings provided)
+                os.path.join(os.getcwd(), "config.json"),
+                # 2. Default settings workdir
+                os.path.join(default_settings.workdir, "config.json"),
+            ]
+
+            for config_file_path in config_paths_to_try:
+                if os.path.exists(config_file_path):
+                    try:
+                        logger.info(f"Loading settings from {config_file_path}")
+                        with open(config_file_path, "r", encoding="utf-8") as f:
+                            config_data = json.load(f)
+
+                        # Create Settings instance from config data
+                        final_settings = Settings.from_dict(config_data)
+                        logger.info(f"Successfully loaded settings from {config_file_path}")
+                        break
+
+                    except Exception as e:
+                        logger.warning(f"Failed to load settings from {config_file_path}: {e}")
+                        continue
+
+            if final_settings is None:
+                logger.info(f"No config file found at: {', '.join(config_paths_to_try)}")
+                final_settings = default_settings
+
+        # Always ensure config.json exists in the final settings' workdir
+        if final_settings:
+            config_file_path = os.path.join(final_settings.workdir, "config.json")
+            try:
+                # Ensure workdir exists
+                os.makedirs(final_settings.workdir, exist_ok=True)
+
+                # Save final settings to config.json (create or update)
+                with open(config_file_path, "w", encoding="utf-8") as f:
+                    json.dump(final_settings.to_dict(), f, indent=2, ensure_ascii=False)
+
+                logger.info(f"Saved settings to {config_file_path}")
+
+            except Exception as e:
+                logger.warning(f"Failed to save settings to {config_file_path}: {e}")
+
+        return final_settings
 
     async def initialize(self) -> None:
         """Asynchronously initialize all components."""
@@ -126,9 +193,7 @@ class AGraph:
                 if loaded:
                     logger.info("Existing knowledge graph loaded successfully")
                 else:
-                    logger.info(
-                        "No existing knowledge graph found, will create new one when needed"
-                    )
+                    logger.info("No existing knowledge graph found, will create new one when needed")
 
             self._is_initialized = True
             logger.info("AGraph initialization successful")
@@ -180,9 +245,7 @@ class AGraph:
     def _initialize_builder(self) -> None:
         """Initialize knowledge graph builder."""
         try:
-            self.builder = KnowledgeGraphBuilder(
-                config=self.config, enable_knowledge_graph=self.enable_knowledge_graph
-            )
+            self.builder = KnowledgeGraphBuilder(config=self.config, enable_knowledge_graph=self.enable_knowledge_graph)
             logger.info("Knowledge graph builder initialization successful")
         except Exception as e:
             logger.error(f"Knowledge graph builder initialization failed: {e}")
@@ -298,9 +361,7 @@ class AGraph:
         # Convert to Union[str, Path] list
         documents_list: List[Union[str, Path]] = [str(doc) for doc in documents]
 
-        logger.info(
-            f"Starting to build knowledge graph from {len(documents_list)} documents: {graph_name}"
-        )
+        logger.info(f"Starting to build knowledge graph from {len(documents_list)} documents: {graph_name}")
 
         try:
             # Use builder to construct knowledge graph
@@ -381,37 +442,7 @@ class AGraph:
                 self.save_knowledge_graph_to_disk()
 
             # Check if new content was built (not all from cache) before saving to vector store
-            should_save_to_vector_store = save_to_vector_store
-            if save_to_vector_store and use_cache:
-                # Check if builder has cache usage information
-                if hasattr(self.builder, 'last_build_context') and self.builder.last_build_context:
-                    context = self.builder.last_build_context
-                    from .config import BuildSteps
-                    
-                    # Check actual cache usage based on execution times
-                    # If major steps completed very quickly (< 1s), likely used cache
-                    new_content_built = False
-                    major_steps = [BuildSteps.ENTITY_EXTRACTION, BuildSteps.RELATION_EXTRACTION, BuildSteps.CLUSTER_FORMATION]
-                    
-                    for step in major_steps:
-                        if context.is_step_completed(step):
-                            execution_time = context.step_execution_times.get(step, float('inf'))
-                            # If execution time > 1 second, likely built new content
-                            # If execution time < 1 second, likely used cache
-                            if execution_time > 1.0:
-                                new_content_built = True
-                                logger.debug(f"Step {step} took {execution_time:.2f}s, indicating new content processing")
-                            else:
-                                logger.debug(f"Step {step} took {execution_time:.2f}s, indicating cache usage")
-                    
-                    if not new_content_built:
-                        should_save_to_vector_store = False
-                        logger.info("All major components loaded from cache, skipping vector store save")
-                    else:
-                        logger.info(f"New content detected, will save to vector store")
-                        
-                else:
-                    logger.debug("No build context available for cache analysis")
+            should_save_to_vector_store = self._should_save_to_vector_store(save_to_vector_store, use_cache)
 
             # Asynchronously save to vector store only if needed
             if should_save_to_vector_store:
@@ -452,16 +483,12 @@ class AGraph:
         # Convert to Union[str, Path] list
         documents_list: List[Union[str, Path]] = [str(doc) for doc in documents]
 
-        logger.info(
-            f"Starting text-only processing from {len(documents_list)} documents: {graph_name}"
-        )
+        logger.info(f"Starting text-only processing from {len(documents_list)} documents: {graph_name}")
 
         try:
             # Initialize components we need
             processor_factory = DocumentProcessorFactory()
-            chunker = TokenChunker(
-                chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
-            )
+            chunker = TokenChunker(chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap)
 
             # Step 1: Process documents
             logger.info(f"Step 1: Processing {len(documents_list)} documents")
@@ -530,9 +557,7 @@ class AGraph:
 
         try:
             # Initialize chunker
-            chunker = TokenChunker(
-                chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
-            )
+            chunker = TokenChunker(chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap)
 
             # Step 1: Chunk texts
             logger.info(f"Step 1: Chunking {len(texts)} texts")
@@ -574,6 +599,59 @@ class AGraph:
             logger.error(f"Text-only processing failed: {e}")
             raise
 
+    def _should_save_to_vector_store(self, save_to_vector_store: bool, use_cache: bool) -> bool:
+        """Determine if we should save to vector store based on cache usage analysis.
+
+        Args:
+            save_to_vector_store: Initial intention to save to vector store
+            use_cache: Whether cache was used during building
+
+        Returns:
+            True if should save to vector store, False otherwise
+        """
+        if not save_to_vector_store:
+            return False
+
+        if not use_cache:
+            return True
+
+        # Check if builder has cache usage information
+        if (
+            self.builder is None
+            or not hasattr(self.builder, "last_build_context")
+            or not self.builder.last_build_context
+        ):
+            logger.debug("No build context available for cache analysis")
+            return True
+
+        context = self.builder.last_build_context
+
+        # Check actual cache usage based on execution times
+        # If major steps completed very quickly (< 1s), likely used cache
+        new_content_built = False
+        major_steps = [
+            BuildSteps.ENTITY_EXTRACTION,
+            BuildSteps.RELATION_EXTRACTION,
+            BuildSteps.CLUSTER_FORMATION,
+        ]
+
+        for step in major_steps:
+            if context.is_step_completed(step):
+                execution_time = context.step_execution_times.get(step, float("inf"))
+                # If execution time > 1 second, likely built new content
+                # If execution time < 1 second, likely used cache
+                if execution_time > 1.0:
+                    new_content_built = True
+                    logger.debug(f"Step {step} took {execution_time:.2f}s, indicating new content processing")
+                else:
+                    logger.debug(f"Step {step} took {execution_time:.2f}s, indicating cache usage")
+
+        if not new_content_built:
+            logger.info("All major components loaded from cache, skipping vector store save")
+            return False
+        logger.info("New content detected, will save to vector store")
+        return True
+
     # =============== Vector Storage Functions ===============
 
     async def _save_to_vector_store(self) -> None:
@@ -587,30 +665,22 @@ class AGraph:
 
             # Batch save entities (if knowledge graph is enabled)
             if self.enable_knowledge_graph and self.knowledge_graph.entities:
-                await self.vector_store.batch_add_entities(
-                    list(self.knowledge_graph.entities.values())
-                )
+                await self.vector_store.batch_add_entities(list(self.knowledge_graph.entities.values()))
                 logger.info(f"Saved {len(self.knowledge_graph.entities)} entities")
 
             # Batch save relations (if knowledge graph is enabled)
             if self.enable_knowledge_graph and self.knowledge_graph.relations:
-                await self.vector_store.batch_add_relations(
-                    list(self.knowledge_graph.relations.values())
-                )
+                await self.vector_store.batch_add_relations(list(self.knowledge_graph.relations.values()))
                 logger.info(f"Saved {len(self.knowledge_graph.relations)} relations")
 
             # Batch save clusters (if knowledge graph is enabled)
             if self.enable_knowledge_graph and self.knowledge_graph.clusters:
-                await self.vector_store.batch_add_clusters(
-                    list(self.knowledge_graph.clusters.values())
-                )
+                await self.vector_store.batch_add_clusters(list(self.knowledge_graph.clusters.values()))
                 logger.info(f"Saved {len(self.knowledge_graph.clusters)} clusters")
 
             # Batch save text chunks
             if self.knowledge_graph.text_chunks:
-                await self.vector_store.batch_add_text_chunks(
-                    list(self.knowledge_graph.text_chunks.values())
-                )
+                await self.vector_store.batch_add_text_chunks(list(self.knowledge_graph.text_chunks.values()))
                 logger.info(f"Saved {len(self.knowledge_graph.text_chunks)} text chunks")
 
             logger.info("Knowledge graph saved to vector store completed")
@@ -776,18 +846,12 @@ class AGraph:
 
         try:
             # 1. Retrieve relevant information
-            context_info = await self._retrieve_context(
-                question, entity_top_k, relation_top_k, text_chunk_top_k
-            )
+            context_info = await self._retrieve_context(question, entity_top_k, relation_top_k, text_chunk_top_k)
             logger.info(f"Retrieved context information: {context_info}")
 
             # 2. Build prompt
-            prompt = self._build_chat_prompt(
-                question, context_info, conversation_history, response_type
-            )
-            logger.info(
-                f"Model: {self.settings.llm}, Built prompt: {prompt[:100]}..."
-            )  # Log first 100 chars of prompt
+            prompt = self._build_chat_prompt(question, context_info, conversation_history, response_type)
+            logger.info(f"Model: {self.settings.llm}, Built prompt: {prompt[:100]}...")  # Log first 100 chars of prompt
 
             # 3. Call LLM to generate answer
             if stream:
@@ -838,9 +902,7 @@ class AGraph:
                 if result_index < len(results) and isinstance(results[result_index], list):
                     entity_results = results[result_index]
                     if isinstance(entity_results, list):  # Type guard for mypy
-                        context["entities"] = [
-                            {"entity": entity, "score": score} for entity, score in entity_results
-                        ]
+                        context["entities"] = [{"entity": entity, "score": score} for entity, score in entity_results]
                 result_index += 1
 
                 # Process relation results (if knowledge graph is enabled)
@@ -848,8 +910,7 @@ class AGraph:
                     relation_results = results[result_index]
                     if isinstance(relation_results, list):  # Type guard for mypy
                         context["relations"] = [
-                            {"relation": relation, "score": score}
-                            for relation, score in relation_results
+                            {"relation": relation, "score": score} for relation, score in relation_results
                         ]
                 result_index += 1
 
@@ -857,9 +918,7 @@ class AGraph:
             if result_index < len(results) and isinstance(results[result_index], list):
                 chunk_results = results[result_index]
                 if isinstance(chunk_results, list):  # Type guard for mypy
-                    context["text_chunks"] = [
-                        {"text_chunk": chunk, "score": score} for chunk, score in chunk_results
-                    ]
+                    context["text_chunks"] = [{"text_chunk": chunk, "score": score} for chunk, score in chunk_results]
 
         except Exception as e:
             logger.error(f"Context retrieval failed: {e}")
@@ -893,9 +952,7 @@ class AGraph:
             kg_context_parts.append("相关实体:")
             for item in context_info["entities"][:3]:
                 entity = item["entity"]
-                kg_context_parts.append(
-                    f"- {entity.name} ({entity.entity_type}): {entity.description or 'N/A'}"
-                )
+                kg_context_parts.append(f"- {entity.name} ({entity.entity_type}): {entity.description or 'N/A'}")
 
         # Add relation information (if knowledge graph is enabled)
         if self.enable_knowledge_graph and context_info.get("relations"):
@@ -904,18 +961,14 @@ class AGraph:
                 relation = item["relation"]
                 head_name = relation.head_entity.name if relation.head_entity else "未知"
                 tail_name = relation.tail_entity.name if relation.tail_entity else "未知"
-                kg_context_parts.append(
-                    f"- {head_name} --[{relation.relation_type}]--> {tail_name}"
-                )
+                kg_context_parts.append(f"- {head_name} --[{relation.relation_type}]--> {tail_name}")
 
         # Add text chunk information
         if context_info.get("text_chunks"):
             kg_context_parts.append("\n相关文档内容:")
             for item in context_info["text_chunks"][:3]:
                 chunk = item["text_chunk"]
-                content_preview = (
-                    chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content
-                )
+                content_preview = chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content
                 kg_context_parts.append(f"- {content_preview}")
 
         kg_context = "\n".join(kg_context_parts)
@@ -938,9 +991,7 @@ class AGraph:
             # Use OpenAI compatible API call
             import openai  # pylint: disable=import-outside-toplevel
 
-            client = openai.AsyncOpenAI(
-                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-            )
+            client = openai.AsyncOpenAI(api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base)
 
             stream = await client.chat.completions.create(
                 model=self.settings.llm.model,
@@ -988,9 +1039,7 @@ class AGraph:
             # Use OpenAI compatible API call
             import openai  # pylint: disable=import-outside-toplevel
 
-            client = openai.AsyncOpenAI(
-                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-            )
+            client = openai.AsyncOpenAI(api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base)
 
             response = await client.chat.completions.create(
                 model=self.settings.llm.model,
@@ -1108,9 +1157,7 @@ class AGraph:
         try:
             # Wait for all background tasks to complete
             if self._background_tasks:
-                logger.info(
-                    f"Waiting for {len(self._background_tasks)} background tasks to complete..."
-                )
+                logger.info(f"Waiting for {len(self._background_tasks)} background tasks to complete...")
                 await asyncio.gather(*self._background_tasks, return_exceptions=True)
                 self._background_tasks.clear()
                 logger.info("All background tasks completed")

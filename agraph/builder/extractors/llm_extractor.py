@@ -21,7 +21,7 @@ from .base import EntityExtractor, RelationExtractor
 class LLMEntityExtractor(EntityExtractor):
     """LLM-based entity extractor."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config: Optional[Any] = None):
         """Initialize LLM entity extractor.
 
         Args:
@@ -29,44 +29,38 @@ class LLMEntityExtractor(EntityExtractor):
             builder_config: BuilderConfig instance with integrated LLM and OpenAI configs
         """
         super().__init__(config)
-        
+
         # Use builder_config if provided, otherwise fall back to global settings
         if builder_config:
             self.llm_provider = builder_config.llm_provider
             self.llm_model = builder_config.llm_model
             self.llm_temperature = builder_config.llm_temperature
             self.llm_max_tokens = builder_config.llm_max_tokens
-            
+
             # Initialize AsyncOpenAI client with builder_config settings
             self.client = AsyncOpenAI(
                 api_key=builder_config.openai_config.api_key,
-                base_url=builder_config.openai_config.api_base
+                base_url=builder_config.openai_config.api_base,
             )
         else:
             # Backward compatibility: use config dict or global settings
             self.settings = get_settings()
             self.llm_provider = (
-                config.get("llm_provider", self.settings.llm.provider)
-                if config
-                else self.settings.llm.provider
+                config.get("llm_provider", self.settings.llm.provider) if config else self.settings.llm.provider
             )
-            self.llm_model = (
-                config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
-            )
+            self.llm_model = config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
             self.llm_temperature = (
-                config.get("llm_temperature", self.settings.llm.temperature) 
-                if config else self.settings.llm.temperature
+                config.get("llm_temperature", self.settings.llm.temperature)
+                if config
+                else self.settings.llm.temperature
             )
             self.llm_max_tokens = (
-                config.get("llm_max_tokens", self.settings.llm.max_tokens) 
-                if config else self.settings.llm.max_tokens
+                config.get("llm_max_tokens", self.settings.llm.max_tokens) if config else self.settings.llm.max_tokens
             )
-            
+
             # Initialize AsyncOpenAI client with global settings
-            self.client = AsyncOpenAI(
-                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-            )
-        
+            self.client = AsyncOpenAI(api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base)
+
         self.batch_size = config.get("batch_size", 5) if config else 5
 
     async def extract(self, chunks: List[TextChunk]) -> List[Entity]:
@@ -254,7 +248,9 @@ Requirements:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]
+    ) -> None:
         """Async context manager exit."""
         await self.aclose()
 
@@ -262,7 +258,7 @@ Requirements:
 class LLMRelationExtractor(RelationExtractor):
     """LLM-based relation extractor."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config=None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, builder_config: Optional[Any] = None):
         """Initialize LLM relation extractor.
 
         Args:
@@ -270,44 +266,38 @@ class LLMRelationExtractor(RelationExtractor):
             builder_config: BuilderConfig instance with integrated LLM and OpenAI configs
         """
         super().__init__(config)
-        
+
         # Use builder_config if provided, otherwise fall back to global settings
         if builder_config:
             self.llm_provider = builder_config.llm_provider
             self.llm_model = builder_config.llm_model
             self.llm_temperature = builder_config.llm_temperature
             self.llm_max_tokens = builder_config.llm_max_tokens
-            
+
             # Initialize AsyncOpenAI client with builder_config settings
             self.client = AsyncOpenAI(
                 api_key=builder_config.openai_config.api_key,
-                base_url=builder_config.openai_config.api_base
+                base_url=builder_config.openai_config.api_base,
             )
         else:
             # Backward compatibility: use config dict or global settings
             self.settings = get_settings()
             self.llm_provider = (
-                config.get("llm_provider", self.settings.llm.provider)
-                if config
-                else self.settings.llm.provider
+                config.get("llm_provider", self.settings.llm.provider) if config else self.settings.llm.provider
             )
-            self.llm_model = (
-                config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
-            )
+            self.llm_model = config.get("llm_model", self.settings.llm.model) if config else self.settings.llm.model
             self.llm_temperature = (
-                config.get("llm_temperature", self.settings.llm.temperature) 
-                if config else self.settings.llm.temperature
+                config.get("llm_temperature", self.settings.llm.temperature)
+                if config
+                else self.settings.llm.temperature
             )
             self.llm_max_tokens = (
-                config.get("llm_max_tokens", self.settings.llm.max_tokens) 
-                if config else self.settings.llm.max_tokens
+                config.get("llm_max_tokens", self.settings.llm.max_tokens) if config else self.settings.llm.max_tokens
             )
-            
+
             # Initialize AsyncOpenAI client with global settings
-            self.client = AsyncOpenAI(
-                api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base
-            )
-        
+            self.client = AsyncOpenAI(api_key=self.settings.openai.api_key, base_url=self.settings.openai.api_base)
+
         self.batch_size = config.get("batch_size", 5) if config else 5
 
     async def extract(self, chunks: List[TextChunk], entities: List[Entity]) -> List[Relation]:
@@ -337,9 +327,7 @@ class LLMRelationExtractor(RelationExtractor):
 
         return await self._extract_from_chunk(temp_chunk, entities)
 
-    async def _extract_batch(
-        self, chunks: List[TextChunk], entities: List[Entity]
-    ) -> List[Relation]:
+    async def _extract_batch(self, chunks: List[TextChunk], entities: List[Entity]) -> List[Relation]:
         """Extract relations from a batch of chunks."""
         tasks = []
         for chunk in chunks:
@@ -424,9 +412,7 @@ Requirements:
 """
         return prompt.strip()
 
-    def _parse_relation_response(
-        self, response: str, entities: List[Entity], chunk_id: str
-    ) -> List[Relation]:
+    def _parse_relation_response(self, response: str, entities: List[Entity], chunk_id: str) -> List[Relation]:
         """Parse LLM response into Relation objects."""
         relations: List[Relation] = []
 
@@ -462,17 +448,11 @@ Requirements:
                 if not head_name or not tail_name:
                     continue
 
-                head_entity = entity_lookup.get(head_name) or entity_lookup_lower.get(
-                    head_name.lower()
-                )
-                tail_entity = entity_lookup.get(tail_name) or entity_lookup_lower.get(
-                    tail_name.lower()
-                )
+                head_entity = entity_lookup.get(head_name) or entity_lookup_lower.get(head_name.lower())
+                tail_entity = entity_lookup.get(tail_name) or entity_lookup_lower.get(tail_name.lower())
 
                 if not head_entity or not tail_entity:
-                    logger.debug(
-                        f"Could not find entities: '{head_name}' or '{tail_name}' in entity list"
-                    )
+                    logger.debug(f"Could not find entities: '{head_name}' or '{tail_name}' in entity list")
                     continue
 
                 # Skip self-relations
@@ -489,9 +469,7 @@ Requirements:
                 try:
                     relation_type = RelationType(relation_type_str.lower())
                 except ValueError:
-                    logger.warning(
-                        f"Unknown relation type '{relation_type_str}', using 'references'"
-                    )
+                    logger.warning(f"Unknown relation type '{relation_type_str}', using 'references'")
                     relation_type = RelationType.REFERENCES
 
                 relation = Relation(
@@ -541,6 +519,8 @@ Requirements:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]
+    ) -> None:
         """Async context manager exit."""
         await self.aclose()

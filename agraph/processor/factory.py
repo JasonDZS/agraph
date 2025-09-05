@@ -68,15 +68,11 @@ class DocumentProcessorFactory:
                 self.register_processor(processor_class)  # type: ignore[arg-type]
                 registered_count += 1
             except DependencyError as e:
-                logger.warning(
-                    f"Skipping {processor_class.__name__} due to missing dependencies: {e}"
-                )
+                logger.warning(f"Skipping {processor_class.__name__} due to missing dependencies: {e}")
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(f"Failed to register {processor_class.__name__}: {e}")
 
-        logger.info(
-            f"Successfully registered {registered_count}/{len(processors_to_register)} processors"
-        )
+        logger.info(f"Successfully registered {registered_count}/{len(processors_to_register)} processors")
 
     def register_processor(self, processor_class: Type[DocumentProcessor]) -> None:
         """Register a document processor for specific file extensions.
@@ -143,10 +139,7 @@ class DocumentProcessorFactory:
 
         if extension not in self._processors:
             supported_extensions = list(self._processors.keys())
-            error_msg = (
-                f"No processor available for file type: {extension}. "
-                f"Supported: {supported_extensions}"
-            )
+            error_msg = f"No processor available for file type: {extension}. " f"Supported: {supported_extensions}"
             logger.error(error_msg)
             raise ProcessingError(error_msg)
 
@@ -285,9 +278,7 @@ class DocumentProcessorManager:
         """
         return self.factory.get_supported_extensions()
 
-    def process_multiple(
-        self, file_paths: List[Union[str, Path]], **kwargs: Any
-    ) -> Dict[str, Union[str, Exception]]:
+    def process_multiple(self, file_paths: List[Union[str, Path]], **kwargs: Any) -> Dict[str, Union[str, Exception]]:
         """Process multiple documents in batch.
 
         This method processes multiple files and returns results for each file.
@@ -316,15 +307,10 @@ class DocumentProcessorManager:
                 results[str(file_path)] = e
                 logger.error(f"Failed to process {file_path}: {e}")
 
-        logger.info(
-            f"Batch processing completed: {success_count}/{len(file_paths)} "
-            f"files processed successfully"
-        )
+        logger.info(f"Batch processing completed: {success_count}/{len(file_paths)} " f"files processed successfully")
         return results
 
-    def batch_extract_metadata(
-        self, file_paths: List[Union[str, Path]]
-    ) -> Dict[str, Union[Dict[str, Any], Exception]]:
+    def batch_extract_metadata(self, file_paths: List[Union[str, Path]]) -> Dict[str, Union[Dict[str, Any], Exception]]:
         """Extract metadata from multiple documents in batch.
 
         Args:
@@ -349,8 +335,7 @@ class DocumentProcessorManager:
                 logger.error(f"Failed to extract metadata from {file_path}: {e}")
 
         logger.info(
-            f"Batch metadata extraction completed: {success_count}/{len(file_paths)} "
-            f"files processed successfully"
+            f"Batch metadata extraction completed: {success_count}/{len(file_paths)} " f"files processed successfully"
         )
         return results
 

@@ -133,11 +133,7 @@ class RelationManager:
 
     def get_relations_by_type(self, relation_type: Union[RelationType, str]) -> List[Relation]:
         """Get all relations of a specific type."""
-        return [
-            relation
-            for relation in self.relations.values()
-            if relation.relation_type == relation_type
-        ]
+        return [relation for relation in self.relations.values() if relation.relation_type == relation_type]
 
     def get_entity_relations(self, entity_id: str, direction: str = "both") -> List[Relation]:
         """Get all relations connected to an entity."""
@@ -199,17 +195,13 @@ class ClusterManager:
 
     def get_clusters_by_type(self, cluster_type: Union[ClusterType, str]) -> List[Cluster]:
         """Get all clusters of a specific type."""
-        return [
-            cluster for cluster in self.clusters.values() if cluster.cluster_type == cluster_type
-        ]
+        return [cluster for cluster in self.clusters.values() if cluster.cluster_type == cluster_type]
 
 
 class TextChunkManager:
     """Manager for text chunk operations in the knowledge graph."""
 
-    def __init__(
-        self, text_chunks: Dict[str, TextChunk], touch_callback: Callable[[], None]
-    ) -> None:
+    def __init__(self, text_chunks: Dict[str, TextChunk], touch_callback: Callable[[], None]) -> None:
         """Initialize the TextChunkManager.
 
         Args:

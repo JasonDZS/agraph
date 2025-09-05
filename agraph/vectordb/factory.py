@@ -40,9 +40,7 @@ class VectorStoreFactory:
     _store_classes: Dict[VectorStoreType, Type[VectorStore]] = {}
 
     @classmethod
-    def register_store_class(
-        cls, store_type: VectorStoreType, store_class: Type[VectorStore]
-    ) -> None:
+    def register_store_class(cls, store_type: VectorStoreType, store_class: Type[VectorStore]) -> None:
         """Register a vector store class for a specific type.
 
         Args:
@@ -81,9 +79,7 @@ class VectorStoreFactory:
         # Get store class
         store_class = cls._store_classes.get(store_type)
         if not store_class:
-            raise VectorStoreError(
-                f"No implementation registered for store type: {store_type.value}"
-            )
+            raise VectorStoreError(f"No implementation registered for store type: {store_type.value}")
 
         # Merge configuration with defaults
         merged_config = cls._get_default_config(store_type)

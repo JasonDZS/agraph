@@ -26,10 +26,12 @@ class BaseResponse(BaseModel):
 
 
 class ConfigUpdateRequest(BaseModel):
-    """Configuration update request."""
+    """Configuration update request for unified Settings."""
 
     # Global settings
     workdir: Optional[str] = None
+    current_project: Optional[str] = None
+    max_current: Optional[int] = None
 
     # OpenAI settings
     openai_api_key: Optional[str] = None
@@ -59,6 +61,20 @@ class ConfigUpdateRequest(BaseModel):
     # RAG system prompt
     system_prompt: Optional[str] = None
 
+    # Builder settings (unified via Settings.builder)
+    builder_enable_cache: Optional[bool] = None
+    builder_cache_dir: Optional[str] = None
+    builder_cache_ttl: Optional[int] = None
+    builder_auto_cleanup: Optional[bool] = None
+    builder_chunk_size: Optional[int] = None
+    builder_chunk_overlap: Optional[int] = None
+    builder_entity_confidence_threshold: Optional[float] = None
+    builder_relation_confidence_threshold: Optional[float] = None
+    builder_cluster_algorithm: Optional[str] = None
+    builder_min_cluster_size: Optional[int] = None
+    builder_enable_user_interaction: Optional[bool] = None
+    builder_auto_save_edits: Optional[bool] = None
+
     # Legacy support for backward compatibility
     collection_name: Optional[str] = None
     persist_directory: Optional[str] = None
@@ -66,8 +82,8 @@ class ConfigUpdateRequest(BaseModel):
     use_openai_embeddings: Optional[bool] = None
     enable_knowledge_graph: Optional[bool] = None
     chunk_size: Optional[int] = None  # Alias for max_chunk_size
-    entity_confidence_threshold: Optional[float] = None
-    relation_confidence_threshold: Optional[float] = None
+    entity_confidence_threshold: Optional[float] = None  # Alias for builder_entity_confidence_threshold
+    relation_confidence_threshold: Optional[float] = None  # Alias for builder_relation_confidence_threshold
 
 
 class ConfigResponse(BaseResponse):
@@ -229,9 +245,7 @@ class KnowledgeGraphVisualizationRequest(BaseModel):
     max_relations: int = Field(default=1000, description="Maximum number of relations to return")
     min_confidence: float = Field(default=0.0, description="Minimum confidence threshold")
     entity_types: Optional[List[str]] = Field(default=None, description="Filter by entity types")
-    relation_types: Optional[List[str]] = Field(
-        default=None, description="Filter by relation types"
-    )
+    relation_types: Optional[List[str]] = Field(default=None, description="Filter by relation types")
     cluster_layout: bool = Field(default=False, description="Apply cluster-based layout")
 
 

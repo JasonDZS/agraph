@@ -60,9 +60,7 @@ async def get_cached_text_chunks(
             chunk_data.append(
                 {
                     "id": chunk.id,
-                    "content": (
-                        chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content
-                    ),
+                    "content": (chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content),
                     "full_content": chunk.content,
                     "title": chunk.title,
                     "source": chunk.source,
@@ -123,9 +121,7 @@ async def get_cached_entities(
                 or (entity.description and filter_by.lower() in entity.description.lower())
                 or filter_by.lower()
                 in (
-                    entity.entity_type.value
-                    if hasattr(entity.entity_type, "value")
-                    else str(entity.entity_type)
+                    entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
                 ).lower()
             ]
 
@@ -145,9 +141,7 @@ async def get_cached_entities(
                     "id": entity.id,
                     "name": entity.name,
                     "entity_type": (
-                        entity.entity_type.value
-                        if hasattr(entity.entity_type, "value")
-                        else str(entity.entity_type)
+                        entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
                     ),
                     "description": entity.description,
                     "properties": entity.properties,
@@ -341,11 +335,8 @@ async def get_cached_clusters(
                                 "name": entity.name if hasattr(entity, "name") else str(entity),
                                 "entity_type": (
                                     entity.entity_type.value
-                                    if hasattr(entity, "entity_type")
-                                    and hasattr(entity.entity_type, "value")
-                                    else str(
-                                        entity.entity_type if hasattr(entity, "entity_type") else ""
-                                    )
+                                    if hasattr(entity, "entity_type") and hasattr(entity.entity_type, "value")
+                                    else str(entity.entity_type if hasattr(entity, "entity_type") else "")
                                 ),
                             }
                             for entity in cluster.entities
@@ -359,13 +350,8 @@ async def get_cached_clusters(
                                 "id": relation.id if hasattr(relation, "id") else str(relation),
                                 "relation_type": (
                                     relation.relation_type.value
-                                    if hasattr(relation, "relation_type")
-                                    and hasattr(relation.relation_type, "value")
-                                    else str(
-                                        relation.relation_type
-                                        if hasattr(relation, "relation_type")
-                                        else ""
-                                    )
+                                    if hasattr(relation, "relation_type") and hasattr(relation.relation_type, "value")
+                                    else str(relation.relation_type if hasattr(relation, "relation_type") else "")
                                 ),
                                 "head_entity_name": (
                                     relation.head_entity.name

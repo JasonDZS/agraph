@@ -1,7 +1,7 @@
 """
 AGraph Knowledge Graph Builder module.
 
-This module provides the high-performance pipeline-based KnowledgeGraphBuilder 
+This module provides the high-performance pipeline-based KnowledgeGraphBuilder
 for building knowledge graphs from text and documents.
 
 Features:
@@ -16,11 +16,10 @@ from .builder import KnowledgeGraphBuilder
 
 __all__ = [
     # Configuration
-    "BuilderConfig", 
-    "CacheMetadata", 
-    "BuildStatus", 
+    "BuilderConfig",
+    "CacheMetadata",
+    "BuildStatus",
     "BuildSteps",
-    
     # Core Builder - Pipeline Architecture
     "KnowledgeGraphBuilder",  # High-performance pipeline-based implementation
 ]

@@ -13,9 +13,8 @@ from .base.models.entities import Entity
 from .base.models.relations import Relation
 from .base.models.text import TextChunk
 from .builder.builder import KnowledgeGraphBuilder
-from .config import BuilderConfig
 from .chunker import SimpleTokenChunker, TokenChunker
-from .config import Settings, get_settings
+from .config import BuilderConfig, Settings, get_settings
 
 __version__ = "0.2.1"
 __author__ = "JasonDZS"

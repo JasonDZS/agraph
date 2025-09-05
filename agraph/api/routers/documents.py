@@ -29,9 +29,7 @@ async def upload_documents(
     files: List[UploadFile] = File(...),
     metadata: str = "{}",  # JSON string for metadata
     tags: str = "[]",  # JSON string for tags
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document upload"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document upload"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> DocumentUploadResponse:
     """Upload documents to storage."""
@@ -45,9 +43,7 @@ async def upload_documents(
             metadata_dict = json.loads(metadata) if metadata else {}
             tags_list = json.loads(tags) if tags else []
         except json.JSONDecodeError as e:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid JSON in metadata or tags: {e}"
-            ) from e
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in metadata or tags: {e}") from e
 
         uploaded_docs = []
 
@@ -64,9 +60,7 @@ async def upload_documents(
 
             try:
                 # Create a temporary file to process with the document processors
-                with tempfile.NamedTemporaryFile(
-                    suffix=Path(file.filename).suffix, delete=False
-                ) as temp_file:
+                with tempfile.NamedTemporaryFile(suffix=Path(file.filename).suffix, delete=False) as temp_file:
                     temp_file.write(content)
                     temp_file_path = temp_file.name
 
@@ -119,9 +113,7 @@ async def upload_documents(
                 raise
             except Exception as e:
                 logger.error(f"Failed to process file {file.filename}: {e}")
-                raise HTTPException(
-                    status_code=400, detail=f"Failed to process file {file.filename}: {str(e)}"
-                ) from e
+                raise HTTPException(status_code=400, detail=f"Failed to process file {file.filename}: {str(e)}") from e
 
         response_data = {
             "uploaded_documents": uploaded_docs,
@@ -146,9 +138,7 @@ async def upload_documents(
 @router.post("/from-text", response_model=DocumentUploadResponse)
 async def upload_texts(
     request: DocumentUploadRequest,
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document upload"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document upload"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> DocumentUploadResponse:
     """Upload texts directly to storage."""
@@ -170,9 +160,7 @@ async def upload_texts(
                 tags=request.tags or [],
             )
 
-            uploaded_docs.append(
-                {"id": doc_id, "filename": f"text_{i+1}.txt", "content_length": len(text)}
-            )
+            uploaded_docs.append({"id": doc_id, "filename": f"text_{i+1}.txt", "content_length": len(text)})
 
         response_data = {
             "uploaded_documents": uploaded_docs,
@@ -198,9 +186,7 @@ async def list_documents(
     page_size: int = 10,
     tag_filter: str = "[]",  # JSON array string
     search_query: str = "",
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document listing"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document listing"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> DocumentListResponse:
     """List stored documents with pagination and filtering."""
@@ -247,9 +233,7 @@ async def list_documents(
 @router.get("/{doc_id}")
 async def get_document(
     doc_id: str,
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document retrieval"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document retrieval"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> Any:
     """Get a specific document by ID."""
@@ -279,9 +263,7 @@ async def get_document(
 @router.post("/delete", response_model=DocumentDeleteResponse)
 async def delete_documents(
     request: DocumentDeleteRequest,
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document deletion"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document deletion"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> DocumentDeleteResponse:
     """Delete documents by IDs."""
@@ -306,9 +288,7 @@ async def delete_documents(
         if failed_deletes:
             message += f", failed to delete {len(failed_deletes)} documents"
 
-        return DocumentDeleteResponse(
-            status=ResponseStatus.SUCCESS, message=message, data=response_data
-        )
+        return DocumentDeleteResponse(status=ResponseStatus.SUCCESS, message=message, data=response_data)
 
     except Exception as e:
         logger.error(f"Failed to delete documents: {e}")
@@ -317,9 +297,7 @@ async def delete_documents(
 
 @router.get("/stats/summary")
 async def get_document_stats(
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for document stats"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for document stats"),
     doc_manager: DocumentManager = Depends(get_document_manager_dependency),
 ) -> Any:
     """Get document storage statistics."""

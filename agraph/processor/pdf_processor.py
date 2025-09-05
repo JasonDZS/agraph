@@ -59,9 +59,7 @@ class PDFProcessor(DocumentProcessor):
         try:
             import pypdf  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
-            raise ProcessingError(
-                "pypdf is required for PDF processing. Install with: pip install pypdf"
-            ) from exc
+            raise ProcessingError("pypdf is required for PDF processing. Install with: pip install pypdf") from exc
 
         self.validate_file(file_path)
 

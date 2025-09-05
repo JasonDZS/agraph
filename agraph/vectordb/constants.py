@@ -57,12 +57,9 @@ ERROR_MESSAGES: Dict[str, str] = {
     "not_initialized": "VectorStore is not initialized",
     "unknown_data_type": "Unknown data type: {data_type}",
     "invalid_embedding": "Invalid embedding for {object_type} {object_id}",
-    "openai_not_available": (
-        "OpenAI is not installed. " "Please install it with: pip install openai>=1.99.9"
-    ),
+    "openai_not_available": ("OpenAI is not installed. " "Please install it with: pip install openai>=1.99.9"),
     "chromadb_not_available": (
-        "ChromaDB is not installed. Please install it with: pip install '.[vectordb]' "
-        "or pip install chromadb>=0.5.0"
+        "ChromaDB is not installed. Please install it with: pip install '.[vectordb]' " "or pip install chromadb>=0.5.0"
     ),
     "openai_api_key_required": "OpenAI API key is required",
     "chromadb_init_failed": "Failed to initialize ChromaDB: {error}",

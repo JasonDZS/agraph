@@ -73,9 +73,7 @@ class OpenAIVisionModel(MultimodalModel):
     - Configurable detail levels
     """
 
-    def __init__(
-        self, api_key: Optional[str] = None, model: str = "gpt-4o"
-    ):  # pylint: disable=unused-argument
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o"):  # pylint: disable=unused-argument
         """Initialize OpenAI vision model.
 
         Args:
@@ -92,9 +90,7 @@ class OpenAIVisionModel(MultimodalModel):
                 "openai package is required for OpenAI vision. Install with: pip install openai"
             ) from exc
 
-        self.client = openai.OpenAI(
-            api_key=get_settings().openai.api_key, base_url=get_settings().openai.api_base
-        )
+        self.client = openai.OpenAI(api_key=get_settings().openai.api_key, base_url=get_settings().openai.api_base)
         self.model = model
 
     def analyze_image(self, image_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
@@ -193,8 +189,7 @@ class ClaudeVisionModel(MultimodalModel):
             import anthropic  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise ProcessingError(
-                "anthropic package is required for Claude vision. "
-                "Install with: pip install anthropic"
+                "anthropic package is required for Claude vision. " "Install with: pip install anthropic"
             ) from exc
 
         self.client = anthropic.Anthropic(api_key=api_key)
@@ -256,8 +251,15 @@ class ClaudeVisionModel(MultimodalModel):
                     }
                 ],
             )
-            text = response.content[0].text
-            return text if text is not None else ""
+
+            # Extract text from response, handling different block types
+            text = ""
+            if response.content and len(response.content) > 0:
+                first_block = response.content[0]
+                if hasattr(first_block, "text") and first_block.text is not None:
+                    text = first_block.text
+
+            return text
         except Exception as e:
             raise ProcessingError(f"Claude vision analysis failed: {str(e)}") from e
 
@@ -320,9 +322,7 @@ class ImageProcessor(DocumentProcessor):
     - WebP (.webp)
     """
 
-    def __init__(
-        self, model: Optional[MultimodalModel] = None, default_prompt: Optional[str] = None
-    ):
+    def __init__(self, model: Optional[MultimodalModel] = None, default_prompt: Optional[str] = None):
         """Initialize image processor with multimodal model.
 
         Args:
@@ -410,9 +410,7 @@ class ImageProcessor(DocumentProcessor):
         except Exception as e:
             raise ProcessingError(f"Failed to process image {file_path}: {str(e)}") from e
 
-    def process_with_custom_prompt(
-        self, file_path: Union[str, Path], prompt: str, **kwargs: Any
-    ) -> str:
+    def process_with_custom_prompt(self, file_path: Union[str, Path], prompt: str, **kwargs: Any) -> str:
         """Process image with a custom analysis prompt.
 
         Args:
@@ -446,9 +444,7 @@ class ImageProcessor(DocumentProcessor):
         )
         return self.process(file_path, prompt=ocr_prompt, **kwargs)
 
-    def describe_image(
-        self, file_path: Union[str, Path], detail_level: str = "detailed", **kwargs: Any
-    ) -> str:
+    def describe_image(self, file_path: Union[str, Path], detail_level: str = "detailed", **kwargs: Any) -> str:
         """Get image description with specified level of detail.
 
         Args:
@@ -460,10 +456,7 @@ class ImageProcessor(DocumentProcessor):
             Image description with requested level of detail.
         """
         prompts = {
-            "brief": (
-                "Provide a brief, one-sentence description of this image "
-                "focusing on the main subject."
-            ),
+            "brief": ("Provide a brief, one-sentence description of this image " "focusing on the main subject."),
             "detailed": self.default_prompt,
             "comprehensive": (
                 "Provide an extremely comprehensive analysis of this image including:\n"
@@ -528,8 +521,7 @@ class ImageProcessor(DocumentProcessor):
                         "height": img.height,
                         "mode": img.mode,
                         "format": img.format,
-                        "has_transparency": img.mode in ("RGBA", "LA")
-                        or "transparency" in img.info,
+                        "has_transparency": img.mode in ("RGBA", "LA") or "transparency" in img.info,
                         "aspect_ratio": round(img.width / img.height, 3) if img.height > 0 else 0,
                     }
                 )
@@ -539,9 +531,7 @@ class ImageProcessor(DocumentProcessor):
                     exif_data = img._getexif()  # pylint: disable=protected-access
                     # Filter EXIF data to include only basic types
                     filtered_exif = {
-                        k: v
-                        for k, v in exif_data.items()
-                        if isinstance(v, (str, int, float)) and len(str(v)) < 100
+                        k: v for k, v in exif_data.items() if isinstance(v, (str, int, float)) and len(str(v)) < 100
                     }
                     if filtered_exif:
                         metadata["exif"] = filtered_exif
@@ -587,9 +577,7 @@ class ImageProcessorFactory:
     """
 
     @staticmethod
-    def create_openai_processor(
-        api_key: Optional[str] = None, model: str = "gpt-4o", **kwargs: Any
-    ) -> ImageProcessor:
+    def create_openai_processor(api_key: Optional[str] = None, model: str = "gpt-4o", **kwargs: Any) -> ImageProcessor:
         """Create image processor with OpenAI GPT-4V model.
 
         Args:

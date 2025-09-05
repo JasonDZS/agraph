@@ -86,7 +86,7 @@ build-backend = "hatchling.build"
 packages = ["agraph"]
 
 [tool.black]
-line-length = 100
+line-length = 120
 target-version = ['py311']
 include = '\.pyi?$'
 extend-exclude = '''
@@ -105,7 +105,7 @@ extend-exclude = '''
 
 [tool.isort]
 profile = "black"
-line_length = 100
+line_length = 120
 multi_line_output = 3
 include_trailing_comma = true
 
@@ -117,7 +117,7 @@ disallow_untyped_defs = true
 ignore_missing_imports = true
 
 [tool.pylint.main]
-max-line-length = 100
+max-line-length = 120
 disable = [
     "missing-module-docstring",
     "missing-class-docstring",
@@ -130,7 +130,7 @@ disable = [
 ]
 
 [tool.pylint.format]
-max-line-length = 100
+max-line-length = 120
 
 [tool.pylint.messages_control]
 confidence = ["HIGH", "CONTROL_FLOW", "INFERENCE", "INFERENCE_FAILURE", "UNDEFINED"]

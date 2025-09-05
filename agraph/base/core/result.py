@@ -29,6 +29,7 @@ class ErrorCode(Enum):
     VALIDATION_ERROR = 422
     DEPENDENCY_ERROR = 424
     INVALID_OPERATION = 400
+    RESOURCE_EXHAUSTED = 429
 
 
 @dataclass
@@ -172,9 +173,7 @@ class Result(Generic[T]):
             except Exception as e:
                 return Result.internal_error(e)
         else:
-            result: Result[U] = Result(
-                success=False, error_code=self.error_code, error_message=self.error_message
-            )
+            result: Result[U] = Result(success=False, error_code=self.error_code, error_message=self.error_message)
             result.error_details = self.error_details
             result.metadata = self.metadata
             return result
@@ -195,9 +194,7 @@ class Result(Generic[T]):
             except Exception as e:
                 return Result.internal_error(e)
         else:
-            result: Result[U] = Result(
-                success=False, error_code=self.error_code, error_message=self.error_message
-            )
+            result: Result[U] = Result(success=False, error_code=self.error_code, error_message=self.error_message)
             result.error_details = self.error_details
             result.metadata = self.metadata
             return result
@@ -217,9 +214,7 @@ class Result(Generic[T]):
                 if predicate(self.data):
                     return self
 
-                return Result.fail(
-                    ErrorCode.VALIDATION_ERROR, "Result data does not satisfy the predicate"
-                )
+                return Result.fail(ErrorCode.VALIDATION_ERROR, "Result data does not satisfy the predicate")
             except Exception as e:
                 return Result.internal_error(e)
         else:

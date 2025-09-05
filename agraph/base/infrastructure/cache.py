@@ -147,9 +147,7 @@ class CacheManager:
 
         return _get()
 
-    def put(
-        self, key: str, value: Any, ttl: Optional[float] = None, tags: Optional[Set[str]] = None
-    ) -> None:
+    def put(self, key: str, value: Any, ttl: Optional[float] = None, tags: Optional[Set[str]] = None) -> None:
         """Put a value into the cache."""
 
         @self._with_write_lock
@@ -350,9 +348,7 @@ def cached(
                     for arg in args:
                         if hasattr(arg, "id") and hasattr(arg, "__class__"):
                             # Use object type and id for instances
-                            hashable_args.append(
-                                f"{arg.__class__.__name__}_{getattr(arg, 'id', id(arg))}"
-                            )
+                            hashable_args.append(f"{arg.__class__.__name__}_{getattr(arg, 'id', id(arg))}")
                         else:
                             try:
                                 hashable_args.append(str(hash(arg)))
@@ -360,9 +356,7 @@ def cached(
                                 hashable_args.append(str(type(arg).__name__))
 
                     hashable_kwargs = [(k, str(v)) for k, v in sorted(kwargs.items())]
-                    cache_key = (
-                        f"{func.__name__}:{hash((tuple(hashable_args), tuple(hashable_kwargs)))}"
-                    )
+                    cache_key = f"{func.__name__}:{hash((tuple(hashable_args), tuple(hashable_kwargs)))}"
 
             # Try to get from cache
             cached_result = cache_manager.get(cache_key)

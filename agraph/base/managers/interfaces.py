@@ -203,9 +203,7 @@ class RelationManager(Manager["Relation"], ABC):
         """
 
     @abstractmethod
-    def get_entity_relations(
-        self, entity_id: str, direction: str = "both"
-    ) -> Result[List["Relation"]]:
+    def get_entity_relations(self, entity_id: str, direction: str = "both") -> Result[List["Relation"]]:
         """
         Get all relations connected to an entity.
 
@@ -218,9 +216,7 @@ class RelationManager(Manager["Relation"], ABC):
         """
 
     @abstractmethod
-    def find_path(
-        self, source_id: str, target_id: str, max_depth: int = 3
-    ) -> Result[List["Relation"]]:
+    def find_path(self, source_id: str, target_id: str, max_depth: int = 3) -> Result[List["Relation"]]:
         """
         Find a path between two entities.
 
@@ -392,13 +388,9 @@ class ManagerFactory(ABC):
         """Create a cluster manager instance."""
 
     @abstractmethod
-    def create_text_chunk_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> TextChunkManager:
+    def create_text_chunk_manager(self, config: Optional[Dict[str, Any]] = None) -> TextChunkManager:
         """Create a text chunk manager instance."""
 
     @abstractmethod
-    def create_batch_operation_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> BatchOperationManager:
+    def create_batch_operation_manager(self, config: Optional[Dict[str, Any]] = None) -> BatchOperationManager:
         """Create a batch operation manager instance."""

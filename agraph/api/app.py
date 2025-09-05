@@ -49,9 +49,7 @@ app = FastAPI(
 
 # Add request logging middleware
 @app.middleware("http")
-async def log_requests(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
+async def log_requests(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """Log HTTP requests."""
     start_time = time.time()
 
@@ -65,10 +63,7 @@ async def log_requests(
     process_time = time.time() - start_time
 
     # Log request
-    logger.info(
-        f'{client_ip} - "{request.method} {request.url.path}" '
-        f"{response.status_code} - {process_time:.3f}s"
-    )
+    logger.info(f'{client_ip} - "{request.method} {request.url.path}" ' f"{response.status_code} - {process_time:.3f}s")
 
     return response
 
@@ -103,9 +98,7 @@ async def health_check() -> HealthResponse:
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Handle HTTP exceptions."""
-    error_response = ErrorResponse(
-        status=ResponseStatus.ERROR, message=exc.detail, error_code=str(exc.status_code)
-    )
+    error_response = ErrorResponse(status=ResponseStatus.ERROR, message=exc.detail, error_code=str(exc.status_code))
     return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(error_response))
 
 

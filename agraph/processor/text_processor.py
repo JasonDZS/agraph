@@ -93,9 +93,7 @@ class TextProcessor(DocumentProcessor):
             return content
 
         except UnicodeDecodeError:
-            logger.warning(
-                f"Failed to decode {file_path} with {encoding}, trying fallback encodings"
-            )
+            logger.warning(f"Failed to decode {file_path} with {encoding}, trying fallback encodings")
             # Try alternative encodings with fallback
             for alt_encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
@@ -110,9 +108,7 @@ class TextProcessor(DocumentProcessor):
                     continue
             error_msg = f"Could not decode file {file_path} with any supported encoding"
             logger.error(error_msg)
-            raise ProcessingError(error_msg) from UnicodeDecodeError(
-                "utf-8", b"", 0, 1, "Could not decode file"
-            )
+            raise ProcessingError(error_msg) from UnicodeDecodeError("utf-8", b"", 0, 1, "Could not decode file")
         except Exception as e:
             error_msg = f"Failed to process text file {file_path}: {str(e)}"
             logger.error(error_msg)

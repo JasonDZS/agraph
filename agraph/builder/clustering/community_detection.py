@@ -76,11 +76,7 @@ class CommunityDetectionAlgorithm(ClusterAlgorithm):
 
         if total_weight == 0:
             # No connections, return single-node communities that meet min size
-            return [
-                community
-                for community in communities.values()
-                if len(community) >= self.min_cluster_size
-            ]
+            return [community for community in communities.values() if len(community) >= self.min_cluster_size]
 
         # Iteratively improve modularity
         improved = True
@@ -138,11 +134,7 @@ class CommunityDetectionAlgorithm(ClusterAlgorithm):
                         del communities[current_community]
 
         # Return non-empty communities
-        return [
-            community
-            for community in communities.values()
-            if len(community) >= self.min_cluster_size
-        ]
+        return [community for community in communities.values() if len(community) >= self.min_cluster_size]
 
     def _calculate_total_weight(self, adjacency: Dict[str, Dict[str, float]]) -> float:
         """Calculate total weight of all edges.
@@ -197,9 +189,7 @@ class CommunityDetectionAlgorithm(ClusterAlgorithm):
 
         # Calculate connections to target community
         target_community_nodes = communities[target_comm]
-        connections_to_target = sum(
-            adjacency.get(node, {}).get(other_node, 0) for other_node in target_community_nodes
-        )
+        connections_to_target = sum(adjacency.get(node, {}).get(other_node, 0) for other_node in target_community_nodes)
 
         # Simplified modularity calculation
         # This is an approximation of the actual Louvain modularity formula

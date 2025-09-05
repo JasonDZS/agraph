@@ -36,9 +36,7 @@ class ClusterAlgorithm(ABC):
             List of generated clusters
         """
 
-    def build_adjacency_matrix(
-        self, entities: List[Entity], relations: List[Relation]
-    ) -> Dict[str, Dict[str, float]]:
+    def build_adjacency_matrix(self, entities: List[Entity], relations: List[Relation]) -> Dict[str, Dict[str, float]]:
         """Build adjacency matrix from entities and relations.
 
         Args:
@@ -72,9 +70,7 @@ class ClusterAlgorithm(ABC):
 
         return adjacency
 
-    def get_entity_neighbors(
-        self, entity_id: str, adjacency: Dict[str, Dict[str, float]]
-    ) -> Set[str]:
+    def get_entity_neighbors(self, entity_id: str, adjacency: Dict[str, Dict[str, float]]) -> Set[str]:
         """Get neighbors of an entity.
 
         Args:
@@ -86,9 +82,7 @@ class ClusterAlgorithm(ABC):
         """
         return set(adjacency.get(entity_id, {}).keys())
 
-    def calculate_cluster_cohesion(
-        self, entity_ids: Set[str], adjacency: Dict[str, Dict[str, float]]
-    ) -> float:
+    def calculate_cluster_cohesion(self, entity_ids: Set[str], adjacency: Dict[str, Dict[str, float]]) -> float:
         """Calculate cohesion score for a cluster.
 
         Args:

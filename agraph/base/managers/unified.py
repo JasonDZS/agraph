@@ -45,9 +45,7 @@ class UnifiedEntityManager(EntityManager):
             "cache_misses": 0,
         }
 
-    def _record_operation(
-        self, operation_name: str, start_time: float, success: bool = True
-    ) -> None:
+    def _record_operation(self, operation_name: str, start_time: float, success: bool = True) -> None:
         """Record operation metrics."""
         execution_time = time.time() - start_time
         with self._lock:
@@ -81,9 +79,7 @@ class UnifiedEntityManager(EntityManager):
             existing = self.dao.get_entity_by_id(item.id)
             if existing:
                 self._record_operation("add", start_time, False)
-                return Result.fail(
-                    ErrorCode.DUPLICATE_ENTRY, f"Entity with ID '{item.id}' already exists"
-                )
+                return Result.fail(ErrorCode.DUPLICATE_ENTRY, f"Entity with ID '{item.id}' already exists")
 
             # Save the entity
             self.dao.save_entity(item)
@@ -301,23 +297,15 @@ class UnifiedEntityManager(EntityManager):
                 errors.append(ErrorDetail(field_name="name", message="Name is required"))
 
             if not item.entity_type:
-                errors.append(
-                    ErrorDetail(field_name="entity_type", message="Entity type is required")
-                )
+                errors.append(ErrorDetail(field_name="entity_type", message="Entity type is required"))
 
             # Check confidence range
             if not 0.0 <= item.confidence <= 1.0:
-                errors.append(
-                    ErrorDetail(
-                        field_name="confidence", message="Confidence must be between 0.0 and 1.0"
-                    )
-                )
+                errors.append(ErrorDetail(field_name="confidence", message="Confidence must be between 0.0 and 1.0"))
 
             # Check name length
             if len(item.name) > 500:
-                errors.append(
-                    ErrorDetail(field_name="name", message="Name must be less than 500 characters")
-                )
+                errors.append(ErrorDetail(field_name="name", message="Name must be less than 500 characters"))
 
             # Check description length
             if len(item.description) > 2000:
@@ -477,9 +465,7 @@ class UnifiedEntityManager(EntityManager):
             # Validate confidence range
             if not 0.0 <= confidence <= 1.0:
                 self._record_operation("update_confidence", start_time, False)
-                return Result.invalid_input(
-                    "Confidence must be between 0.0 and 1.0", field="confidence"
-                )
+                return Result.invalid_input("Confidence must be between 0.0 and 1.0", field="confidence")
 
             # Get the entity
             entity = self.dao.get_entity_by_id(entity_id)
@@ -525,9 +511,7 @@ class UnifiedRelationManager(RelationManager):
             "cache_misses": 0,
         }
 
-    def _record_operation(
-        self, operation_name: str, start_time: float, success: bool = True
-    ) -> None:
+    def _record_operation(self, operation_name: str, start_time: float, success: bool = True) -> None:
         """Record operation metrics."""
         execution_time = time.time() - start_time
         with self._lock:
@@ -561,9 +545,7 @@ class UnifiedRelationManager(RelationManager):
             existing = self.dao.get_relation_by_id(item.id)
             if existing:
                 self._record_operation("add", start_time, False)
-                return Result.fail(
-                    ErrorCode.DUPLICATE_ENTRY, f"Relation with ID '{item.id}' already exists"
-                )
+                return Result.fail(ErrorCode.DUPLICATE_ENTRY, f"Relation with ID '{item.id}' already exists")
 
             # Verify that referenced entities exist
             if item.head_entity and not self.dao.get_entity_by_id(item.head_entity.id):
@@ -725,10 +707,7 @@ class UnifiedRelationManager(RelationManager):
             matches = []
 
             for relation in all_relations.values():
-                if (
-                    query_lower in relation.description.lower()
-                    or query_lower in str(relation.relation_type).lower()
-                ):
+                if query_lower in relation.description.lower() or query_lower in str(relation.relation_type).lower():
                     matches.append(relation)
                     if len(matches) >= limit:
                         break
@@ -802,16 +781,10 @@ class UnifiedRelationManager(RelationManager):
 
             # Check required fields
             if not item.relation_type:
-                errors.append(
-                    ErrorDetail(field_name="relation_type", message="Relation type is required")
-                )
+                errors.append(ErrorDetail(field_name="relation_type", message="Relation type is required"))
 
             if not item.head_entity and not item.tail_entity:
-                errors.append(
-                    ErrorDetail(
-                        field_name="entities", message="At least one entity must be specified"
-                    )
-                )
+                errors.append(ErrorDetail(field_name="entities", message="At least one entity must be specified"))
 
             # Check description length
             if len(item.description) > 1000:
@@ -904,9 +877,7 @@ class UnifiedRelationManager(RelationManager):
             self._record_operation("list_by_type", start_time, False)
             return Result.internal_error(e)
 
-    def get_entity_relations(
-        self, entity_id: str, direction: str = "both"
-    ) -> Result[List["Relation"]]:
+    def get_entity_relations(self, entity_id: str, direction: str = "both") -> Result[List["Relation"]]:
         """Get all relations connected to an entity."""
         start_time = time.time()
 
@@ -942,9 +913,7 @@ class UnifiedRelationManager(RelationManager):
             self._record_operation("get_entity_relations", start_time, False)
             return Result.internal_error(e)
 
-    def find_path(
-        self, source_id: str, target_id: str, max_depth: int = 3
-    ) -> Result[List["Relation"]]:
+    def find_path(self, source_id: str, target_id: str, max_depth: int = 3) -> Result[List["Relation"]]:
         """Find a path between two entities."""
         start_time = time.time()
         # pylint: disable=too-many-nested-blocks
@@ -1063,17 +1032,13 @@ class UnifiedClusterManager(ClusterManager):
             validation = self.validate(item)
             if not validation.is_ok():
                 self._record_operation("add", start_time, False)
-                return Result.fail(
-                    ErrorCode.VALIDATION_ERROR, validation.error_message or "Validation failed"
-                )
+                return Result.fail(ErrorCode.VALIDATION_ERROR, validation.error_message or "Validation failed")
 
             # Check for duplicates
             existing = self.dao.get_cluster_by_id(item.id)
             if existing:
                 self._record_operation("add", start_time, False)
-                return Result.fail(
-                    ErrorCode.DUPLICATE_ENTRY, f"Cluster with ID '{item.id}' already exists"
-                )
+                return Result.fail(ErrorCode.DUPLICATE_ENTRY, f"Cluster with ID '{item.id}' already exists")
 
             # Add cluster
             self.dao.save_cluster(item)
@@ -1117,9 +1082,7 @@ class UnifiedClusterManager(ClusterManager):
                     },
                 )
 
-            return Result.fail(
-                ErrorCode.INTERNAL_ERROR, f"Failed to remove cluster with ID '{item_id}'"
-            )
+            return Result.fail(ErrorCode.INTERNAL_ERROR, f"Failed to remove cluster with ID '{item_id}'")
 
         except Exception as e:
             self._record_operation("remove", start_time, False)
@@ -1223,11 +1186,7 @@ class UnifiedClusterManager(ClusterManager):
                     """Check if cluster matches the search query."""
                     return (
                         query_lower in cluster.id.lower()
-                        or (
-                            hasattr(cluster, "name")
-                            and cluster.name
-                            and query_lower in cluster.name.lower()
-                        )
+                        or (hasattr(cluster, "name") and cluster.name and query_lower in cluster.name.lower())
                         or (
                             hasattr(cluster, "description")
                             and cluster.description
@@ -1535,9 +1494,7 @@ class UnifiedTextChunkManager(TextChunkManager):
             existing = self.dao.get_text_chunk_by_id(item.id)
             if existing:
                 self._record_operation("add", start_time, False)
-                return Result.fail(
-                    ErrorCode.DUPLICATE_ENTRY, f"TextChunk with ID '{item.id}' already exists"
-                )
+                return Result.fail(ErrorCode.DUPLICATE_ENTRY, f"TextChunk with ID '{item.id}' already exists")
 
             # Add text chunk
             self.dao.save_text_chunk(item)
@@ -1581,9 +1538,7 @@ class UnifiedTextChunkManager(TextChunkManager):
                     },
                 )
 
-            return Result.fail(
-                ErrorCode.INTERNAL_ERROR, f"Failed to remove text chunk with ID '{item_id}'"
-            )
+            return Result.fail(ErrorCode.INTERNAL_ERROR, f"Failed to remove text chunk with ID '{item_id}'")
 
         except Exception as e:
             self._record_operation("remove", start_time, False)
@@ -1686,11 +1641,7 @@ class UnifiedTextChunkManager(TextChunkManager):
                 if (
                     query_lower in chunk.content.lower()
                     or query_lower in chunk.id.lower()
-                    or (
-                        hasattr(chunk, "source")
-                        and chunk.source
-                        and query_lower in chunk.source.lower()
-                    )
+                    or (hasattr(chunk, "source") and chunk.source and query_lower in chunk.source.lower())
                 ):
                     matching_chunks.append(chunk)
                     if len(matching_chunks) >= limit:

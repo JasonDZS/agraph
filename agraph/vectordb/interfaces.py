@@ -91,15 +91,11 @@ class RelationStore(ABC):
     """Interface for relation storage operations."""
 
     @abstractmethod
-    async def add_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Add relation to vector storage."""
 
     @abstractmethod
-    async def update_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Update relation information."""
 
     @abstractmethod
@@ -136,9 +132,7 @@ class ClusterStore(ABC):
         """Add cluster to vector storage."""
 
     @abstractmethod
-    async def update_cluster(
-        self, cluster: Cluster, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_cluster(self, cluster: Cluster, embedding: Optional[List[float]] = None) -> bool:
         """Update cluster information."""
 
     @abstractmethod
@@ -171,15 +165,11 @@ class TextChunkStore(ABC):
     """Interface for text chunk storage operations."""
 
     @abstractmethod
-    async def add_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Add text chunk to vector storage."""
 
     @abstractmethod
-    async def update_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Update text chunk information."""
 
     @abstractmethod

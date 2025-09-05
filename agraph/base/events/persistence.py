@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from ..core.result import Result
+from ..core.result import ErrorCode, Result
 from .events import EventListener, EventPriority, EventType, GraphEvent
 
 if TYPE_CHECKING:
@@ -50,7 +50,6 @@ class EventPersistenceBackend(ABC):
         Returns:
             Result indicating success or failure
         """
-        pass
 
     @abstractmethod
     def persist_events_batch(self, events: List[GraphEvent]) -> Result[int]:
@@ -63,7 +62,6 @@ class EventPersistenceBackend(ABC):
         Returns:
             Result containing the number of successfully persisted events
         """
-        pass
 
     @abstractmethod
     def retrieve_events(
@@ -85,7 +83,6 @@ class EventPersistenceBackend(ABC):
         Returns:
             Result containing list of events
         """
-        pass
 
     @abstractmethod
     def get_statistics(self) -> Dict[str, Any]:
@@ -95,7 +92,6 @@ class EventPersistenceBackend(ABC):
         Returns:
             Dictionary containing backend statistics
         """
-        pass
 
     @abstractmethod
     def cleanup(self, older_than_seconds: Optional[float] = None) -> Result[int]:
@@ -108,7 +104,6 @@ class EventPersistenceBackend(ABC):
         Returns:
             Result containing number of cleaned up events
         """
-        pass
 
 
 class JSONFileBackend(EventPersistenceBackend):
@@ -154,7 +149,7 @@ class JSONFileBackend(EventPersistenceBackend):
         self._lock = threading.RLock()
 
         # Statistics
-        self.stats = {
+        self.stats: Dict[str, int] = {
             "events_written": 0,
             "files_created": 0,
             "files_rotated": 0,
@@ -195,7 +190,7 @@ class JSONFileBackend(EventPersistenceBackend):
     def _cleanup_old_files(self) -> None:
         """Remove old event files beyond the retention limit."""
         event_files = sorted(
-            [f for f in self.storage_dir.glob("events_*.jsonl*")],
+            list(self.storage_dir.glob("events_*.jsonl*")),
             key=lambda f: f.stat().st_mtime,
             reverse=True,
         )
@@ -219,9 +214,7 @@ class JSONFileBackend(EventPersistenceBackend):
                 event_dict = asdict(event)
 
                 # Add ISO timestamp for better readability
-                event_dict["timestamp_iso"] = datetime.fromtimestamp(
-                    event.timestamp, tz=timezone.utc
-                ).isoformat()
+                event_dict["timestamp_iso"] = datetime.fromtimestamp(event.timestamp, tz=timezone.utc).isoformat()
 
                 # Convert enum values to strings
                 event_dict["event_type"] = event.event_type.value
@@ -266,9 +259,9 @@ class JSONFileBackend(EventPersistenceBackend):
         """Retrieve events from JSON files."""
         with self._lock:
             try:
-                events = []
+                events: List[GraphEvent] = []
                 event_files = sorted(
-                    [f for f in self.storage_dir.glob("events_*.jsonl*")],
+                    list(self.storage_dir.glob("events_*.jsonl*")),
                     key=lambda f: f.stat().st_mtime,
                 )
 
@@ -297,10 +290,7 @@ class JSONFileBackend(EventPersistenceBackend):
                                         continue
                                     if end_time and event_timestamp >= end_time:
                                         continue
-                                    if (
-                                        event_type_values
-                                        and event_dict.get("event_type") not in event_type_values
-                                    ):
+                                    if event_type_values and event_dict.get("event_type") not in event_type_values:
                                         continue
 
                                     # Convert back to GraphEvent
@@ -348,19 +338,19 @@ class JSONFileBackend(EventPersistenceBackend):
     def get_statistics(self) -> Dict[str, Any]:
         """Get backend statistics."""
         with self._lock:
-            stats = self.stats.copy()
-            stats.update(
+            stats_copy: Dict[str, Any] = dict(self.stats)
+            stats_copy.update(
                 {
                     "storage_directory": str(self.storage_dir),
                     "current_file": str(self.current_file_path),
-                    "current_file_size_bytes": self.current_file_size,
+                    "current_file_size_bytes": float(self.current_file_size),
                     "total_files": len(list(self.storage_dir.glob("events_*.jsonl*"))),
                     "average_event_size_bytes": (
-                        self.stats["total_bytes_written"] / max(1, self.stats["events_written"])
+                        self.stats["total_bytes_written"] / max(1.0, float(self.stats["events_written"]))
                     ),
                 }
             )
-            return stats
+            return stats_copy
 
     def cleanup(self, older_than_seconds: Optional[float] = None) -> Result[int]:
         """Clean up old event files."""
@@ -428,9 +418,8 @@ class EventPersistenceListener(EventListener):
         """Get event types this listener handles."""
         if self.event_types:
             return self.event_types
-        else:
-            # Return all event types if none specified
-            return set(EventType)
+        # Return all event types if none specified
+        return set(EventType)
 
     def should_handle_event(self, event: GraphEvent) -> bool:
         """Check if this event should be persisted."""
@@ -477,10 +466,12 @@ class EventPersistenceListener(EventListener):
 
         if result.is_ok():
             return Result.ok(True, metadata={"persisted_count": result.data})
-        else:
-            # Put events back in batch if persistence failed
-            self.event_batch.extend(events_to_persist)
-            return result
+        # Put events back in batch if persistence failed
+        self.event_batch.extend(events_to_persist)
+        return Result.fail(
+            result.error_code or ErrorCode.INTERNAL_ERROR,
+            result.error_message or "Batch persistence failed",
+        )
 
     def flush(self) -> Result[bool]:
         """Manually flush the current batch."""
@@ -488,7 +479,7 @@ class EventPersistenceListener(EventListener):
             return self._flush_batch()
 
     @contextmanager
-    def auto_flush_context(self):
+    def auto_flush_context(self) -> Any:
         """Context manager that ensures batch is flushed on exit."""
         try:
             yield self
@@ -551,8 +542,10 @@ def setup_event_persistence(
                     "min_priority": min_priority.value,
                 }
             )
-        else:
-            return subscription_result
+        return Result.fail(
+            subscription_result.error_code or ErrorCode.INTERNAL_ERROR,
+            subscription_result.error_message or "Subscription failed",
+        )
 
     except Exception as e:
         return Result.internal_error(e)
@@ -581,7 +574,10 @@ def analyze_persisted_events(
         # Retrieve events
         events_result = backend.retrieve_events(start_time, end_time)
         if not events_result.is_ok():
-            return events_result
+            return Result.fail(
+                events_result.error_code or ErrorCode.INTERNAL_ERROR,
+                events_result.error_message or "Failed to retrieve events",
+            )
 
         events = events_result.data
 
@@ -589,10 +585,10 @@ def analyze_persisted_events(
             return Result.ok({"total_events": 0})
 
         # Analyze events
-        event_type_counts = {}
-        priority_counts = {}
-        source_counts = {}
-        hourly_counts = {}
+        event_type_counts: Dict[str, int] = {}
+        priority_counts: Dict[str, int] = {}
+        source_counts: Dict[str, int] = {}
+        hourly_counts: Dict[str, int] = {}
 
         for event in events:
             # Event type counts
@@ -600,7 +596,7 @@ def analyze_persisted_events(
             event_type_counts[event_type] = event_type_counts.get(event_type, 0) + 1
 
             # Priority counts
-            priority = event.priority.value
+            priority = str(event.priority.value)
             priority_counts[priority] = priority_counts.get(priority, 0) + 1
 
             # Source counts
@@ -616,20 +612,16 @@ def analyze_persisted_events(
             "time_range": {
                 "start": events[0].timestamp if events else None,
                 "end": events[-1].timestamp if events else None,
-                "duration_seconds": (
-                    (events[-1].timestamp - events[0].timestamp) if len(events) > 1 else 0
-                ),
+                "duration_seconds": ((events[-1].timestamp - events[0].timestamp) if len(events) > 1 else 0),
             },
             "event_type_distribution": event_type_counts,
             "priority_distribution": priority_counts,
             "source_distribution": source_counts,
             "hourly_distribution": hourly_counts,
             "most_common_event_type": (
-                max(event_type_counts, key=event_type_counts.get) if event_type_counts else None
+                max(event_type_counts, key=lambda x: event_type_counts[x]) if event_type_counts else None
             ),
-            "most_active_source": (
-                max(source_counts, key=source_counts.get) if source_counts else None
-            ),
+            "most_active_source": (max(source_counts, key=lambda x: source_counts[x]) if source_counts else None),
         }
 
         return Result.ok(analysis)

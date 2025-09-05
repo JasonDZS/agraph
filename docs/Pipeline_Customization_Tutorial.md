@@ -124,7 +124,7 @@ kg = await builder_simple.build_from_text(texts)  # 仅处理文本块
 ```python
 # 使用缓存加速重复构建
 kg = await builder.build_from_text(
-    texts, 
+    texts,
     use_cache=True,  # 启用缓存
     graph_name=\"cached_graph\"
 )
@@ -195,22 +195,22 @@ kg = await custom_pipeline.execute(context)
 # 根据数据特征动态决定步骤
 def create_adaptive_pipeline(text_length: int) -> BuildPipeline:
     builder_instance = builder.pipeline_builder
-    
+
     # 总是包含文本分块
     builder_instance.with_text_chunking(builder.text_chunker_handler)
-    
+
     # 仅对长文本进行实体提取
     if text_length > 1000:
         builder_instance.with_entity_extraction(builder.entity_handler)
         builder_instance.with_relation_extraction(builder.relation_handler)
-    
+
     # 仅对复杂文档进行聚类
     if text_length > 5000:
         builder_instance.with_cluster_formation(builder.cluster_handler)
-    
+
     # 总是包含图谱组装
     builder_instance.with_graph_assembly(builder.graph_assembler)
-    
+
     return builder_instance.build()
 
 # 使用自适应管道
@@ -235,11 +235,11 @@ from typing import List
 
 class CustomTextPreprocessingStep(BuildStep):
     \"\"\"自定义文本预处理步骤\"\"\"
-    
+
     def __init__(self, cache_manager, preprocessing_config: dict):
         super().__init__(\"custom_preprocessing\", cache_manager)
         self.config = preprocessing_config
-    
+
     async def _execute_step(self, context: BuildContext) -> StepResult[List[str]]:
         try:
             processed_texts = []
@@ -247,7 +247,7 @@ class CustomTextPreprocessingStep(BuildStep):
                 # 应用自定义预处理逻辑
                 processed_text = self._apply_preprocessing(text)
                 processed_texts.append(processed_text)
-            
+
             return StepResult.success_result(
                 processed_texts,
                 metadata={
@@ -257,21 +257,21 @@ class CustomTextPreprocessingStep(BuildStep):
             )
         except Exception as e:
             return StepResult.failure_result(f\"预处理失败: {str(e)}\")
-    
+
     def _apply_preprocessing(self, text: str) -> str:
         # 实现您的预处理逻辑
         if self.config.get(\"remove_urls\", False):
             import re
             text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
-        
+
         if self.config.get(\"normalize_whitespace\", False):
             text = re.sub(r'\\s+', ' ', text.strip())
-        
+
         return text
-    
+
     def _get_cache_input_data(self, context: BuildContext):
         return (context.texts, str(self.config))
-    
+
     def _get_expected_result_type(self):
         return list
 
@@ -380,12 +380,12 @@ try:
     kg = await builder.build_from_text(texts)
 except Exception as e:
     print(f\"构建失败: {e}\")
-    
+
     # 检查构建状态以了解失败位置
     status = builder.get_build_status()
     print(f\"当前步骤: {status.get('current_step')}\")
     print(f\"错误消息: {status.get('error_message')}\")
-    
+
     # 尝试从上一个成功的步骤恢复
     if status.get('completed_step'):
         print(f\"尝试从 {status['completed_step']} 后的步骤恢复...\")
@@ -432,7 +432,7 @@ kg = await builder.build_from_text(texts, use_cache=True)
 # 增量处理 - 从特定步骤开始
 if need_update_entities_only:
     kg = await builder.build_from_text(
-        texts, 
+        texts,
         from_step=\"entity_extraction\",
         use_cache=True
     )
@@ -465,7 +465,7 @@ finally:
 async def process_multiple_datasets(datasets: List[List[str]]) -> List[OptimizedKnowledgeGraph]:
     builder = KnowledgeGraphBuilder()
     results = []
-    
+
     for i, texts in enumerate(datasets):
         try:
             kg = await builder.build_from_text(
@@ -477,7 +477,7 @@ async def process_multiple_datasets(datasets: List[List[str]]) -> List[Optimized
         except Exception as e:
             print(f\"数据集 {i} 处理失败: {e}\")
             continue
-    
+
     await builder.aclose()
     return results
 ```

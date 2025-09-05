@@ -18,12 +18,7 @@ from .interfaces import (
     RelationManager,
     TextChunkManager,
 )
-from .unified import (
-    UnifiedClusterManager,
-    UnifiedEntityManager,
-    UnifiedRelationManager,
-    UnifiedTextChunkManager,
-)
+from .unified import UnifiedClusterManager, UnifiedEntityManager, UnifiedRelationManager, UnifiedTextChunkManager
 
 if TYPE_CHECKING:
     from ..transactions.batch import BatchContext
@@ -82,9 +77,7 @@ class DefaultManagerFactory(ManagerFactory):
         """
         return UnifiedClusterManager(self.dao)
 
-    def create_text_chunk_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> TextChunkManager:
+    def create_text_chunk_manager(self, config: Optional[Dict[str, Any]] = None) -> TextChunkManager:
         """
         Create a text chunk manager instance.
 
@@ -96,9 +89,7 @@ class DefaultManagerFactory(ManagerFactory):
         """
         return UnifiedTextChunkManager(self.dao)
 
-    def create_batch_operation_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> BatchOperationManager:
+    def create_batch_operation_manager(self, config: Optional[Dict[str, Any]] = None) -> BatchOperationManager:
         """
         Create a batch operation manager instance.
 
@@ -148,17 +139,13 @@ class OptimizedManagerFactory(ManagerFactory):
         # Could add caching decorators or other optimizations here
         return manager
 
-    def create_text_chunk_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> TextChunkManager:
+    def create_text_chunk_manager(self, config: Optional[Dict[str, Any]] = None) -> TextChunkManager:
         """Create an optimized text chunk manager instance."""
         manager = UnifiedTextChunkManager(self.dao)
         # Could add caching decorators or other optimizations here
         return manager
 
-    def create_batch_operation_manager(
-        self, config: Optional[Dict[str, Any]] = None
-    ) -> BatchOperationManager:
+    def create_batch_operation_manager(self, config: Optional[Dict[str, Any]] = None) -> BatchOperationManager:
         """Create an optimized batch operation manager instance."""
         return DefaultBatchOperationManager(self.dao)
 
@@ -328,9 +315,7 @@ def get_manager_factory(name: str = "default") -> ManagerFactory:
     return factory
 
 
-def create_managers(
-    factory_name: str = "default", dao: Optional[DataAccessLayer] = None
-) -> Dict[str, Any]:
+def create_managers(factory_name: str = "default", dao: Optional[DataAccessLayer] = None) -> Dict[str, Any]:
     """
     Convenience function to create a complete set of managers.
 

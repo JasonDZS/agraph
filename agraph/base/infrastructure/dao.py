@@ -17,13 +17,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Set, Union
 
 from ..core.result import ErrorCode, Result
 from ..core.types import ClusterType, EntityType, RelationType
-from ..events.events import (
-    EventManager,
-    EventType,
-    create_entity_event,
-    create_relation_event,
-    create_system_event,
-)
+from ..events.events import EventManager, EventType, create_entity_event, create_relation_event, create_system_event
 from ..models.clusters import Cluster
 from ..models.entities import Entity
 from ..models.relations import Relation
@@ -48,9 +42,7 @@ class TransactionContext:
     def commit(self) -> Result[bool]:
         """Commit all operations in the transaction."""
         if self.committed or self.rolled_back:
-            return Result.fail(
-                ErrorCode.INVALID_OPERATION, "Transaction already committed or rolled back"
-            )
+            return Result.fail(ErrorCode.INVALID_OPERATION, "Transaction already committed or rolled back")
 
         try:
             for operation in self.operations:
@@ -64,9 +56,7 @@ class TransactionContext:
     def rollback(self) -> Result[bool]:
         """Rollback all operations in the transaction."""
         if self.committed:
-            return Result.fail(
-                ErrorCode.INVALID_OPERATION, "Cannot rollback already committed transaction"
-            )
+            return Result.fail(ErrorCode.INVALID_OPERATION, "Cannot rollback already committed transaction")
 
         try:
             for rollback_op in reversed(self.rollback_operations):
@@ -115,13 +105,9 @@ class DataAccessLayer(ABC):
         """Publish an event if event manager is available."""
         if self._event_manager:
             if target_type == "entity":
-                event = create_entity_event(
-                    event_type, target_id, data, self._source_name, transaction_id
-                )
+                event = create_entity_event(event_type, target_id, data, self._source_name, transaction_id)
             elif target_type == "relation":
-                event = create_relation_event(
-                    event_type, target_id, data, self._source_name, transaction_id
-                )
+                event = create_relation_event(event_type, target_id, data, self._source_name, transaction_id)
             else:
                 event = create_system_event(event_type, self._source_name, data)
 
@@ -139,10 +125,7 @@ class DataAccessLayer(ABC):
         try:
             yield self._transaction_context
             # Auto-commit if not explicitly handled
-            if (
-                not self._transaction_context.committed
-                and not self._transaction_context.rolled_back
-            ):
+            if not self._transaction_context.committed and not self._transaction_context.rolled_back:
                 result = self._transaction_context.commit()
                 if not result.is_ok():
                     raise RuntimeError(f"Transaction commit failed: {result.error_message}")
@@ -323,12 +306,10 @@ class MemoryDataAccessLayer(DataAccessLayer):
             if self._transaction_context:
                 old_entity = self._entities.get(entity.id)
 
-                def _save_operation():
+                def _save_operation() -> None:
                     self._entities[entity.id] = entity
                     # Publish event after successful save
-                    event_type = (
-                        EventType.ENTITY_ADDED if is_new_entity else EventType.ENTITY_UPDATED
-                    )
+                    event_type = EventType.ENTITY_ADDED if is_new_entity else EventType.ENTITY_UPDATED
                     entity_data = entity.to_dict() if hasattr(entity, "to_dict") else vars(entity)
                     self._publish_event(
                         event_type,
@@ -338,7 +319,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
                         getattr(self._transaction_context, "transaction_id", None),
                     )
 
-                def _rollback_operation():
+                def _rollback_operation() -> None:
                     if old_entity is None:
                         self._entities.pop(entity.id, None)
                     else:
@@ -367,13 +348,11 @@ class MemoryDataAccessLayer(DataAccessLayer):
                 return False
 
             old_entity = self._entities[entity_id]
-            entity_data = (
-                old_entity.to_dict() if hasattr(old_entity, "to_dict") else vars(old_entity)
-            )
+            entity_data = old_entity.to_dict() if hasattr(old_entity, "to_dict") else vars(old_entity)
 
             if self._transaction_context:
 
-                def _delete_operation():
+                def _delete_operation() -> None:
                     self._entities.pop(entity_id, None)
                     # Publish event after successful delete
                     self._publish_event(
@@ -384,7 +363,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
                         getattr(self._transaction_context, "transaction_id", None),
                     )
 
-                def _rollback_operation():
+                def _rollback_operation() -> None:
                     self._entities[entity_id] = old_entity
 
                 self._transaction_context.add_operation(_delete_operation, _rollback_operation)
@@ -403,9 +382,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
             else:
                 target_type = str(entity_type)
 
-            return [
-                entity for entity in self._entities.values() if entity.entity_type == target_type
-            ]
+            return [entity for entity in self._entities.values() if entity.entity_type == target_type]
 
     def search_entities(self, query: str, limit: int = 10) -> List["Entity"]:
         """Search entities by query."""
@@ -444,15 +421,11 @@ class MemoryDataAccessLayer(DataAccessLayer):
             if self._transaction_context:
                 old_relation = self._relations.get(relation.id)
 
-                def _save_operation():
+                def _save_operation() -> None:
                     self._relations[relation.id] = relation
                     # Publish event after successful save
-                    event_type = (
-                        EventType.RELATION_ADDED if is_new_relation else EventType.RELATION_UPDATED
-                    )
-                    relation_data = (
-                        relation.to_dict() if hasattr(relation, "to_dict") else vars(relation)
-                    )
+                    event_type = EventType.RELATION_ADDED if is_new_relation else EventType.RELATION_UPDATED
+                    relation_data = relation.to_dict() if hasattr(relation, "to_dict") else vars(relation)
                     self._publish_event(
                         event_type,
                         "relation",
@@ -461,7 +434,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
                         getattr(self._transaction_context, "transaction_id", None),
                     )
 
-                def _rollback_operation():
+                def _rollback_operation() -> None:
                     if old_relation is None:
                         self._relations.pop(relation.id, None)
                     else:
@@ -471,12 +444,8 @@ class MemoryDataAccessLayer(DataAccessLayer):
             else:
                 self._relations[relation.id] = relation
                 # Publish event immediately for non-transactional operations
-                event_type = (
-                    EventType.RELATION_ADDED if is_new_relation else EventType.RELATION_UPDATED
-                )
-                relation_data = (
-                    relation.to_dict() if hasattr(relation, "to_dict") else vars(relation)
-                )
+                event_type = EventType.RELATION_ADDED if is_new_relation else EventType.RELATION_UPDATED
+                relation_data = relation.to_dict() if hasattr(relation, "to_dict") else vars(relation)
                 self._publish_event(event_type, "relation", relation.id, relation_data)
 
     def add_relation(self, relation: "Relation") -> None:
@@ -494,13 +463,11 @@ class MemoryDataAccessLayer(DataAccessLayer):
                 return False
 
             old_relation = self._relations[relation_id]
-            relation_data = (
-                old_relation.to_dict() if hasattr(old_relation, "to_dict") else vars(old_relation)
-            )
+            relation_data = old_relation.to_dict() if hasattr(old_relation, "to_dict") else vars(old_relation)
 
             if self._transaction_context:
 
-                def _delete_operation():
+                def _delete_operation() -> None:
                     self._relations.pop(relation_id, None)
                     # Publish event after successful delete
                     self._publish_event(
@@ -511,16 +478,14 @@ class MemoryDataAccessLayer(DataAccessLayer):
                         getattr(self._transaction_context, "transaction_id", None),
                     )
 
-                def _rollback_operation():
+                def _rollback_operation() -> None:
                     self._relations[relation_id] = old_relation
 
                 self._transaction_context.add_operation(_delete_operation, _rollback_operation)
             else:
                 del self._relations[relation_id]
                 # Publish event immediately for non-transactional operations
-                self._publish_event(
-                    EventType.RELATION_REMOVED, "relation", relation_id, relation_data
-                )
+                self._publish_event(EventType.RELATION_REMOVED, "relation", relation_id, relation_data)
             return True
 
     def get_relations_by_type(self, relation_type: Union[RelationType, str]) -> List["Relation"]:
@@ -532,11 +497,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
             else:
                 target_type = str(relation_type)
 
-            return [
-                relation
-                for relation in self._relations.values()
-                if relation.relation_type == target_type
-            ]
+            return [relation for relation in self._relations.values() if relation.relation_type == target_type]
 
     def get_entity_relations(self, entity_id: str) -> List["Relation"]:
         """Get all relations connected to an entity."""
@@ -609,19 +570,13 @@ class MemoryDataAccessLayer(DataAccessLayer):
             else:
                 target_type = str(cluster_type)
 
-            return [
-                cluster
-                for cluster in self._clusters.values()
-                if cluster.cluster_type == target_type
-            ]
+            return [cluster for cluster in self._clusters.values() if cluster.cluster_type == target_type]
 
     def get_cluster_entities(self, cluster_id: str) -> List["Entity"]:
         """Get all entities in a cluster."""
         with self._lock:
             entity_ids = self._cluster_entities.get(cluster_id, set())
-            return [
-                self._entities[entity_id] for entity_id in entity_ids if entity_id in self._entities
-            ]
+            return [self._entities[entity_id] for entity_id in entity_ids if entity_id in self._entities]
 
     def add_entity_to_cluster(self, cluster_id: str, entity_id: str) -> bool:
         """Add an entity to a cluster."""
@@ -669,9 +624,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
                     lambda: (
                         self._text_chunks.pop(chunk.id, None)
                         if old_chunk is None
-                        else setattr(
-                            self, "_text_chunks", {**self._text_chunks, chunk.id: old_chunk}
-                        )
+                        else setattr(self, "_text_chunks", {**self._text_chunks, chunk.id: old_chunk})
                     ),
                 )
             else:
@@ -695,9 +648,7 @@ class MemoryDataAccessLayer(DataAccessLayer):
                 old_chunk = self._text_chunks[chunk_id]
                 self._transaction_context.add_operation(
                     lambda: self._text_chunks.pop(chunk_id, None),
-                    lambda: setattr(
-                        self, "_text_chunks", {**self._text_chunks, chunk_id: old_chunk}
-                    ),
+                    lambda: setattr(self, "_text_chunks", {**self._text_chunks, chunk_id: old_chunk}),
                 )
             else:
                 del self._text_chunks[chunk_id]

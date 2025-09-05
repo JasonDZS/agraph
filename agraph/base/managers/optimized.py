@@ -91,9 +91,7 @@ class OptimizedEntityManager:
         entity = self.entities[entity_id]
 
         # Use index to efficiently find and remove related objects
-        removed_data = self.index_manager.remove_entity_from_all_indexes(
-            entity_id, entity.entity_type
-        )
+        removed_data = self.index_manager.remove_entity_from_all_indexes(entity_id, entity.entity_type)
 
         # Remove relations using index information
         for relation_id in removed_data["relations"]:
@@ -115,9 +113,7 @@ class OptimizedEntityManager:
         del self.entities[entity_id]
 
         # Invalidate relevant caches
-        self.cache_manager.invalidate_by_tags(
-            {"entities", f"entity_type_{entity.entity_type}", f"entity_{entity_id}"}
-        )
+        self.cache_manager.invalidate_by_tags({"entities", f"entity_type_{entity.entity_type}", f"entity_{entity_id}"})
 
         self._touch()
         self._record_operation("remove_entity", start_time)
@@ -297,14 +293,10 @@ class OptimizedRelationManager:
 
         # Update indexes
         if relation.head_entity and relation.tail_entity:
-            self.index_manager.add_relation_to_index(
-                relation.id, relation.head_entity.id, relation.tail_entity.id
-            )
+            self.index_manager.add_relation_to_index(relation.id, relation.head_entity.id, relation.tail_entity.id)
 
         # Invalidate relevant caches
-        self.cache_manager.invalidate_by_tags(
-            {"relations", f"relation_type_{relation.relation_type}"}
-        )
+        self.cache_manager.invalidate_by_tags({"relations", f"relation_type_{relation.relation_type}"})
 
         self._touch()
         self._record_operation("add_relation", start_time)
@@ -376,11 +368,7 @@ class OptimizedRelationManager:
             return cached_result  # type: ignore[no-any-return]
 
         # Filter relations by type
-        relations = [
-            relation
-            for relation in self.relations.values()
-            if relation.relation_type == relation_type
-        ]
+        relations = [relation for relation in self.relations.values() if relation.relation_type == relation_type]
 
         # Cache the result
         self.cache_manager.put(
@@ -415,17 +403,9 @@ class OptimizedRelationManager:
                 # Apply direction filter
                 if direction == "both":
                     relations.append(relation)
-                elif (
-                    direction == "outgoing"
-                    and relation.head_entity
-                    and relation.head_entity.id == entity_id
-                ):
+                elif direction == "outgoing" and relation.head_entity and relation.head_entity.id == entity_id:
                     relations.append(relation)
-                elif (
-                    direction == "incoming"
-                    and relation.tail_entity
-                    and relation.tail_entity.id == entity_id
-                ):
+                elif direction == "incoming" and relation.tail_entity and relation.tail_entity.id == entity_id:
                     relations.append(relation)
 
         # Cache the result

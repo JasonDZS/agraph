@@ -57,9 +57,7 @@ class HierarchicalClusteringAlgorithm(ClusterAlgorithm):
 
         return self.post_process_clusters(final_clusters)
 
-    def _calculate_distance_matrix(
-        self, adjacency: Dict[str, Dict[str, float]]
-    ) -> Dict[Tuple[str, str], float]:
+    def _calculate_distance_matrix(self, adjacency: Dict[str, Dict[str, float]]) -> Dict[Tuple[str, str], float]:
         """Calculate distance matrix from adjacency matrix.
 
         Args:
@@ -110,9 +108,7 @@ class HierarchicalClusteringAlgorithm(ClusterAlgorithm):
                         if i >= j:
                             continue
 
-                        distance = self._calculate_cluster_distance(
-                            cluster1, cluster2, distance_matrix
-                        )
+                        distance = self._calculate_cluster_distance(cluster1, cluster2, distance_matrix)
 
                         min_distance = min(min_distance, distance)
 

@@ -7,6 +7,7 @@ import inspect
 from typing import Any, Dict, List, Optional
 
 from ...base.models.entities import Entity
+from ...base.models.positioning import AlignmentStatus, CharInterval, Position
 from ...base.models.text import TextChunk
 from ...builder.cache import CacheManager
 from ...builder.extractors import EntityExtractor
@@ -27,9 +28,7 @@ class EntityHandler:
         self.cache_manager = cache_manager
         self.entity_extractor = entity_extractor
 
-    async def extract_entities_from_chunks(
-        self, chunks: List[TextChunk], use_cache: bool = True
-    ) -> List[Entity]:
+    async def extract_entities_from_chunks(self, chunks: List[TextChunk], use_cache: bool = True) -> List[Entity]:
         """Extract entities from text chunks with incremental processing support.
 
         Args:
@@ -39,9 +38,7 @@ class EntityHandler:
         Returns:
             List of extracted entities
         """
-        logger.info(
-            f"Extracting entities from {len(chunks)} chunks using {type(self.entity_extractor).__name__}"
-        )
+        logger.info(f"Extracting entities from {len(chunks)} chunks using {type(self.entity_extractor).__name__}")
 
         if not use_cache:
             return await self._extract_all_entities(chunks)
@@ -78,9 +75,7 @@ class EntityHandler:
 
         # Process uncached chunks
         if chunks_to_process:
-            logger.info(
-                f"Processing {len(chunks_to_process)} uncached chunks for entity extraction"
-            )
+            logger.info(f"Processing {len(chunks_to_process)} uncached chunks for entity extraction")
 
             # Group chunks to process by document for caching
             doc_chunks_to_process: Dict[str, List[TextChunk]] = {}
@@ -95,9 +90,7 @@ class EntityHandler:
             max_concurrent = settings.max_current
             semaphore = asyncio.Semaphore(max_concurrent)
 
-            logger.info(
-                f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks"
-            )
+            logger.info(f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks")
 
             async def process_document(doc_id: str, doc_chunks: List[TextChunk]) -> Any:
                 """Process a single document with concurrency control."""
@@ -108,18 +101,14 @@ class EntityHandler:
                         if inspect.iscoroutine(extraction_result):
                             doc_entities = await extraction_result
                         else:
-                            doc_entities = (
-                                extraction_result if extraction_result is not None else []
-                            )
+                            doc_entities = extraction_result if extraction_result is not None else []
 
                         # Update text chunks with entity references and set positioning
                         chunk_map = {chunk.id: chunk for chunk in doc_chunks}
                         self._integrate_positioning_info(doc_entities, chunk_map)
 
                         # Cache entities for this document
-                        doc_entities_id = self.cache_manager.backend.generate_key(
-                            [c.content for c in doc_chunks]
-                        )
+                        doc_entities_id = self.cache_manager.backend.generate_key([c.content for c in doc_chunks])
                         doc_chunks_key = f"doc_entities_{doc_entities_id}"
                         self.cache_manager.backend.set(doc_chunks_key, doc_entities)
                         logger.debug(f"Cached {len(doc_entities)} entities for {doc_id}")
@@ -130,10 +119,7 @@ class EntityHandler:
                         return []
 
             # Process all documents concurrently
-            tasks = [
-                process_document(doc_id, doc_chunks)
-                for doc_id, doc_chunks in doc_chunks_to_process.items()
-            ]
+            tasks = [process_document(doc_id, doc_chunks) for doc_id, doc_chunks in doc_chunks_to_process.items()]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -164,9 +150,7 @@ class EntityHandler:
 
         # Save step-level result for compatibility
         if use_cache:
-            self.cache_manager.save_step_result(
-                BuildSteps.ENTITY_EXTRACTION, chunks, unique_entities
-            )
+            self.cache_manager.save_step_result(BuildSteps.ENTITY_EXTRACTION, chunks, unique_entities)
 
         return unique_entities
 
@@ -180,9 +164,7 @@ class EntityHandler:
 
         return entities
 
-    def _integrate_positioning_info(
-        self, entities: List[Entity], chunk_map: Dict[str, TextChunk]
-    ) -> None:
+    def _integrate_positioning_info(self, entities: List[Entity], chunk_map: Dict[str, TextChunk]) -> None:
         """Integrate positioning information from text chunks into entities.
 
         This method attempts to find the entity text within the source text chunks
@@ -192,8 +174,6 @@ class EntityHandler:
             entities: List of entities to update with positioning info
             chunk_map: Mapping of chunk IDs to TextChunk objects
         """
-        from ...base.models.positioning import AlignmentStatus, CharInterval, Position
-
         for entity in entities:
             # Establish bidirectional linking
             for chunk_id in entity.text_chunks:
@@ -211,9 +191,7 @@ class EntityHandler:
                             entity.set_position(position)
                             break  # Use first successful match
 
-    def _find_entity_position_in_chunk(
-        self, entity: Entity, chunk: TextChunk
-    ) -> Optional["Position"]:
+    def _find_entity_position_in_chunk(self, entity: Entity, chunk: TextChunk) -> Optional["Position"]:
         """Find entity position within a text chunk.
 
         Args:
@@ -223,8 +201,6 @@ class EntityHandler:
         Returns:
             Position object if entity is found, None otherwise
         """
-        from ...base.models.positioning import AlignmentStatus, CharInterval, Position
-
         if not entity.name or not chunk.content:
             return None
 

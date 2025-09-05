@@ -84,11 +84,7 @@ class TextChunkerHandler:
 
                     text_chunks = []
                     for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
-                        source_name = (
-                            Path(documents[i]).name
-                            if documents and i < len(documents)
-                            else f"document_{i}"
-                        )
+                        source_name = Path(documents[i]).name if documents and i < len(documents) else f"document_{i}"
                         chunk = TextChunk(
                             id=f"chunk_{i}_{j}",
                             content=chunk_text,
@@ -123,9 +119,7 @@ class TextChunkerHandler:
 
         return all_chunks
 
-    def _chunk_all_texts(
-        self, texts: List[str], documents: Optional[List[Union[str, Path]]] = None
-    ) -> List[TextChunk]:
+    def _chunk_all_texts(self, texts: List[str], documents: Optional[List[Union[str, Path]]] = None) -> List[TextChunk]:
         """Chunk all texts without caching (fallback method)."""
         all_chunks = []
 
@@ -136,11 +130,7 @@ class TextChunkerHandler:
                 logger.debug(f"Text {i+1} split into {len(chunks_with_positions)} chunks")
 
                 for j, (chunk_text, start_idx, end_idx) in enumerate(chunks_with_positions):
-                    source_name = (
-                        Path(documents[i]).name
-                        if documents and i < len(documents)
-                        else f"document_{i}"
-                    )
+                    source_name = Path(documents[i]).name if documents and i < len(documents) else f"document_{i}"
                     chunk = TextChunk(
                         id=f"chunk_{i}_{j}",
                         content=chunk_text,

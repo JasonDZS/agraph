@@ -8,12 +8,7 @@ and vector store setups, improving the configuration management and reusability.
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from .constants import (
-    CACHED_EMBEDDING_DEFAULTS,
-    DEFAULT_CHROMA_HOST,
-    DEFAULT_CHROMA_PORT,
-    OPENAI_EMBEDDING_DEFAULTS,
-)
+from .constants import CACHED_EMBEDDING_DEFAULTS, DEFAULT_CHROMA_HOST, DEFAULT_CHROMA_PORT, OPENAI_EMBEDDING_DEFAULTS
 
 
 @dataclass
@@ -24,9 +19,7 @@ class EmbeddingConfig:
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     batch_size: int = field(default_factory=lambda: OPENAI_EMBEDDING_DEFAULTS["batch_size"])
-    max_concurrency: int = field(
-        default_factory=lambda: OPENAI_EMBEDDING_DEFAULTS["max_concurrency"]
-    )
+    max_concurrency: int = field(default_factory=lambda: OPENAI_EMBEDDING_DEFAULTS["max_concurrency"])
     max_retries: int = field(default_factory=lambda: OPENAI_EMBEDDING_DEFAULTS["max_retries"])
     timeout: float = field(default_factory=lambda: OPENAI_EMBEDDING_DEFAULTS["timeout"])
     use_cache: bool = True

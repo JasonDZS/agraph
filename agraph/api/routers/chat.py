@@ -15,18 +15,14 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for project-specific chat"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for project-specific chat"),
 ) -> ChatResponse:
     """Chat with the knowledge base (non-streaming)."""
     try:
         # Get the appropriate AGraph instance based on project_name
         agraph = await get_agraph_instance(project_name)
         if request.stream:
-            raise HTTPException(
-                status_code=400, detail="Use /chat/stream endpoint for streaming responses"
-            )
+            raise HTTPException(status_code=400, detail="Use /chat/stream endpoint for streaming responses")
 
         response = await agraph.chat(
             question=request.question,
@@ -59,9 +55,7 @@ async def chat(
 @router.post("/stream")
 async def chat_stream(
     request: ChatRequest,
-    project_name: Optional[str] = Query(
-        default=None, description="Project name for project-specific chat"
-    ),
+    project_name: Optional[str] = Query(default=None, description="Project name for project-specific chat"),
 ) -> StreamingResponse:
     """Chat with the knowledge base (streaming)."""
     try:

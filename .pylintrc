@@ -33,7 +33,8 @@ disable=
     redefined-outer-name,
     duplicate-code,
     too-many-lines,
-    attribute-defined-outside-init
+    logging-fstring-interpolation,
+    attribute-defined-outside-init,
 
 
 [REPORTS]

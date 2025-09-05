@@ -265,9 +265,7 @@ class FileCacheBackend(CacheBackend):
 
     def _serialize_data(self, data: Any) -> Any:
         """Serialize data for JSON storage."""
-        if isinstance(
-            data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph)
-        ):
+        if isinstance(data, (Entity, Relation, Cluster, TextChunk, KnowledgeGraph)):
             return {"_type": data.__class__.__name__, "_data": data.to_dict()}
         if isinstance(data, list):
             return [self._serialize_data(item) for item in data]
@@ -394,9 +392,7 @@ class FileCacheBackend(CacheBackend):
 
         return None
 
-    def _set_in_grouped_cache(
-        self, key: str, value: Any, metadata: Optional[CacheMetadata] = None
-    ) -> None:
+    def _set_in_grouped_cache(self, key: str, value: Any, metadata: Optional[CacheMetadata] = None) -> None:
         """Set item in grouped cache file."""
         data_type = self._get_data_type_from_key(key)
         if not data_type:

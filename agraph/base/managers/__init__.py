@@ -30,12 +30,7 @@ from .legacy import ClusterManager, EntityManager, RelationManager, TextChunkMan
 from .optimized import OptimizedEntityManager, OptimizedRelationManager
 
 # Modern implementations
-from .unified import (
-    UnifiedClusterManager,
-    UnifiedEntityManager,
-    UnifiedRelationManager,
-    UnifiedTextChunkManager,
-)
+from .unified import UnifiedClusterManager, UnifiedEntityManager, UnifiedRelationManager, UnifiedTextChunkManager
 
 __all__ = [
     # Interfaces

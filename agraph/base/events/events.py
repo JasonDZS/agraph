@@ -134,7 +134,6 @@ class EventListener(ABC):
         Returns:
             Result indicating success or failure
         """
-        pass
 
     @abstractmethod
     def get_event_types(self) -> Set[EventType]:
@@ -144,11 +143,10 @@ class EventListener(ABC):
         Returns:
             Set of event types this listener handles
         """
-        pass
 
     def get_priority(self) -> EventPriority:
-        """
-        Get the priority of this listener.
+        """Get the priority of this listener.
+
         Higher priority listeners are called first.
 
         Returns:
@@ -188,7 +186,6 @@ class AsyncEventListener(EventListener):
         Returns:
             Result indicating success or failure
         """
-        pass
 
     def handle_event(self, event: GraphEvent) -> Result[bool]:
         """
@@ -208,9 +205,8 @@ class AsyncEventListener(EventListener):
                 asyncio.ensure_future(self.handle_event_async(event))
                 # For now, return success - the actual result will be handled asynchronously
                 return Result.ok(True)
-            else:
-                # Run in the event loop
-                return loop.run_until_complete(self.handle_event_async(event))
+            # Run in the event loop
+            return loop.run_until_complete(self.handle_event_async(event))
         except RuntimeError:
             # No event loop, create one
             loop = asyncio.new_event_loop()
@@ -376,9 +372,7 @@ class EventManager:
             for event_type in subscription.event_types:
                 if event_type in self._subscriptions:
                     self._subscriptions[event_type] = [
-                        s
-                        for s in self._subscriptions[event_type]
-                        if s.subscription_id != subscription_id
+                        s for s in self._subscriptions[event_type] if s.subscription_id != subscription_id
                     ]
 
                     # Clean up empty event type entries
@@ -408,18 +402,17 @@ class EventManager:
 
             if synchronous or not self.enable_async:
                 return self._process_event_sync(event)
-            else:
-                # Add to queue for asynchronous processing
-                if len(self._event_queue) >= self.max_queue_size:
-                    return Result.fail(
-                        ErrorCode.RESOURCE_EXHAUSTED,
-                        f"Event queue is full (max size: {self.max_queue_size})",
-                    )
+            # Add to queue for asynchronous processing
+            if len(self._event_queue) >= self.max_queue_size:
+                return Result.fail(
+                    ErrorCode.RESOURCE_EXHAUSTED,
+                    f"Event queue is full (max size: {self.max_queue_size})",
+                )
 
-                self._event_queue.append(event)
-                self._stats["queue_size"] = len(self._event_queue)
+            self._event_queue.append(event)
+            self._stats["queue_size"] = len(self._event_queue)
 
-                return Result.ok(True)
+            return Result.ok(True)
 
     def _process_event_sync(self, event: GraphEvent) -> Result[bool]:
         """
@@ -556,9 +549,7 @@ class EventManager:
             stats = self._stats.copy()
             stats["active_subscriptions"] = len(self._subscription_by_id)
             stats["event_types_registered"] = len(self._subscriptions)
-            stats["average_processing_time"] = stats["processing_time_total"] / max(
-                1, stats["events_processed"]
-            )
+            stats["average_processing_time"] = stats["processing_time_total"] / max(1, stats["events_processed"])
             return stats
 
     def shutdown(self, timeout: float = 5.0) -> Result[bool]:
@@ -582,14 +573,12 @@ class EventManager:
             self._processing_thread.join(timeout / 2)
 
             if self._processing_thread.is_alive():
-                return Result.fail(
-                    ErrorCode.TIMEOUT, "Event processing thread did not shutdown within timeout"
-                )
+                return Result.fail(ErrorCode.TIMEOUT, "Event processing thread did not shutdown within timeout")
 
         return Result.ok(True, metadata={"events_flushed": flush_result.data or 0})
 
     @contextmanager
-    def event_context(self, source: str):
+    def event_context(self, source: str) -> Any:
         """
         Context manager for event publishing with automatic source tagging.
 
@@ -675,6 +664,4 @@ def create_system_event(
     priority: EventPriority = EventPriority.NORMAL,
 ) -> GraphEvent:
     """Create a system-related event."""
-    return GraphEvent(
-        event_type=event_type, source=source, data=data, metadata=metadata, priority=priority
-    )
+    return GraphEvent(event_type=event_type, source=source, data=data, metadata=metadata, priority=priority)

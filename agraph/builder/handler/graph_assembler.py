@@ -5,12 +5,7 @@ Knowledge graph assembly handler for knowledge graph builder.
 from typing import Any, Dict, List, Optional
 
 from ...base.graphs.optimized import KnowledgeGraph
-from ...base.managers.interfaces import (
-    ClusterManager,
-    EntityManager,
-    RelationManager,
-    TextChunkManager,
-)
+from ...base.managers.interfaces import ClusterManager, EntityManager, RelationManager, TextChunkManager
 from ...base.models.clusters import Cluster
 from ...base.models.entities import Entity
 from ...base.models.relations import Relation
@@ -106,9 +101,7 @@ class GraphAssembler:
         cache_input = (entities, relations, clusters, chunks, graph_name, graph_description)
 
         if use_cache:
-            cached_result = self.cache_manager.get_step_result(
-                BuildSteps.GRAPH_ASSEMBLY, cache_input, KnowledgeGraph
-            )
+            cached_result = self.cache_manager.get_step_result(BuildSteps.GRAPH_ASSEMBLY, cache_input, KnowledgeGraph)
             if cached_result is not None:
                 logger.info("Using cached knowledge graph assembly results")
                 return cached_result
@@ -116,9 +109,7 @@ class GraphAssembler:
         # Create optimized knowledge graph for better performance
         kg_name = graph_name or "Generated Knowledge Graph"
         kg_description = graph_description or "Knowledge graph generated from documents"
-        logger.debug(
-            f"Creating optimized knowledge graph '{kg_name}' with description: {kg_description}"
-        )
+        logger.debug(f"Creating optimized knowledge graph '{kg_name}' with description: {kg_description}")
 
         kg = KnowledgeGraph(
             name=kg_name,
@@ -138,9 +129,7 @@ class GraphAssembler:
                         if result.success:
                             kg.add_entity(result.unwrap())
                         else:
-                            logger.warning(
-                                f"Failed to add entity {entity.name}: {result.error_message}"
-                            )
+                            logger.warning(f"Failed to add entity {entity.name}: {result.error_message}")
                             # Fall back to direct addition
                             kg.add_entity(entity)
                 else:
@@ -156,9 +145,7 @@ class GraphAssembler:
                         if relation_result.success:
                             kg.add_relation(relation_result.unwrap())
                         else:
-                            logger.warning(
-                                f"Failed to add relation {relation.id}: {relation_result.error_message}"
-                            )
+                            logger.warning(f"Failed to add relation {relation.id}: {relation_result.error_message}")
                             # Fall back to direct addition
                             kg.add_relation(relation)
                 else:
@@ -174,9 +161,7 @@ class GraphAssembler:
                         if cluster_result.success:
                             kg.add_cluster(cluster_result.unwrap())
                         else:
-                            logger.warning(
-                                f"Failed to add cluster {cluster.id}: {cluster_result.error_message}"
-                            )
+                            logger.warning(f"Failed to add cluster {cluster.id}: {cluster_result.error_message}")
                             # Fall back to direct addition
                             kg.add_cluster(cluster)
                 else:
@@ -192,9 +177,7 @@ class GraphAssembler:
                         if chunk_result.success:
                             kg.add_text_chunk(chunk_result.unwrap())
                         else:
-                            logger.warning(
-                                f"Failed to add text chunk {chunk.id}: {chunk_result.error_message}"
-                            )
+                            logger.warning(f"Failed to add text chunk {chunk.id}: {chunk_result.error_message}")
                             # Fall back to direct addition
                             kg.add_text_chunk(chunk)
                 else:

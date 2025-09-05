@@ -75,12 +75,8 @@ class JSONProcessor(DocumentProcessor):
         try:
             with open(file_path, "r", encoding=encoding) as file:
                 if file_path.suffix.lower() in [".jsonl", ".ndjson"]:
-                    return self._process_jsonlines_file(
-                        file, pretty_print, extract_values, max_depth
-                    )
-                return self._process_regular_json_file(
-                    file, pretty_print, extract_values, max_depth
-                )
+                    return self._process_jsonlines_file(file, pretty_print, extract_values, max_depth)
+                return self._process_regular_json_file(file, pretty_print, extract_values, max_depth)
 
         except UnicodeDecodeError:
             # Try alternative encodings for JSON files
@@ -89,12 +85,8 @@ class JSONProcessor(DocumentProcessor):
                     try:
                         with open(file_path, "r", encoding=alt_encoding) as file:
                             if file_path.suffix.lower() in [".jsonl", ".ndjson"]:
-                                return self._process_jsonlines_file(
-                                    file, pretty_print, extract_values, max_depth
-                                )
-                            return self._process_regular_json_file(
-                                file, pretty_print, extract_values, max_depth
-                            )
+                                return self._process_jsonlines_file(file, pretty_print, extract_values, max_depth)
+                            return self._process_regular_json_file(file, pretty_print, extract_values, max_depth)
                     except (UnicodeDecodeError, json.JSONDecodeError):
                         continue
             raise ProcessingError(
@@ -127,9 +119,7 @@ class JSONProcessor(DocumentProcessor):
 
             # Detect potential binary data (high-byte characters when using latin-1)
             if self._contains_likely_binary_data(content):
-                raise ProcessingError(
-                    "File appears to contain binary data and cannot be processed as JSON"
-                )
+                raise ProcessingError("File appears to contain binary data and cannot be processed as JSON")
 
             data = json.load(file)
 
@@ -176,9 +166,7 @@ class JSONProcessor(DocumentProcessor):
                     formatted = json.dumps(data, indent=2, ensure_ascii=False, default=str)
                     results.append(f"Line {line_num}:\n{formatted}")
                 else:
-                    results.append(
-                        f"Line {line_num}: {json.dumps(data, ensure_ascii=False, default=str)}"
-                    )
+                    results.append(f"Line {line_num}: {json.dumps(data, ensure_ascii=False, default=str)}")
 
             except json.JSONDecodeError as e:
                 results.append(f"Line {line_num}: JSON decode error - {str(e)}")
@@ -207,9 +195,7 @@ class JSONProcessor(DocumentProcessor):
 
         return False
 
-    def _extract_text_values_from_data(
-        self, data: Any, max_depth: Optional[int] = None, current_depth: int = 0
-    ) -> str:
+    def _extract_text_values_from_data(self, data: Any, max_depth: Optional[int] = None, current_depth: int = 0) -> str:
         """Extract only text values from JSON data structure recursively.
 
         This method traverses the JSON structure and extracts only meaningful
@@ -234,9 +220,7 @@ class JSONProcessor(DocumentProcessor):
                 if isinstance(value, str) and value.strip():
                     text_values.append(f"{key}: {value}")
                 elif isinstance(value, (dict, list)):
-                    nested_text = self._extract_text_values_from_data(
-                        value, max_depth, current_depth + 1
-                    )
+                    nested_text = self._extract_text_values_from_data(value, max_depth, current_depth + 1)
                     if nested_text:
                         text_values.append(f"{key}: {nested_text}")
                 elif value is not None and not (isinstance(value, str) and not value.strip()):
@@ -248,9 +232,7 @@ class JSONProcessor(DocumentProcessor):
                 if isinstance(item, str) and item.strip():
                     text_values.append(item)
                 elif isinstance(item, (dict, list)):
-                    nested_text = self._extract_text_values_from_data(
-                        item, max_depth, current_depth + 1
-                    )
+                    nested_text = self._extract_text_values_from_data(item, max_depth, current_depth + 1)
                     if nested_text:
                         text_values.append(nested_text)
                 elif item is not None and not (isinstance(item, str) and not item.strip()):
@@ -369,18 +351,14 @@ class JSONProcessor(DocumentProcessor):
                 metadata.update(
                     {
                         "key_count": len(data),
-                        "top_level_keys": list(data.keys())[
-                            :10
-                        ],  # First 10 keys to avoid huge output
+                        "top_level_keys": list(data.keys())[:10],  # First 10 keys to avoid huge output
                     }
                 )
             elif isinstance(data, list):
                 metadata.update(
                     {
                         "array_length": len(data),
-                        "item_types": list(
-                            set(type(item).__name__ for item in data[:100])
-                        ),  # Types of first 100 items
+                        "item_types": list(set(type(item).__name__ for item in data[:100])),  # Types of first 100 items
                     }
                 )
 
@@ -409,9 +387,7 @@ class JSONProcessor(DocumentProcessor):
         if isinstance(data, dict):
             if not data:
                 return current_depth
-            return max(
-                self._calculate_max_depth(value, current_depth + 1) for value in data.values()
-            )
+            return max(self._calculate_max_depth(value, current_depth + 1) for value in data.values())
         if isinstance(data, list):
             if not data:
                 return current_depth

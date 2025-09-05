@@ -60,13 +60,14 @@ format:
 	find . -name "*.md" -type f -exec sed -i '' 's/[[:space:]]*$$//' {} +
 	find . -name "*.yaml" -name "*.yml" -type f -exec sed -i '' 's/[[:space:]]*$$//' {} +
 	black agraph/
-	isort agraph/ --line-length=100
+	isort agraph/ --profile black --line-length=120 --multi-line=3 --trailing-comma --force-grid-wrap=0 --combine-as
 
 lint:
 	@echo "📋 Running code linting tools..."
 	flake8 agraph/ --ignore=E501,E203,W503
-	pylint agraph/ --rcfile=.pylintrc --exit-zero
+	pylint agraph/ --rcfile=.pylintrc --max-line-length=120 --disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,too-few-public-methods,too-many-arguments,too-many-instance-attributes,fixme,no-member --exit-zero
 	mypy agraph/ --ignore-missing-imports
+	pydocstyle agraph/ --convention=google --add-ignore=D100,D101,D102,D104,D105,D106,D107,D200,D203,D212,D213,D406,D407,D413
 
 # Documentation
 docs:

@@ -180,9 +180,7 @@ class Cluster(GraphNodeBase, TextChunkMixin, PropertyMixin):
         # Update cohesion score as weighted average
         total_size = self.size + other.size
         if total_size > 0:
-            self.cohesion_score = (
-                self.cohesion_score * self.size + other.cohesion_score * other.size
-            ) / total_size
+            self.cohesion_score = (self.cohesion_score * self.size + other.cohesion_score * other.size) / total_size
 
         self.touch()
 

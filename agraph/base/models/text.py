@@ -121,11 +121,7 @@ class TextChunk(BaseModel, SerializableMixin):
         Returns:
             List[Relation]: List of connected Relation objects.
         """
-        return [
-            relations_map[relation_id]
-            for relation_id in self.relations
-            if relation_id in relations_map
-        ]
+        return [relations_map[relation_id] for relation_id in self.relations if relation_id in relations_map]
 
     def add_metadata(self, key: str, value: Any) -> None:
         """Add metadata to the text chunk."""

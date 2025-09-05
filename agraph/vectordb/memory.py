@@ -70,9 +70,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
                 logger.error(f"Warning: Failed to create OpenAI embedding function: {e}")
                 logger.error("Falling back to simple character-based embeddings.")
                 self._openai_embedding = None
-                raise VectorStoreError(
-                    ERROR_MESSAGES["openai_embedding_failed"].format(error=e)
-                ) from e
+                raise VectorStoreError(ERROR_MESSAGES["openai_embedding_failed"].format(error=e)) from e
 
     async def initialize(self) -> None:
         """Initialize vector store."""
@@ -129,9 +127,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
                 return list(result)  # Ensure it's List[float]
             except Exception as e:
                 print(f"Warning: OpenAI embedding failed, falling back to simple embedding: {e}")
-                raise VectorStoreError(
-                    ERROR_MESSAGES["openai_embedding_failed"].format(error=e)
-                ) from e
+                raise VectorStoreError(ERROR_MESSAGES["openai_embedding_failed"].format(error=e)) from e
 
         # Fall back to simple embedding
         return self._generate_text_embedding(text)
@@ -152,9 +148,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
 
             if not self._validate_embedding(embedding):
                 raise VectorStoreError(
-                    ERROR_MESSAGES["invalid_embedding"].format(
-                        object_type="entity", object_id=entity.id
-                    )
+                    ERROR_MESSAGES["invalid_embedding"].format(object_type="entity", object_id=entity.id)
                 )
 
             self._entity_embeddings[entity.id] = embedding
@@ -208,9 +202,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         return results[:top_k]
 
     # Relation operations
-    async def add_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Add relation to vector store."""
         try:
             self._relations[relation.id] = relation
@@ -225,9 +217,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
 
             if not self._validate_embedding(embedding):
                 raise VectorStoreError(
-                    ERROR_MESSAGES["invalid_embedding"].format(
-                        object_type="relation", object_id=relation.id
-                    )
+                    ERROR_MESSAGES["invalid_embedding"].format(object_type="relation", object_id=relation.id)
                 )
 
             self._relation_embeddings[relation.id] = embedding
@@ -235,9 +225,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add relation {relation.id}: {e}") from e
 
-    async def update_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Update relation information."""
         if relation.id not in self._relations:
             return False
@@ -296,9 +284,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
 
             if not self._validate_embedding(embedding):
                 raise VectorStoreError(
-                    ERROR_MESSAGES["invalid_embedding"].format(
-                        object_type="cluster", object_id=cluster.id
-                    )
+                    ERROR_MESSAGES["invalid_embedding"].format(object_type="cluster", object_id=cluster.id)
                 )
 
             self._cluster_embeddings[cluster.id] = embedding
@@ -306,9 +292,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add cluster {cluster.id}: {e}") from e
 
-    async def update_cluster(
-        self, cluster: Cluster, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_cluster(self, cluster: Cluster, embedding: Optional[List[float]] = None) -> bool:
         """Update cluster information."""
         if cluster.id not in self._clusters:
             return False
@@ -352,9 +336,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         return results[:top_k]
 
     # TextChunk operations
-    async def add_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Add text chunk to vector store."""
         try:
             self._text_chunks[text_chunk.id] = text_chunk
@@ -368,9 +350,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
 
             if not self._validate_embedding(embedding):
                 raise VectorStoreError(
-                    ERROR_MESSAGES["invalid_embedding"].format(
-                        object_type="text_chunk", object_id=text_chunk.id
-                    )
+                    ERROR_MESSAGES["invalid_embedding"].format(object_type="text_chunk", object_id=text_chunk.id)
                 )
 
             self._text_chunk_embeddings[text_chunk.id] = embedding
@@ -378,9 +358,7 @@ class MemoryVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add text_chunk {text_chunk.id}: {e}") from e
 
-    async def update_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Update text chunk information."""
         if text_chunk.id not in self._text_chunks:
             return False

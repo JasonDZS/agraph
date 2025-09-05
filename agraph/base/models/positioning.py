@@ -10,7 +10,7 @@ LangExtract's positioning analysis, it implements dual-level positioning
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class AlignmentStatus(Enum):
@@ -39,7 +39,7 @@ class CharInterval(BaseModel):
 
     @field_validator("end_pos")
     @classmethod
-    def validate_end_pos(cls, v: int, info) -> int:
+    def validate_end_pos(cls, v: int, info: ValidationInfo) -> int:
         """Validate end position is after start position."""
         if "start_pos" in info.data and v <= info.data["start_pos"]:
             raise ValueError("end_pos must be greater than start_pos")
@@ -83,7 +83,7 @@ class TokenInterval(BaseModel):
 
     @field_validator("end_index")
     @classmethod
-    def validate_end_index(cls, v: int, info) -> int:
+    def validate_end_index(cls, v: int, info: ValidationInfo) -> int:
         """Validate end index is after start index."""
         if "start_index" in info.data and v <= info.data["start_index"]:
             raise ValueError("end_index must be greater than start_index")
@@ -121,21 +121,13 @@ class Position(BaseModel):
         source_context: Additional context about the source location
     """
 
-    char_interval: Optional[CharInterval] = Field(
-        default=None, description="Character-level position interval"
-    )
-    token_interval: Optional[TokenInterval] = Field(
-        default=None, description="Token-level position interval"
-    )
+    char_interval: Optional[CharInterval] = Field(default=None, description="Character-level position interval")
+    token_interval: Optional[TokenInterval] = Field(default=None, description="Token-level position interval")
     alignment_status: AlignmentStatus = Field(
         default=AlignmentStatus.NO_MATCH, description="Status of the alignment process"
     )
-    confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Confidence score for positioning accuracy"
-    )
-    source_context: str = Field(
-        default="", description="Additional context about the source location"
-    )
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Confidence score for positioning accuracy")
+    source_context: str = Field(default="", description="Additional context about the source location")
 
     @field_validator("confidence")
     @classmethod
@@ -230,20 +222,14 @@ class Position(BaseModel):
         char_interval = None
         if data.get("char_interval"):
             char_data = data["char_interval"]
-            char_interval = CharInterval(
-                start_pos=char_data["start_pos"], end_pos=char_data["end_pos"]
-            )
+            char_interval = CharInterval(start_pos=char_data["start_pos"], end_pos=char_data["end_pos"])
 
         token_interval = None
         if data.get("token_interval"):
             token_data = data["token_interval"]
-            token_interval = TokenInterval(
-                start_index=token_data["start_index"], end_index=token_data["end_index"]
-            )
+            token_interval = TokenInterval(start_index=token_data["start_index"], end_index=token_data["end_index"])
 
-        alignment_status = AlignmentStatus(
-            data.get("alignment_status", AlignmentStatus.NO_MATCH.value)
-        )
+        alignment_status = AlignmentStatus(data.get("alignment_status", AlignmentStatus.NO_MATCH.value))
 
         return cls(
             char_interval=char_interval,
@@ -261,9 +247,7 @@ class PositionMixin(BaseModel):
     to Entity and Relation classes to enable source document positioning.
     """
 
-    position: Optional[Position] = Field(
-        default=None, description="Position information for the entity or relation"
-    )
+    position: Optional[Position] = Field(default=None, description="Position information for the entity or relation")
 
     def set_char_position(
         self,
@@ -377,7 +361,7 @@ class PositionMixin(BaseModel):
             return self.position.confidence
         return 0.0
 
-    def overlaps_with(self, other) -> bool:
+    def overlaps_with(self, other: "PositionMixin") -> bool:
         """Check if this object's position overlaps with another positioned object.
 
         Args:
@@ -387,6 +371,10 @@ class PositionMixin(BaseModel):
             True if positions overlap, False otherwise
         """
         if not (self.has_position() and hasattr(other, "has_position") and other.has_position()):
+            return False
+
+        # Add None check for position
+        if self.position is None or other.position is None:
             return False
 
         return self.position.overlaps_with(other.position)

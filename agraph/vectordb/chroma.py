@@ -14,8 +14,7 @@ try:
     from chromadb.config import Settings
 except ImportError as e:
     raise ImportError(
-        "ChromaDB is not installed. Please install it with: "
-        "pip install '.[vectordb]' or pip install chromadb>=0.5.0"
+        "ChromaDB is not installed. Please install it with: " "pip install '.[vectordb]' or pip install chromadb>=0.5.0"
     ) from e
 
 from ..base.models.clusters import Cluster
@@ -25,11 +24,7 @@ from ..base.models.text import TextChunk
 from ..config import get_settings
 from ..utils import get_type_value
 from .constants import COLLECTION_SUFFIXES, ERROR_MESSAGES, MAX_CONTENT_LENGTH_IN_METADATA
-from .embeddings import (
-    ChromaEmbeddingFunction,
-    OpenAIEmbeddingFunction,
-    create_openai_embedding_function,
-)
+from .embeddings import ChromaEmbeddingFunction, OpenAIEmbeddingFunction, create_openai_embedding_function
 from .exceptions import VectorStoreError
 from .interfaces import VectorStore
 from .mixins import EmbeddingStatsMixin, HybridSearchMixin
@@ -77,13 +72,9 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         if embedding_function is None and use_openai_embeddings:
             # Create OpenAI embedding function
             try:
-                embedding_function = create_openai_embedding_function(
-                    **(openai_embedding_config or {})
-                )
+                embedding_function = create_openai_embedding_function(**(openai_embedding_config or {}))
             except Exception as e:
-                raise VectorStoreError(
-                    ERROR_MESSAGES["openai_embedding_failed"].format(error=e)
-                ) from e
+                raise VectorStoreError(ERROR_MESSAGES["openai_embedding_failed"].format(error=e)) from e
 
         if isinstance(embedding_function, OpenAIEmbeddingFunction):
             # Wrap in ChromaEmbeddingFunction
@@ -99,8 +90,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
 
         # Collection name mapping
         self._collection_names = {
-            data_type: f"{collection_name}{suffix}"
-            for data_type, suffix in COLLECTION_SUFFIXES.items()
+            data_type: f"{collection_name}{suffix}" for data_type, suffix in COLLECTION_SUFFIXES.items()
         }
 
     async def initialize(self) -> None:
@@ -118,9 +108,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
                 )
             else:
                 # In-memory mode
-                self._client = chromadb.Client(
-                    settings=Settings(anonymized_telemetry=False, allow_reset=True)
-                )
+                self._client = chromadb.Client(settings=Settings(anonymized_telemetry=False, allow_reset=True))
 
             # Create or get collections
             for data_type, collection_name in self._collection_names.items():
@@ -311,21 +299,13 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             updated_entity = Entity(
                 id=entity.id,
                 name=entity.name if entity.name else existing_entity.name,
-                entity_type=(
-                    entity.entity_type if entity.entity_type else existing_entity.entity_type
-                ),
-                description=(
-                    entity.description if entity.description else existing_entity.description
-                ),
+                entity_type=(entity.entity_type if entity.entity_type else existing_entity.entity_type),
+                description=(entity.description if entity.description else existing_entity.description),
                 properties={**existing_entity.properties, **entity.properties},
                 aliases=(
-                    list(set(existing_entity.aliases + entity.aliases))
-                    if entity.aliases
-                    else existing_entity.aliases
+                    list(set(existing_entity.aliases + entity.aliases)) if entity.aliases else existing_entity.aliases
                 ),
-                confidence=(
-                    entity.confidence if entity.confidence != 1.0 else existing_entity.confidence
-                ),
+                confidence=(entity.confidence if entity.confidence != 1.0 else existing_entity.confidence),
                 source=entity.source if entity.source else existing_entity.source,
                 text_chunks=existing_entity.text_chunks.union(entity.text_chunks),
                 created_at=existing_entity.created_at,  # Preserve original creation time
@@ -397,20 +377,11 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             result = self._execute_chroma_query(collection, query, top_k, filter_dict)
 
             entities_with_scores = []
-            if (
-                result.get("ids")
-                and result["ids"][0]
-                and result.get("metadatas")
-                and result["metadatas"][0]
-            ):
+            if result.get("ids") and result["ids"][0] and result.get("metadatas") and result["metadatas"][0]:
                 for entity_id, metadata, distance in zip(
                     result["ids"][0],
                     result["metadatas"][0],
-                    (
-                        result["distances"][0]
-                        if result.get("distances")
-                        else [0.0] * len(result["ids"][0])
-                    ),
+                    (result["distances"][0] if result.get("distances") else [0.0] * len(result["ids"][0])),
                 ):
                     entity = self._reconstruct_entity_from_metadata(entity_id, dict(metadata))
                     similarity = ResultProcessor.calculate_similarity(distance)
@@ -421,9 +392,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             raise VectorStoreError(f"Failed to search entities: {e}") from e
 
     # Relation operations
-    async def add_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Add relation to ChromaDB."""
         try:
             collection = self._get_collection("relation")
@@ -439,9 +408,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add relation {relation.id}: {e}") from e
 
-    async def update_relation(
-        self, relation: Relation, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_relation(self, relation: Relation, embedding: Optional[List[float]] = None) -> bool:
         """Update relation information with incremental changes."""
         try:
             # Get existing relation
@@ -453,26 +420,12 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             # Merge updates with existing data
             updated_relation = Relation(
                 id=relation.id,
-                head_entity=(
-                    relation.head_entity if relation.head_entity else existing_relation.head_entity
-                ),
-                tail_entity=(
-                    relation.tail_entity if relation.tail_entity else existing_relation.tail_entity
-                ),
-                relation_type=(
-                    relation.relation_type
-                    if relation.relation_type
-                    else existing_relation.relation_type
-                ),
-                description=(
-                    relation.description if relation.description else existing_relation.description
-                ),
+                head_entity=(relation.head_entity if relation.head_entity else existing_relation.head_entity),
+                tail_entity=(relation.tail_entity if relation.tail_entity else existing_relation.tail_entity),
+                relation_type=(relation.relation_type if relation.relation_type else existing_relation.relation_type),
+                description=(relation.description if relation.description else existing_relation.description),
                 properties={**existing_relation.properties, **relation.properties},
-                confidence=(
-                    relation.confidence
-                    if relation.confidence != 0.8
-                    else existing_relation.confidence
-                ),
+                confidence=(relation.confidence if relation.confidence != 0.8 else existing_relation.confidence),
                 source=relation.source if relation.source else existing_relation.source,
                 text_chunks=existing_relation.text_chunks.union(relation.text_chunks),
                 created_at=existing_relation.created_at,  # Preserve original creation time
@@ -516,9 +469,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to get relation {relation_id}: {e}") from e
 
-    async def _reconstruct_relation_from_metadata(
-        self, relation_id: str, metadata: Dict[str, Any]
-    ) -> Relation:
+    async def _reconstruct_relation_from_metadata(self, relation_id: str, metadata: Dict[str, Any]) -> Relation:
         """Reconstruct Relation object from ChromaDB metadata."""
         # Fetch entity references
         head_entity = None
@@ -583,24 +534,13 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             )
 
             relations_with_scores = []
-            if (
-                result.get("ids")
-                and result["ids"][0]
-                and result.get("metadatas")
-                and result["metadatas"][0]
-            ):
+            if result.get("ids") and result["ids"][0] and result.get("metadatas") and result["metadatas"][0]:
                 for relation_id, metadata, distance in zip(
                     result["ids"][0],
                     result["metadatas"][0],
-                    (
-                        result["distances"][0]
-                        if result.get("distances")
-                        else [0.0] * len(result["ids"][0])
-                    ),
+                    (result["distances"][0] if result.get("distances") else [0.0] * len(result["ids"][0])),
                 ):
-                    relation = await self._reconstruct_relation_from_metadata(
-                        relation_id, dict(metadata)
-                    )
+                    relation = await self._reconstruct_relation_from_metadata(relation_id, dict(metadata))
                     similarity = max(0.0, 1.0 - distance)
                     relations_with_scores.append((relation, similarity))
 
@@ -625,9 +565,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add cluster {cluster.id}: {e}") from e
 
-    async def update_cluster(
-        self, cluster: Cluster, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_cluster(self, cluster: Cluster, embedding: Optional[List[float]] = None) -> bool:
         """Update cluster information with incremental changes."""
         try:
             # Get existing cluster
@@ -640,34 +578,22 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             updated_cluster = Cluster(
                 id=cluster.id,
                 name=cluster.name if cluster.name else existing_cluster.name,
-                cluster_type=(
-                    cluster.cluster_type if cluster.cluster_type else existing_cluster.cluster_type
-                ),
-                description=(
-                    cluster.description if cluster.description else existing_cluster.description
-                ),
+                cluster_type=(cluster.cluster_type if cluster.cluster_type else existing_cluster.cluster_type),
+                description=(cluster.description if cluster.description else existing_cluster.description),
                 entities=existing_cluster.entities.union(cluster.entities),
                 relations=existing_cluster.relations.union(cluster.relations),
                 centroid_entity_id=(
-                    cluster.centroid_entity_id
-                    if cluster.centroid_entity_id
-                    else existing_cluster.centroid_entity_id
+                    cluster.centroid_entity_id if cluster.centroid_entity_id else existing_cluster.centroid_entity_id
                 ),
                 parent_cluster_id=(
-                    cluster.parent_cluster_id
-                    if cluster.parent_cluster_id
-                    else existing_cluster.parent_cluster_id
+                    cluster.parent_cluster_id if cluster.parent_cluster_id else existing_cluster.parent_cluster_id
                 ),
                 child_clusters=existing_cluster.child_clusters.union(cluster.child_clusters),
                 cohesion_score=(
-                    cluster.cohesion_score
-                    if cluster.cohesion_score != 0.0
-                    else existing_cluster.cohesion_score
+                    cluster.cohesion_score if cluster.cohesion_score != 0.0 else existing_cluster.cohesion_score
                 ),
                 properties={**existing_cluster.properties, **cluster.properties},
-                confidence=(
-                    cluster.confidence if cluster.confidence != 0.8 else existing_cluster.confidence
-                ),
+                confidence=(cluster.confidence if cluster.confidence != 0.8 else existing_cluster.confidence),
                 source=cluster.source if cluster.source else existing_cluster.source,
                 text_chunks=existing_cluster.text_chunks.union(cluster.text_chunks),
                 created_at=existing_cluster.created_at,  # Preserve original creation time
@@ -711,9 +637,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to get cluster {cluster_id}: {e}") from e
 
-    def _reconstruct_cluster_from_metadata(
-        self, cluster_id: str, metadata: Dict[str, Any]
-    ) -> Cluster:
+    def _reconstruct_cluster_from_metadata(self, cluster_id: str, metadata: Dict[str, Any]) -> Cluster:
         """Reconstruct Cluster object from ChromaDB metadata."""
         return Cluster(
             id=cluster_id,
@@ -770,20 +694,11 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             )
 
             clusters_with_scores = []
-            if (
-                result.get("ids")
-                and result["ids"][0]
-                and result.get("metadatas")
-                and result["metadatas"][0]
-            ):
+            if result.get("ids") and result["ids"][0] and result.get("metadatas") and result["metadatas"][0]:
                 for cluster_id, metadata, distance in zip(
                     result["ids"][0],
                     result["metadatas"][0],
-                    (
-                        result["distances"][0]
-                        if result.get("distances")
-                        else [0.0] * len(result["ids"][0])
-                    ),
+                    (result["distances"][0] if result.get("distances") else [0.0] * len(result["ids"][0])),
                 ):
                     cluster = self._reconstruct_cluster_from_metadata(cluster_id, dict(metadata))
                     similarity = max(0.0, 1.0 - distance)
@@ -794,9 +709,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             raise VectorStoreError(f"Failed to search clusters: {e}") from e
 
     # TextChunk operations
-    async def add_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def add_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Add text chunk to ChromaDB."""
         try:
             collection = self._get_collection("text_chunk")
@@ -812,9 +725,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to add text_chunk {text_chunk.id}: {e}") from e
 
-    async def update_text_chunk(
-        self, text_chunk: TextChunk, embedding: Optional[List[float]] = None
-    ) -> bool:
+    async def update_text_chunk(self, text_chunk: TextChunk, embedding: Optional[List[float]] = None) -> bool:
         """Update text chunk information with incremental changes."""
         try:
             # Get existing text chunk
@@ -830,24 +741,12 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
                 title=text_chunk.title if text_chunk.title else existing_chunk.title,
                 source=text_chunk.source if text_chunk.source else existing_chunk.source,
                 start_index=(
-                    text_chunk.start_index
-                    if text_chunk.start_index is not None
-                    else existing_chunk.start_index
+                    text_chunk.start_index if text_chunk.start_index is not None else existing_chunk.start_index
                 ),
-                end_index=(
-                    text_chunk.end_index
-                    if text_chunk.end_index is not None
-                    else existing_chunk.end_index
-                ),
-                chunk_type=(
-                    text_chunk.chunk_type if text_chunk.chunk_type else existing_chunk.chunk_type
-                ),
+                end_index=(text_chunk.end_index if text_chunk.end_index is not None else existing_chunk.end_index),
+                chunk_type=(text_chunk.chunk_type if text_chunk.chunk_type else existing_chunk.chunk_type),
                 language=text_chunk.language if text_chunk.language else existing_chunk.language,
-                confidence=(
-                    text_chunk.confidence
-                    if text_chunk.confidence != 1.0
-                    else existing_chunk.confidence
-                ),
+                confidence=(text_chunk.confidence if text_chunk.confidence != 1.0 else existing_chunk.confidence),
                 metadata={**existing_chunk.metadata, **text_chunk.metadata},
                 entities=existing_chunk.entities.union(text_chunk.entities),
                 relations=existing_chunk.relations.union(text_chunk.relations),
@@ -892,9 +791,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
         except Exception as e:
             raise VectorStoreError(f"Failed to get text_chunk {chunk_id}: {e}") from e
 
-    def _reconstruct_text_chunk_from_metadata(
-        self, chunk_id: str, metadata: Dict[str, Any]
-    ) -> TextChunk:
+    def _reconstruct_text_chunk_from_metadata(self, chunk_id: str, metadata: Dict[str, Any]) -> TextChunk:
         """Reconstruct TextChunk object from ChromaDB metadata."""
         # Convert -1 back to None for start_index and end_index
         start_index = metadata.get("start_index")
@@ -957,20 +854,11 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
             )
 
             chunks_with_scores = []
-            if (
-                result.get("ids")
-                and result["ids"][0]
-                and result.get("metadatas")
-                and result["metadatas"][0]
-            ):
+            if result.get("ids") and result["ids"][0] and result.get("metadatas") and result["metadatas"][0]:
                 for chunk_id, metadata, distance in zip(
                     result["ids"][0],
                     result["metadatas"][0],
-                    (
-                        result["distances"][0]
-                        if result.get("distances")
-                        else [0.0] * len(result["ids"][0])
-                    ),
+                    (result["distances"][0] if result.get("distances") else [0.0] * len(result["ids"][0])),
                 ):
                     chunk = self._reconstruct_text_chunk_from_metadata(chunk_id, dict(metadata))
                     similarity = max(0.0, 1.0 - distance)

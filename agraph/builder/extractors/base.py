@@ -86,9 +86,7 @@ class EntityExtractor(ABC):
                 unique_entities.append(entity)
             else:
                 # Merge with existing entity (keep higher confidence)
-                existing = next(
-                    e for e in unique_entities if (e.name.lower(), str(e.entity_type)) == key
-                )
+                existing = next(e for e in unique_entities if (e.name.lower(), str(e.entity_type)) == key)
                 if entity.confidence > existing.confidence:
                     unique_entities.remove(existing)
                     unique_entities.append(entity)

@@ -70,18 +70,18 @@ class RelationHandler:
         for entity in entities:
             # Find which documents this entity belongs to based on text_chunks
             entity_docs = set()
-            if hasattr(entity, 'text_chunks') and entity.text_chunks:
+            if hasattr(entity, "text_chunks") and entity.text_chunks:
                 # Map entity to documents based on its text chunks
                 for chunk_id in entity.text_chunks:
                     for chunk in chunks:
                         if chunk.id == chunk_id:
                             entity_docs.add(chunk.source)
                             break
-            
+
             # If entity has no text chunk references, associate with all documents
             if not entity_docs:
                 entity_docs = set(doc_chunks_map.keys())
-            
+
             # Add entity to relevant document mappings
             for doc_id in entity_docs:
                 if doc_id in doc_entities_map:
@@ -92,11 +92,19 @@ class RelationHandler:
 
             # Generate stable cache key for this document's relations
             doc_chunks_content = sorted([c.content.strip() for c in doc_chunks if c.content])
-            doc_entities_content = sorted([
-                (e.name.strip() if hasattr(e, "name") and e.name else "", 
-                 e.type.value if hasattr(e, "type") and hasattr(e.type, "value") else str(e.type) if hasattr(e, "type") else "")
-                for e in doc_entities
-            ])
+            doc_entities_content = sorted(
+                [
+                    (
+                        e.name.strip() if hasattr(e, "name") and e.name else "",
+                        (
+                            e.type.value
+                            if hasattr(e, "type") and hasattr(e.type, "value")
+                            else str(e.type) if hasattr(e, "type") else ""
+                        ),
+                    )
+                    for e in doc_entities
+                ]
+            )
             doc_input = (tuple(doc_chunks_content), tuple(doc_entities_content))
             doc_relations_key = f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
             cached_data = self.cache_manager.backend.get(doc_relations_key, dict)
@@ -149,17 +157,13 @@ class RelationHandler:
                         if chunk_id in chunk_map:
                             chunk_map[chunk_id].relations.add(relation.id)
 
-                logger.debug(
-                    f"Using cached relations for {doc_id}: {len(cached_relations)} relations"
-                )
+                logger.debug(f"Using cached relations for {doc_id}: {len(cached_relations)} relations")
             else:
                 chunks_to_process.extend(doc_chunks)
 
         # Process uncached chunks
         if chunks_to_process:
-            logger.info(
-                f"Processing {len(chunks_to_process)} uncached chunks for relation extraction"
-            )
+            logger.info(f"Processing {len(chunks_to_process)} uncached chunks for relation extraction")
 
             # Group chunks to process by document
             doc_chunks_to_process: Dict[str, List[TextChunk]] = {}
@@ -174,9 +178,7 @@ class RelationHandler:
             max_concurrent = settings.max_current
             semaphore = asyncio.Semaphore(max_concurrent)
 
-            logger.info(
-                f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks"
-            )
+            logger.info(f"Processing {len(doc_chunks_to_process)} documents with max {max_concurrent} concurrent tasks")
 
             async def process_document(doc_id: str, doc_chunks: List[TextChunk]) -> Any:
                 """Process a single document with concurrency control."""
@@ -185,15 +187,11 @@ class RelationHandler:
                         doc_entities = doc_entities_map[doc_id]
 
                         # Extract relations for this document's chunks and entities
-                        extraction_result = self.relation_extractor.extract(
-                            doc_chunks, doc_entities
-                        )
+                        extraction_result = self.relation_extractor.extract(doc_chunks, doc_entities)
                         if inspect.iscoroutine(extraction_result):
                             doc_relations = await extraction_result
                         else:
-                            doc_relations = (
-                                extraction_result if extraction_result is not None else []
-                            )
+                            doc_relations = extraction_result if extraction_result is not None else []
 
                         # Update text chunks with relation references (bidirectional linking)
                         chunk_map = {chunk.id: chunk for chunk in doc_chunks}
@@ -204,11 +202,19 @@ class RelationHandler:
 
                         # Cache relations for this document with entity context (use stable content-based keys)
                         doc_chunks_content = sorted([c.content.strip() for c in doc_chunks if c.content])
-                        doc_entities_content = sorted([
-                            (e.name.strip() if hasattr(e, "name") and e.name else "", 
-                             e.type.value if hasattr(e, "type") and hasattr(e.type, "value") else str(e.type) if hasattr(e, "type") else "")
-                            for e in doc_entities
-                        ])
+                        doc_entities_content = sorted(
+                            [
+                                (
+                                    e.name.strip() if hasattr(e, "name") and e.name else "",
+                                    (
+                                        e.type.value
+                                        if hasattr(e, "type") and hasattr(e.type, "value")
+                                        else str(e.type) if hasattr(e, "type") else ""
+                                    ),
+                                )
+                                for e in doc_entities
+                            ]
+                        )
                         doc_input = (tuple(doc_chunks_content), tuple(doc_entities_content))
                         doc_relations_key = f"doc_relations_{self.cache_manager.backend.generate_key(doc_input)}"
                         # Save relations with entity context for proper deserialization
@@ -225,10 +231,7 @@ class RelationHandler:
                         return []
 
             # Process all documents concurrently
-            tasks = [
-                process_document(doc_id, doc_chunks)
-                for doc_id, doc_chunks in doc_chunks_to_process.items()
-            ]
+            tasks = [process_document(doc_id, doc_chunks) for doc_id, doc_chunks in doc_chunks_to_process.items()]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -261,15 +264,11 @@ class RelationHandler:
         # Save step-level result for compatibility
         if use_cache:
             cache_input = (chunks, entities)
-            self.cache_manager.save_step_result(
-                BuildSteps.RELATION_EXTRACTION, cache_input, unique_relations
-            )
+            self.cache_manager.save_step_result(BuildSteps.RELATION_EXTRACTION, cache_input, unique_relations)
 
         return unique_relations
 
-    async def _extract_all_relations(
-        self, chunks: List[TextChunk], entities: List[Entity]
-    ) -> List[Relation]:
+    async def _extract_all_relations(self, chunks: List[TextChunk], entities: List[Entity]) -> List[Relation]:
         """Extract relations from all chunks without caching (fallback method)."""
         relations = await self.relation_extractor.extract(chunks, entities)
         return relations

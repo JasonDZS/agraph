@@ -12,9 +12,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 
 @router.post("", response_model=SearchResponse)
-async def search(
-    request: SearchRequest, agraph: Any = Depends(get_agraph_instance_dependency)
-) -> SearchResponse:
+async def search(request: SearchRequest, agraph: Any = Depends(get_agraph_instance_dependency)) -> SearchResponse:
     """Search entities, relations, or text chunks."""
     try:
         results = []

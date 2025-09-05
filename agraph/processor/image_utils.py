@@ -70,9 +70,7 @@ class ImagePreprocessor:
             raise ProcessingError(f"Failed to resize image {image_path}: {str(e)}") from e
 
     @staticmethod
-    def convert_to_rgb(
-        image_path: Union[str, Path], output_path: Optional[Union[str, Path]] = None
-    ) -> str:
+    def convert_to_rgb(image_path: Union[str, Path], output_path: Optional[Union[str, Path]] = None) -> str:
         """Convert image to RGB format for better compatibility.
 
         This method converts images to RGB color mode and JPEG format,
@@ -219,9 +217,7 @@ class ImagePreprocessor:
                 # Validate bounding box
                 left, top, right, bottom = bbox
                 if left < 0 or top < 0 or right > img.width or bottom > img.height:
-                    raise ValueError(
-                        f"Bounding box {bbox} is outside image dimensions {img.width}x{img.height}"
-                    )
+                    raise ValueError(f"Bounding box {bbox} is outside image dimensions {img.width}x{img.height}")
                 if left >= right or top >= bottom:
                     raise ValueError(f"Invalid bounding box {bbox}: left >= right or top >= bottom")
 
@@ -274,18 +270,14 @@ class ImagePreprocessor:
                     "size_bytes": file_size,
                     "aspect_ratio": round(img.width / img.height, 3) if img.height > 0 else 0,
                     "total_pixels": total_pixels,
-                    "estimated_quality": ImagePreprocessor._estimate_quality(
-                        total_pixels, file_size
-                    ),
+                    "estimated_quality": ImagePreprocessor._estimate_quality(total_pixels, file_size),
                     "has_transparency": img.mode in ("RGBA", "LA") or "transparency" in img.info,
                 }
         except Exception as e:
             raise ProcessingError(f"Failed to get image info for {image_path}: {str(e)}") from e
 
     @staticmethod
-    def _estimate_quality(
-        total_pixels: int, file_size: int  # pylint: disable=unused-argument
-    ) -> str:
+    def _estimate_quality(total_pixels: int, file_size: int) -> str:  # pylint: disable=unused-argument
         """Estimate image quality based on pixel count and file size.
 
         Args:
@@ -388,9 +380,7 @@ class ImagePreprocessor:
             final_path = resized_path
             quality = 85
 
-            while (
-                ImagePreprocessor.is_image_too_large(final_path, max_file_size_mb) and quality > 20
-            ):
+            while ImagePreprocessor.is_image_too_large(final_path, max_file_size_mb) and quality > 20:
                 try:
                     from PIL import Image  # pylint: disable=import-outside-toplevel
 

@@ -9,9 +9,7 @@ from loguru import logger as _logger  # pylint: disable=import-error
 PRINT_LEVEL = "INFO"
 
 
-def define_log_level(
-    print_level: str = "INFO", logfile_level: str = "DEBUG", name: Optional[str] = None
-) -> Any:
+def define_log_level(print_level: str = "INFO", logfile_level: str = "DEBUG", name: Optional[str] = None) -> Any:
     """Adjust the log level to above level."""
     global PRINT_LEVEL  # pylint: disable=global-statement
     PRINT_LEVEL = print_level

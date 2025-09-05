@@ -64,9 +64,7 @@ class OpenAIEmbeddingFunction:
             **kwargs: Additional parameters passed to OpenAI client
         """
         if not OPENAI_AVAILABLE:
-            raise EmbeddingFunctionError(
-                "OpenAI is not installed. Please install it with: pip install openai>=1.99.9"
-            )
+            raise EmbeddingFunctionError("OpenAI is not installed. Please install it with: pip install openai>=1.99.9")
 
         # Get configuration
         settings = get_settings()
@@ -180,9 +178,7 @@ class OpenAIEmbeddingFunction:
             start_time = time.time()
 
             try:
-                response = await self._client.embeddings.create(
-                    model=self.model, input=texts, encoding_format="float"
-                )
+                response = await self._client.embeddings.create(model=self.model, input=texts, encoding_format="float")
 
                 # Extract embedding vectors
                 embeddings = [data.embedding for data in response.data]
@@ -222,9 +218,7 @@ class OpenAIEmbeddingFunction:
         self._stats["total_tokens"] += token_count
 
         # Calculate average response time
-        total_time = (
-            self._stats["avg_response_time"] * (self._stats["total_requests"] - 1) + response_time
-        )
+        total_time = self._stats["avg_response_time"] * (self._stats["total_requests"] - 1) + response_time
         self._stats["avg_response_time"] = total_time / self._stats["total_requests"]
 
     def get_stats(self) -> Dict[str, Union[int, float]]:

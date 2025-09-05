@@ -100,9 +100,7 @@ async def test_agraph_api() -> None:
         if response.status_code == 200 and result["data"]["entities"]:
             print(f"Found {result['data']['total_count']} entities")
             for entity in result["data"]["entities"][:2]:  # Show first 2
-                print(
-                    f"  - {entity['name']} ({entity['entity_type']}): {entity['description'] or 'No description'}"
-                )
+                print(f"  - {entity['name']} ({entity['entity_type']}): {entity['description'] or 'No description'}")
 
         # 11. View cached relations
         print("\n11. Testing cached relations view...")
@@ -112,12 +110,8 @@ async def test_agraph_api() -> None:
         if response.status_code == 200 and result["data"]["relations"]:
             print(f"Found {result['data']['total_count']} relations")
             for relation in result["data"]["relations"][:2]:  # Show first 2
-                head_name = (
-                    relation["head_entity"]["name"] if relation["head_entity"] else "Unknown"
-                )
-                tail_name = (
-                    relation["tail_entity"]["name"] if relation["tail_entity"] else "Unknown"
-                )
+                head_name = relation["head_entity"]["name"] if relation["head_entity"] else "Unknown"
+                tail_name = relation["tail_entity"]["name"] if relation["tail_entity"] else "Unknown"
                 print(f"  - {head_name} --[{relation['relation_type']}]--> {tail_name}")
 
         # 12. View cached clusters
@@ -212,9 +206,7 @@ async def test_cache_viewing() -> None:
 
         # Test text chunks with filter
         print("\n1. Testing text chunks with filter...")
-        response = await client.get(
-            f"{base_url}/cache/text-chunks?filter_by=technology&page_size=3"
-        )
+        response = await client.get(f"{base_url}/cache/text-chunks?filter_by=technology&page_size=3")
         if response.status_code == 200:
             result = response.json()
             print(f"Found {result['data']['total_count']} text chunks matching 'technology'")
@@ -262,9 +254,7 @@ async def test_cache_viewing() -> None:
             for cluster in result["data"]["clusters"]:
                 print(f"  - Cluster: {cluster['name']}")
                 print(f"    Description: {cluster['description'] or 'No description'}")
-                print(
-                    f"    Contains {cluster['entity_count']} entities and {cluster['relation_count']} relations"
-                )
+                print(f"    Contains {cluster['entity_count']} entities and {cluster['relation_count']} relations")
                 if cluster["entities"]:
                     print("    Entities:")
                     for entity in cluster["entities"][:3]:  # Show first 3

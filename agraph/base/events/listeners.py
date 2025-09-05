@@ -60,25 +60,25 @@ class IndexUpdateListener(EventListener):
         Returns:
             Result indicating success or failure
         """
+        # pylint: disable=too-many-return-statements
         try:
             if event.event_type == EventType.ENTITY_ADDED:
                 return self._handle_entity_added(event)
-            elif event.event_type == EventType.ENTITY_UPDATED:
+            if event.event_type == EventType.ENTITY_UPDATED:
                 return self._handle_entity_updated(event)
-            elif event.event_type == EventType.ENTITY_REMOVED:
+            if event.event_type == EventType.ENTITY_REMOVED:
                 return self._handle_entity_removed(event)
-            elif event.event_type == EventType.RELATION_ADDED:
+            if event.event_type == EventType.RELATION_ADDED:
                 return self._handle_relation_added(event)
-            elif event.event_type == EventType.RELATION_UPDATED:
+            if event.event_type == EventType.RELATION_UPDATED:
                 return self._handle_relation_updated(event)
-            elif event.event_type == EventType.RELATION_REMOVED:
+            if event.event_type == EventType.RELATION_REMOVED:
                 return self._handle_relation_removed(event)
-            elif event.event_type == EventType.CLUSTER_ENTITY_ADDED:
+            if event.event_type == EventType.CLUSTER_ENTITY_ADDED:
                 return self._handle_cluster_entity_added(event)
-            elif event.event_type == EventType.CLUSTER_ENTITY_REMOVED:
+            if event.event_type == EventType.CLUSTER_ENTITY_REMOVED:
                 return self._handle_cluster_entity_removed(event)
-            else:
-                return Result.ok(True)  # Event not handled, but not an error
+            return Result.ok(True)  # Event not handled, but not an error
 
         except Exception as e:
             self.logger.error(f"Error handling event {event.event_type}: {str(e)}")
@@ -256,6 +256,7 @@ class CacheInvalidationListener(EventListener):
         Returns:
             Result indicating success or failure
         """
+        # pylint: disable=too-many-return-statements
         try:
             if event.event_type in {
                 EventType.ENTITY_ADDED,
@@ -263,33 +264,30 @@ class CacheInvalidationListener(EventListener):
                 EventType.ENTITY_REMOVED,
             }:
                 return self._handle_entity_change(event)
-            elif event.event_type in {
+            if event.event_type in {
                 EventType.RELATION_ADDED,
                 EventType.RELATION_UPDATED,
                 EventType.RELATION_REMOVED,
             }:
                 return self._handle_relation_change(event)
-            elif event.event_type in {
+            if event.event_type in {
                 EventType.CLUSTER_ADDED,
                 EventType.CLUSTER_UPDATED,
                 EventType.CLUSTER_REMOVED,
             }:
                 return self._handle_cluster_change(event)
-            elif event.event_type in {
+            if event.event_type in {
                 EventType.TEXT_CHUNK_ADDED,
                 EventType.TEXT_CHUNK_UPDATED,
                 EventType.TEXT_CHUNK_REMOVED,
             }:
                 return self._handle_text_chunk_change(event)
-            elif event.event_type == EventType.GRAPH_CLEARED:
+            if event.event_type == EventType.GRAPH_CLEARED:
                 return self._handle_graph_cleared(event)
-            else:
-                return Result.ok(True)  # Event not handled, but not an error
+            return Result.ok(True)  # Event not handled, but not an error
 
         except Exception as e:
-            self.logger.error(
-                f"Error handling cache invalidation for event {event.event_type}: {str(e)}"
-            )
+            self.logger.error(f"Error handling cache invalidation for event {event.event_type}: {str(e)}")
             return Result.internal_error(e)
 
     def _handle_entity_change(self, event: GraphEvent) -> Result[bool]:
@@ -440,20 +438,17 @@ class IntegrityCheckListener(EventListener):
         try:
             if event.event_type == EventType.ENTITY_REMOVED:
                 return self._check_dangling_relations(event)
-            elif event.event_type == EventType.RELATION_ADDED:
+            if event.event_type == EventType.RELATION_ADDED:
                 return self._check_relation_validity(event)
-            elif event.event_type in {
+            if event.event_type in {
                 EventType.CLUSTER_ENTITY_ADDED,
                 EventType.CLUSTER_ENTITY_REMOVED,
             }:
                 return self._check_cluster_consistency(event)
-            else:
-                return Result.ok(True)  # Event not handled, but not an error
+            return Result.ok(True)  # Event not handled, but not an error
 
         except Exception as e:
-            self.logger.error(
-                f"Error performing integrity check for event {event.event_type}: {str(e)}"
-            )
+            self.logger.error(f"Error performing integrity check for event {event.event_type}: {str(e)}")
             return Result.internal_error(e)
 
     def _check_dangling_relations(self, event: GraphEvent) -> Result[bool]:
@@ -471,7 +466,7 @@ class IntegrityCheckListener(EventListener):
             head_id = getattr(relation.head_entity, "id", None) if relation.head_entity else None
             tail_id = getattr(relation.tail_entity, "id", None) if relation.tail_entity else None
 
-            if head_id == entity_id or tail_id == entity_id:
+            if entity_id in (head_id, tail_id):
                 dangling_relations.append(relation_id)
                 self.integrity_issues.append(
                     {
@@ -483,9 +478,7 @@ class IntegrityCheckListener(EventListener):
                 )
 
         if dangling_relations:
-            self.logger.warning(
-                f"Found {len(dangling_relations)} dangling relations after removing entity {entity_id}"
-            )
+            self.logger.warning(f"Found {len(dangling_relations)} dangling relations after removing entity {entity_id}")
             # In a production system, you might want to automatically clean up these relations
             # or trigger a separate cleanup process
 
@@ -634,21 +627,21 @@ def setup_default_listeners(
     if index_manager:
         index_listener = create_index_update_listener(index_manager)
         result = event_manager.subscribe(index_listener)
-        if result.is_ok():
+        if result.is_ok() and result.data:
             subscriptions["index_update"] = result.data
 
     # Set up cache invalidation listener
     if cache_manager:
         cache_listener = create_cache_invalidation_listener(cache_manager)
         result = event_manager.subscribe(cache_listener)
-        if result.is_ok():
+        if result.is_ok() and result.data:
             subscriptions["cache_invalidation"] = result.data
 
     # Set up integrity check listener
     if dao_layer:
         integrity_listener = create_integrity_check_listener(dao_layer)
         result = event_manager.subscribe(integrity_listener)
-        if result.is_ok():
+        if result.is_ok() and result.data:
             subscriptions["integrity_check"] = result.data
 
     return subscriptions

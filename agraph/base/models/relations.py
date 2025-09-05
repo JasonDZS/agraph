@@ -14,7 +14,7 @@ from ...utils import get_type_value
 from ..core.base import GraphNodeBase, TextChunkMixin
 from ..core.mixins import PropertyMixin
 from ..core.types import RelationType, RelationTypeType
-from .positioning import PositionMixin
+from .positioning import Position, PositionMixin
 
 if TYPE_CHECKING:
     from .entities import Entity
@@ -35,9 +35,7 @@ class Relation(GraphNodeBase, TextChunkMixin, PropertyMixin, PositionMixin):
 
     head_entity: Optional["Entity"] = Field(default=None, description="Source entity")
     tail_entity: Optional["Entity"] = Field(default=None, description="Target entity")
-    relation_type: RelationTypeType = Field(
-        default=RelationType.RELATED_TO, description="Relation type"
-    )
+    relation_type: RelationTypeType = Field(default=RelationType.RELATED_TO, description="Relation type")
     description: str = Field(default="", description="Human-readable description")
     properties: Dict[str, Any] = Field(default_factory=dict, description="Additional properties")
     text_chunks: set = Field(default_factory=set, description="Connected text chunk IDs")
@@ -58,11 +56,7 @@ class Relation(GraphNodeBase, TextChunkMixin, PropertyMixin, PositionMixin):
         Returns:
             bool: True if the relation is valid, False otherwise.
         """
-        return (
-            self.head_entity is not None
-            and self.tail_entity is not None
-            and self.head_entity != self.tail_entity
-        )
+        return self.head_entity is not None and self.tail_entity is not None and self.head_entity != self.tail_entity
 
     def reverse(self) -> "Relation":
         """Create a reverse relation.
@@ -193,8 +187,6 @@ class Relation(GraphNodeBase, TextChunkMixin, PropertyMixin, PositionMixin):
 
         # Set position information if available
         if "position" in data and data["position"] is not None:
-            from .positioning import Position  # Import here to avoid circular imports
-
             relation.position = Position.from_dict(data["position"])
 
         if "created_at" in data:

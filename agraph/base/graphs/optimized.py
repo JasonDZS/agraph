@@ -24,7 +24,6 @@ from ..models.relations import Relation
 from ..models.text import TextChunk
 
 
-
 class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
     """
     Optimized knowledge graph with indexing and caching support.
@@ -45,9 +44,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
     entities: Dict[str, Entity] = Field(default_factory=dict, description="Entity storage")
     relations: Dict[str, Relation] = Field(default_factory=dict, description="Relation storage")
     clusters: Dict[str, Cluster] = Field(default_factory=dict, description="Cluster storage")
-    text_chunks: Dict[str, TextChunk] = Field(
-        default_factory=dict, description="Text chunk storage"
-    )
+    text_chunks: Dict[str, TextChunk] = Field(default_factory=dict, description="Text chunk storage")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Graph metadata")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
     updated_at: datetime = Field(default_factory=datetime.now, description="Update timestamp")
@@ -67,9 +64,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         self.cache_manager = CacheManager(max_size=2000, default_ttl=300)  # 5 min default TTL
 
         # Initialize optimized managers
-        self._entity_manager = OptimizedEntityManager(
-            self.entities, self.touch, self.index_manager, self.cache_manager
-        )
+        self._entity_manager = OptimizedEntityManager(self.entities, self.touch, self.index_manager, self.cache_manager)
         self._relation_manager = OptimizedRelationManager(
             self.relations, self.touch, self.index_manager, self.cache_manager
         )
@@ -111,9 +106,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 
     def remove_entity(self, entity_id: str) -> bool:
         """Remove an entity from the knowledge graph (optimized)."""
-        result = self._entity_manager.remove_entity(
-            entity_id, self.relations, self.clusters, self.text_chunks
-        )
+        result = self._entity_manager.remove_entity(entity_id, self.relations, self.clusters, self.text_chunks)
         self._performance_metrics["total_operations"] += 1
         return result
 
@@ -137,9 +130,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 
     def remove_relation(self, relation_id: str) -> bool:
         """Remove a relation from the knowledge graph (optimized)."""
-        result = self._relation_manager.remove_relation(
-            relation_id, self.clusters, self.text_chunks
-        )
+        result = self._relation_manager.remove_relation(relation_id, self.clusters, self.text_chunks)
         self._performance_metrics["total_operations"] += 1
         return result
 
@@ -248,18 +239,13 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
             "index_statistics": self.index_manager.get_statistics(),
             "cache_statistics": self.cache_manager.get_statistics(),
             "optimization_summary": {
-                "total_index_hits": (
-                    entity_metrics.get("index_hits", 0) + relation_metrics.get("index_hits", 0)
-                ),
-                "total_cache_hits": (
-                    entity_metrics.get("cache_hits", 0) + relation_metrics.get("cache_hits", 0)
-                ),
+                "total_index_hits": (entity_metrics.get("index_hits", 0) + relation_metrics.get("index_hits", 0)),
+                "total_cache_hits": (entity_metrics.get("cache_hits", 0) + relation_metrics.get("cache_hits", 0)),
                 "average_operation_time": (
                     (entity_metrics.get("total_time", 0) + relation_metrics.get("total_time", 0))
                     / max(
                         1,
-                        entity_metrics.get("operations_count", 0)
-                        + relation_metrics.get("operations_count", 0),
+                        entity_metrics.get("operations_count", 0) + relation_metrics.get("operations_count", 0),
                     )
                 ),
             },
@@ -337,9 +323,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
 
     def get_clusters_by_type(self, cluster_type: Union[ClusterType, str]) -> List[Cluster]:
         """Get all clusters of a specific type."""
-        return [
-            cluster for cluster in self.clusters.values() if cluster.cluster_type == cluster_type
-        ]
+        return [cluster for cluster in self.clusters.values() if cluster.cluster_type == cluster_type]
 
     # Text Chunk Management (unchanged but using optimized base)
     def add_text_chunk(self, text_chunk: TextChunk) -> None:
@@ -467,9 +451,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         for cluster in self.clusters.values():
             for entity_id in cluster.entities:
                 if entity_id not in self.entities:
-                    errors.append(
-                        f"Cluster {cluster.id} references non-existent entity {entity_id}"
-                    )
+                    errors.append(f"Cluster {cluster.id} references non-existent entity {entity_id}")
         return errors
 
     def _validate_text_chunk_references(self) -> List[str]:
@@ -478,14 +460,10 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         for chunk in self.text_chunks.values():
             for entity_id in chunk.entities:
                 if entity_id not in self.entities:
-                    errors.append(
-                        f"TextChunk {chunk.id} references non-existent entity {entity_id}"
-                    )
+                    errors.append(f"TextChunk {chunk.id} references non-existent entity {entity_id}")
             for relation_id in chunk.relations:
                 if relation_id not in self.relations:
-                    errors.append(
-                        f"TextChunk {chunk.id} references non-existent relation {relation_id}"
-                    )
+                    errors.append(f"TextChunk {chunk.id} references non-existent relation {relation_id}")
         return errors
 
     # SerializableMixin abstract methods implementation
@@ -575,9 +553,7 @@ class KnowledgeGraph(BaseModel, SerializableMixin, ImportExportMixin):
         # Rebuild relation indexes
         for relation_id, relation in self.relations.items():
             if relation.head_entity and relation.tail_entity:
-                self.index_manager.add_relation_to_index(
-                    relation_id, relation.head_entity.id, relation.tail_entity.id
-                )
+                self.index_manager.add_relation_to_index(relation_id, relation.head_entity.id, relation.tail_entity.id)
 
     # ImportExportMixin abstract methods implementation
     def _export_data(self) -> Dict[str, Any]:

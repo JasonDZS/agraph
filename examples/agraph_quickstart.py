@@ -1,41 +1,39 @@
 #!/usr/bin/env python3
 """
-AGraph 快速开始示例 (Pipeline架构版本)
+AGraph 快速开始示例 (统一配置版本)
 
-这是一个使用新Pipeline架构的AGraph示例，展示了增强功能：
-1. 创建AGraph实例 (使用Pipeline架构)
-2. 从文本构建知识图谱 (83%性能提升)
-3. 进行语义搜索
-4. 智能问答对话
+这是一个使用新统一配置系统的AGraph示例，展示了简化的配置方式：
+1. 统一的Settings配置管理
+2. 简化的AGraph初始化 (只需传入settings)
+3. 从文本构建知识图谱
+4. 进行语义搜索
+5. 智能问答对话
 
-适合了解AGraph Pipeline架构的强大功能和性能提升。
+适合了解AGraph统一配置系统的强大功能和简化使用方式。
 """
 
 import asyncio
 import sys
 import time
 from pathlib import Path
-from agraph import AGraph, get_settings
-from agraph.config import update_settings, save_config_to_workdir
-# Import pipeline components for advanced features demonstration  
-from agraph import KnowledgeGraphBuilder
+from agraph import AGraph
+from agraph.config import get_settings, update_settings
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# 设置工作目录并保存配置
+# 设置工作目录并更新配置
 workdir = str(project_root / "workdir" / "agraph_quickstart-cache")
-update_settings({"workdir": workdir})
-
-# 保存配置到工作目录
-try:
-    config_path = save_config_to_workdir()
-    print(f"✅ 配置已保存到: {config_path}")
-except Exception as e:
-    print(f"⚠️  配置保存失败: {e}")
-
 settings = get_settings()
+settings = update_settings({"workdir": workdir, "llm_config": {"model": "Qwen/Qwen3-32B"}})
+
+print(f"✅ 使用工作目录: {settings.workdir}")
+print(f"📋 配置概览:")
+print(f"   - LLM模型: {settings.llm.model}")
+print(f"   - 嵌入模型: {settings.embedding.model}")
+print(f"   - 最大并发: {settings.max_current}")
+print(f"   - 缓存设置: TTL={settings.cache_config['cache_ttl']}s")
 
 async def quickstart_demo():
     """AGraph快速开始演示"""
@@ -80,28 +78,27 @@ async def quickstart_demo():
     else:
         print(f"✅ 成功读取 {len(sample_texts)} 个文档")
 
-    # 1. 创建AGraph实例并初始化 (Pipeline架构)
-    print("\n📦 1. 初始化AGraph (Pipeline架构)...")
-    print("   🏗️ 使用新的Pipeline架构 (83%复杂度降低)")
-    print("   ⚡ 智能缓存和错误恢复")
-    print("   📊 详细的性能监控和指标")
-    async with AGraph(
-        collection_name="quickstart_demo",
-        persist_directory=settings.workdir,  # 使用工作目录下的向量存储
-        vector_store_type="chroma",
-        use_openai_embeddings=True,
-        enable_knowledge_graph=True,  # 启用知识图谱功能
-    ) as agraph:
+    # 1. 创建AGraph实例并初始化 (自动配置保存)
+    print("\n📦 1. 初始化AGraph (自动配置保存)...")
+    print("   🔧 使用统一Settings配置系统")
+    print("   ⚡ 简化初始化过程 (自动保存配置到workdir)")
+    print("   📋 自动从配置数据中获取所有参数")
+    async with AGraph(collection_name="quickstart_demo") as agraph:
         await agraph.initialize()
-        print("✅ AGraph初始化成功 (内部使用Pipeline架构)")
+        print("✅ AGraph初始化成功 (使用统一配置系统)")
+        print(f"   🗺️ 持久化目录: {agraph.persist_directory}")
+        print(f"   💾 向量存储类型: {agraph.vector_store_type}")
+        print(f"   🧠 启用知识图谱: {agraph.enable_knowledge_graph}")
+        print(f"   🌐 嵌入提供者: {settings.embedding.provider}")
 
-        # 2. 从文本构建知识图谱 (使用Pipeline架构)
-        print("\n🏗️ 2. 构建知识图谱 (Pipeline架构)...")
-        print("   📋 Pipeline步骤: 文本分块 → 实体提取 → 关系提取 → 聚类 → 组装")
+        # 2. 从文本构建知识图谱 (使用统一配置)
+        print("\n🏗️ 2. 构建知识图谱 (统一配置)...")
+        print(f"   📋 处理配置: 块大小={settings.processing_config['chunk_size']}, 重叠={settings.processing_config['chunk_overlap']}")
+        print(f"   🎯 提取配置: 实体置信度={settings.extraction_config['entity_confidence_threshold']}, 关系置信度={settings.extraction_config['relation_confidence_threshold']}")
         try:
             graph_name = "企业文档知识图谱"
             graph_description = "基于企业文档构建的综合知识图谱"
-            
+
             start_time = time.time()
             knowledge_graph = await agraph.build_from_texts(
                 texts=sample_texts,
@@ -113,13 +110,14 @@ async def quickstart_demo():
             build_time = time.time() - start_time
 
             print("✅ 知识图谱构建成功!")
-            print(f"   ⏱️ 构建时间: {build_time:.2f}秒 (Pipeline优化)")
+            print(f"   ⏱️ 构建时间: {build_time:.2f}秒 (统一配置优化)")
             print(f"   📊 实体: {len(knowledge_graph.entities)} 个")
             print(f"   🔗 关系: {len(knowledge_graph.relations)} 个")
             print(f"   📄 文本块: {len(knowledge_graph.text_chunks)} 个")
 
         except Exception as e:
             print(f"⚠️  知识图谱构建遇到问题: {e}")
+            print(f"   📋 当前配置: {settings.get_all_configs()['core']}")
 
         # 3. 语义搜索演示
         print("\n🔍 3. 语义搜索演示...")
@@ -161,17 +159,18 @@ async def quickstart_demo():
                         print(f"\n完整回答: {chunk_data['answer']}")
                         break
 
-                # 显示检索统计
+                # 显示检索统计和配置信息
                 context = chunk_data['context']
                 entity_count = len(context.get('entities', []))
                 chunk_count = len(context.get('text_chunks', []))
                 print(f"   📊 检索了 {entity_count} 个实体, {chunk_count} 个文档")
+                print(f"   ⚙️ 使用的LLM配置: {settings.llm.model} (temp={settings.llm.temperature})")
 
             except Exception as e:
                 print(f"🤖 回答: 抱歉，无法回答这个问题: {e}")
 
-        # 5. 系统信息
-        print("\n📊 5. 系统信息...")
+        # 5. 系统信息和配置概览
+        print("\n📊 5. 系统信息和统一配置...")
         stats = await agraph.get_stats()
 
         if 'vector_store' in stats:
@@ -181,14 +180,25 @@ async def quickstart_demo():
             print(f"   - 关系: {vs_stats.get('relations', 0)}")
             print(f"   - 文本块: {vs_stats.get('text_chunks', 0)}")
 
+        # 显示统一配置概览
+        print("\n统一配置概览:")
+        all_configs = settings.get_all_configs()
+        print(f"   - 核心配置: {all_configs['core']}")
+        print(f"   - 缓存配置: {all_configs['unified_views']['cache']}")
+        print(f"   - 处理配置: {all_configs['unified_views']['processing']}")
+
         print(f"\n系统状态: {agraph}")
 
-    print("\n✅ 快速开始演示完成!")
+    print("\n✅ 快速开始演示完成 (统一配置版本)!")
+    print("🔧 体验了AGraph统一配置系统的强大功能:")
+    print("   - 简化的初始化过程 (只需传入settings)")
+    print("   - 统一的配置管理和访问")
+    print("   - 自动化的参数派生和优化")
 
 
 def main():
     """主函数"""
-    print("🎯 启动AGraph快速开始演示...")
+    print("🎯 启动AGraph快速开始演示 (统一配置版本)...")
 
     # 检查Python版本
     if sys.version_info < (3, 7):

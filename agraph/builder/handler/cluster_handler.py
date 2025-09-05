@@ -26,9 +26,7 @@ class ClusterHandler:
         self.cache_manager = cache_manager
         self.cluster_algorithm = cluster_algorithm
 
-    def form_clusters(
-        self, entities: List[Entity], relations: List[Relation], use_cache: bool = True
-    ) -> List[Cluster]:
+    def form_clusters(self, entities: List[Entity], relations: List[Relation], use_cache: bool = True) -> List[Cluster]:
         """Form clusters from entities and relations.
 
         Args:
@@ -47,9 +45,7 @@ class ClusterHandler:
         cache_input = (entities, relations)
 
         if use_cache:
-            cached_result = self.cache_manager.get_step_result(
-                BuildSteps.CLUSTER_FORMATION, cache_input, list
-            )
+            cached_result = self.cache_manager.get_step_result(BuildSteps.CLUSTER_FORMATION, cache_input, list)
             if cached_result is not None:
                 logger.info(
                     f"Using cached cluster formation results for {len(entities)} entities "

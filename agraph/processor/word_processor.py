@@ -85,8 +85,7 @@ class WordProcessor(DocumentProcessor):
             import docx  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise ProcessingError(
-                "python-docx is required for .docx processing. "
-                "Install with: pip install python-docx"
+                "python-docx is required for .docx processing. " "Install with: pip install python-docx"
             ) from exc
 
         try:
@@ -137,9 +136,7 @@ class WordProcessor(DocumentProcessor):
 
         return table_rows
 
-    def _process_doc_file(
-        self, file_path: Path, **kwargs: Any  # pylint: disable=unused-argument
-    ) -> str:
+    def _process_doc_file(self, file_path: Path, **kwargs: Any) -> str:  # pylint: disable=unused-argument
         """Process .doc files using docx2txt or antiword fallback.
 
         Args:
