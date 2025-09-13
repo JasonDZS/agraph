@@ -1,6 +1,6 @@
 [project]
 name = "agraph"
-version = "0.2.2"
+version = "0.2.3"
 description = "A knowledge graph toolkit for entity and relation management"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "chromadb<1.0",
+    "chromadb>=1.0.21",
     "loguru>=0.7.3",
     "matplotlib>=3.10.5",
     "networkx>=3.2",
@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vectordb = ["chromadb>=0.5.0"]
+vectordb = []
 jupyter = ["nest-asyncio>=1.5.0"]
 api = [
     "fastapi>=0.104.0",
@@ -155,7 +155,3 @@ exclude_lines = [
     "raise NotImplementedError",
 ]
 
-[tool.uv.workspace]
-members = [
-    "agraph",
-]

@@ -116,7 +116,7 @@ class ChromaVectorStore(VectorStore, EmbeddingStatsMixin, HybridSearchMixin):
                     collection = self._client.get_collection(
                         name=collection_name, embedding_function=self.embedding_function
                     )
-                except (ValueError, chromadb.errors.InvalidCollectionException):
+                except (ValueError, chromadb.errors.NotFoundError):
                     # Collection doesn't exist, create new collection
                     collection = self._client.create_collection(
                         name=collection_name, embedding_function=self.embedding_function

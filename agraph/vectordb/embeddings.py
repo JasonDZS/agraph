@@ -392,3 +392,22 @@ class ChromaEmbeddingFunction:
             List of embedding vectors
         """
         return self.embedding_function(input)
+
+    @staticmethod
+    def name() -> str:
+        """Return the name of the embedding function."""
+        return "custom_openai_embedding"
+
+    def get_config(self) -> Dict[str, Any]:
+        """Return the config for the embedding function."""
+        return {
+            "name": self.name(),
+            "model": getattr(self.embedding_function, 'model', 'text-embedding-ada-002')
+        }
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "ChromaEmbeddingFunction":
+        """Build the embedding function from a config."""
+        # This would need to be implemented properly for full serialization support
+        _ = config  # Suppress unused parameter warning
+        raise NotImplementedError("build_from_config not implemented for ChromaEmbeddingFunction")
