@@ -9,10 +9,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .. import get_version
 from ..logger import logger
 from .dependencies import close_agraph_instance, get_agraph_instance
 from .models import ErrorResponse, HealthResponse, ResponseStatus
-from .. import get_version
 from .routers import (
     cache_router,
     chat_router,

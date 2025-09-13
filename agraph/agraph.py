@@ -725,17 +725,17 @@ class AGraph:
 
     def delete_chroma_files(self) -> bool:
         """Delete ChromaDB persistent files from disk.
-        
+
         Returns:
             True if files were deleted or didn't exist, False if deletion failed.
         """
         try:
             import os
             import shutil
-            
+
             # ChromaDB persistent directory path
             chroma_dir = os.path.join(self.persist_directory, "chroma")
-            
+
             if os.path.exists(chroma_dir):
                 # Delete all contents inside the chroma directory, but keep the directory itself
                 for filename in os.listdir(chroma_dir):
@@ -747,11 +747,11 @@ class AGraph:
                             shutil.rmtree(file_path)
                     except Exception as e:
                         logger.warning(f"Failed to delete {file_path}: {e}")
-                
+
                 logger.info(f"ChromaDB persistent files content deleted from: {chroma_dir}")
             else:
                 logger.info(f"No ChromaDB persistent directory found: {chroma_dir}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to delete ChromaDB files: {e}")
@@ -759,7 +759,7 @@ class AGraph:
 
     def delete_knowledge_graph_from_disk(self) -> bool:
         """Delete knowledge graph file from disk.
-        
+
         Returns:
             True if file was deleted or didn't exist, False if deletion failed.
         """
@@ -767,13 +767,13 @@ class AGraph:
             # Get knowledge graph file path
             kg_storage_dir = os.path.join(self.persist_directory, "knowledge_graphs")
             kg_file_path = os.path.join(kg_storage_dir, f"{self.collection_name}_kg.json")
-            
+
             if os.path.exists(kg_file_path):
                 os.remove(kg_file_path)
                 logger.info(f"Knowledge graph file deleted: {kg_file_path}")
             else:
                 logger.info(f"No knowledge graph file found to delete: {kg_file_path}")
-            
+
             # Also try to remove the storage directory if it's empty
             try:
                 if os.path.exists(kg_storage_dir) and not os.listdir(kg_storage_dir):
@@ -782,7 +782,7 @@ class AGraph:
             except OSError:
                 # Directory not empty or other issues, ignore
                 pass
-                
+
             return True
         except Exception as e:
             logger.error(f"Failed to delete knowledge graph from disk: {e}")
@@ -1227,8 +1227,10 @@ class AGraph:
 
             # Clear in-memory knowledge graph
             self.knowledge_graph = None
-            
-            logger.info("All data cleared including disk files and ChromaDB persistent files, vector store reinitialized")
+
+            logger.info(
+                "All data cleared including disk files and ChromaDB persistent files, vector store reinitialized"
+            )
             return True
 
         except Exception as e:

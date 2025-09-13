@@ -100,10 +100,10 @@ async def build_knowledge_graph(
         # Get project-specific instances
         agraph = await get_agraph_instance(project_name)
         doc_manager = get_document_manager(project_name)
-        
+
         # Set knowledge graph enablement based on request
         agraph.enable_knowledge_graph = request.enable_graph
-        
+
         texts_to_process = []
         document_info = []
 
@@ -1147,7 +1147,7 @@ async def delete_knowledge_graph(
     try:
         # Get project-specific instance
         agraph = await get_agraph_instance(project_name)
-        
+
         if not agraph.has_knowledge_graph:
             return KnowledgeGraphStatusResponse(
                 status=ResponseStatus.SUCCESS,
@@ -1170,10 +1170,10 @@ async def delete_knowledge_graph(
             "text_chunks": len(kg.text_chunks) if kg else 0,
         }
         graph_name = kg.name if kg else "Unknown"
-        
+
         # Clear all knowledge graph data
         success = await agraph.clear_all()
-        
+
         if success:
             logger.info(f"Knowledge graph '{graph_name}' deleted successfully")
             return KnowledgeGraphStatusResponse(

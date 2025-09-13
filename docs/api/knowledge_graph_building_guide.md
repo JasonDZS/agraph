@@ -606,7 +606,7 @@ curl -X POST "http://localhost:8000/documents/upload?project_name=my_knowledge_b
         }
       },
       {
-        "id": "doc_002", 
+        "id": "doc_002",
         "filename": "document2.docx",
         "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "size": 512000

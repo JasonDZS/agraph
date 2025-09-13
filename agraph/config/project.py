@@ -17,8 +17,9 @@ from .settings import Settings, get_settings, update_settings
 try:
     # Try to get version from parent module
     import sys
-    parent_module = sys.modules.get('agraph')
-    if parent_module and hasattr(parent_module, '__version__'):
+
+    parent_module = sys.modules.get("agraph")
+    if parent_module and hasattr(parent_module, "__version__"):
         __version__ = parent_module.__version__
     else:
         __version__ = "0.2.2"  # Fallback version

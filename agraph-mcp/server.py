@@ -44,22 +44,22 @@ logger = logging.getLogger("agraph-mcp")
 
 class AGraphMCPServer:
     """MCP Server for AGraph Knowledge Graph using direct AGraph instances"""
-    
+
     def __init__(self):
         # Validate configuration
         try:
             config.validate()
         except ValueError as e:
             raise ConfigurationError(f"Invalid configuration: {e}")
-        
+
         self.server = Server("agraph-mcp")
         self.agraph: Optional[AGraph] = None
         self._is_initialized = False
         self.setup_handlers()
-    
+
     def setup_handlers(self):
         """Setup MCP handlers"""
-        
+
         @self.server.list_tools()
         async def handle_list_tools() -> List[Tool]:
             """List available tools"""
@@ -273,17 +273,17 @@ class AGraphMCPServer:
             collection_name is None or self.agraph.collection_name == collection_name
         ):
             return
-        
+
         try:
             # Use collection_name or default
             collection = collection_name or config.default_collection
-            
+
             # Create settings from config
             settings = get_settings()
             settings.workdir = config.workdir
-            
+
             logger.info(f"Initializing AGraph with collection: {collection}")
-            
+
             # Create AGraph instance
             self.agraph = AGraph(
                 settings=settings,
@@ -292,13 +292,13 @@ class AGraphMCPServer:
                 vector_store_type=config.vector_store_type,
                 enable_knowledge_graph=True
             )
-            
+
             # Initialize the AGraph instance
             await self.agraph.initialize()
-            
+
             self._is_initialized = True
             logger.info(f"AGraph initialized successfully with collection: {collection}")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize AGraph: {e}")
             raise AGraphMCPError(f"AGraph initialization failed: {e}")
@@ -307,15 +307,15 @@ class AGraphMCPServer:
         """Get knowledge graph status"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get statistics from AGraph
             stats = await self.agraph.get_stats()
-            
+
             # Format the response nicely
             collection = self.agraph.collection_name
             status_text = f"# Knowledge Graph Status for '{collection}'\n\n"
-            
+
             # Basic information
             status_text += "## Basic Information\n"
             status_text += f"- **Collection Name**: {collection}\n"
@@ -323,7 +323,7 @@ class AGraphMCPServer:
             status_text += f"- **Enable Knowledge Graph**: {self.agraph.enable_knowledge_graph}\n"
             status_text += f"- **Initialized**: {self.agraph.is_initialized}\n"
             status_text += f"- **Has Knowledge Graph**: {self.agraph.has_knowledge_graph}\n\n"
-            
+
             # Knowledge graph statistics
             if stats.get("knowledge_graph"):
                 kg_stats = stats["knowledge_graph"]
@@ -332,33 +332,33 @@ class AGraphMCPServer:
                 status_text += f"- **Relations**: {kg_stats.get('relations', 0)}\n"
                 status_text += f"- **Clusters**: {kg_stats.get('clusters', 0)}\n"
                 status_text += f"- **Text Chunks**: {kg_stats.get('text_chunks', 0)}\n\n"
-            
+
             # Get entity type distribution if available
             if self.agraph.knowledge_graph and self.agraph.knowledge_graph.entities:
                 entity_types = {}
                 for entity in self.agraph.knowledge_graph.entities.values():
                     entity_type = entity.entity_type.value if entity.entity_type else "OTHER"
                     entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
-                
+
                 if entity_types:
                     status_text += "## Entity Types Distribution\n"
                     for entity_type, count in entity_types.items():
                         status_text += f"- **{entity_type}**: {count}\n"
                     status_text += "\n"
-            
+
             # Get relation type distribution if available
             if self.agraph.knowledge_graph and self.agraph.knowledge_graph.relations:
                 relation_types = {}
                 for relation in self.agraph.knowledge_graph.relations.values():
                     relation_type = relation.relation_type.value if relation.relation_type else "OTHER"
                     relation_types[relation_type] = relation_types.get(relation_type, 0) + 1
-                
+
                 if relation_types:
                     status_text += "## Relation Types Distribution\n"
                     for relation_type, count in relation_types.items():
                         status_text += f"- **{relation_type}**: {count}\n"
                     status_text += "\n"
-            
+
             # Vector store statistics
             if stats.get("vector_store"):
                 vs_stats = stats["vector_store"]
@@ -366,9 +366,9 @@ class AGraphMCPServer:
                 for key, value in vs_stats.items():
                     status_text += f"- **{key}**: {value}\n"
                 status_text += "\n"
-            
+
             return [TextContent(type="text", text=status_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to get knowledge graph status: {e}")
             return [TextContent(type="text", text=f"Failed to get knowledge graph status: {str(e)}")]
@@ -377,18 +377,18 @@ class AGraphMCPServer:
         """Search entities"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get parameters
             entity_type = arguments.get("entity_type")
             limit = arguments.get("limit", config.default_entity_limit)
             offset = arguments.get("offset", 0)
-            
+
             if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.entities:
                 return [TextContent(type="text", text="No entities found in the knowledge graph.")]
-            
+
             entities = list(self.agraph.knowledge_graph.entities.values())
-            
+
             # Filter by entity type if specified
             if entity_type:
                 try:
@@ -396,32 +396,32 @@ class AGraphMCPServer:
                     entities = [e for e in entities if e.entity_type == entity_type_enum]
                 except ValueError:
                     return [TextContent(type="text", text=f"Invalid entity type: {entity_type}")]
-            
+
             # Apply pagination
             total_count = len(entities)
             entities = entities[offset:offset + limit]
-            
+
             response_text = f"# Entity Search Results\n\n"
             response_text += f"**Found**: {total_count} entities\n"
             response_text += f"**Showing**: {len(entities)} entities (offset: {offset})\n\n"
-            
+
             for entity in entities:
                 response_text += f"## {entity.name}\n"
                 response_text += f"- **ID**: {entity.id}\n"
                 response_text += f"- **Type**: {entity.entity_type.value if entity.entity_type else 'N/A'}\n"
                 response_text += f"- **Description**: {entity.description or 'N/A'}\n"
                 response_text += f"- **Confidence**: {entity.confidence}\n"
-                
+
                 if entity.aliases:
                     response_text += f"- **Aliases**: {', '.join(entity.aliases)}\n"
-                
+
                 if entity.properties:
                     response_text += f"- **Properties**: {json.dumps(entity.properties, ensure_ascii=False)}\n"
-                
+
                 response_text += "\n"
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to search entities: {e}")
             return [TextContent(type="text", text=f"Failed to search entities: {str(e)}")]
@@ -430,19 +430,19 @@ class AGraphMCPServer:
         """Search relations"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get parameters
             relation_type = arguments.get("relation_type")
             entity_id = arguments.get("entity_id")
             limit = arguments.get("limit", config.default_relation_limit)
             offset = arguments.get("offset", 0)
-            
+
             if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.relations:
                 return [TextContent(type="text", text="No relations found in the knowledge graph.")]
-            
+
             relations = list(self.agraph.knowledge_graph.relations.values())
-            
+
             # Filter by relation type if specified
             if relation_type:
                 try:
@@ -451,23 +451,23 @@ class AGraphMCPServer:
                 except ValueError:
                     # Allow string matching for custom relation types
                     relations = [r for r in relations if str(r.relation_type).upper() == relation_type.upper()]
-            
+
             # Filter by entity ID if specified
             if entity_id:
                 relations = [r for r in relations if r.head_entity.id == entity_id or r.tail_entity.id == entity_id]
-            
+
             # Apply pagination
             total_count = len(relations)
             relations = relations[offset:offset + limit]
-            
+
             response_text = f"# Relation Search Results\n\n"
             response_text += f"**Found**: {total_count} relations\n"
             response_text += f"**Showing**: {len(relations)} relations (offset: {offset})\n\n"
-            
+
             for relation in relations:
                 head_name = relation.head_entity.name if relation.head_entity else "Unknown"
                 tail_name = relation.tail_entity.name if relation.tail_entity else "Unknown"
-                
+
                 response_text += f"## {head_name} → {tail_name}\n"
                 response_text += f"- **ID**: {relation.id}\n"
                 response_text += f"- **Type**: {relation.relation_type.value if relation.relation_type else 'N/A'}\n"
@@ -475,14 +475,14 @@ class AGraphMCPServer:
                 response_text += f"- **Confidence**: {relation.confidence}\n"
                 response_text += f"- **Head Entity ID**: {relation.head_entity.id if relation.head_entity else 'N/A'}\n"
                 response_text += f"- **Tail Entity ID**: {relation.tail_entity.id if relation.tail_entity else 'N/A'}\n"
-                
+
                 if relation.properties:
                     response_text += f"- **Properties**: {json.dumps(relation.properties, ensure_ascii=False)}\n"
-                
+
                 response_text += "\n"
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to search relations: {e}")
             return [TextContent(type="text", text=f"Failed to search relations: {str(e)}")]
@@ -491,54 +491,54 @@ class AGraphMCPServer:
         """Search text chunks"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get parameters
             search_query = arguments.get("search_query")
             entity_id = arguments.get("entity_id")
             limit = arguments.get("limit", config.default_text_chunk_limit)
             offset = arguments.get("offset", 0)
-            
+
             # Try vector search first if query is provided
             if search_query and self.agraph.vector_store:
                 try:
                     results = await self.agraph.search_text_chunks(search_query, top_k=limit + offset)
                     # Apply offset manually for vector search results
                     results = results[offset:]
-                    
+
                     response_text = f"# Text Chunk Search Results (Vector Search)\n\n"
                     response_text += f"**Query**: {search_query}\n"
                     response_text += f"**Found**: {len(results)} text chunks\n\n"
-                    
+
                     for chunk, score in results:
                         response_text += f"## Text Chunk: {chunk.id}\n"
                         response_text += f"- **Source**: {chunk.source or 'N/A'}\n"
                         response_text += f"- **Title**: {chunk.title or 'N/A'}\n"
                         response_text += f"- **Score**: {score:.4f}\n"
-                        
+
                         content_preview = chunk.content[:config.max_content_preview_length]
                         if len(chunk.content) > config.max_content_preview_length:
                             content_preview += "..."
                         response_text += f"- **Content**: {content_preview}\n"
-                        
+
                         if hasattr(chunk, 'start_index') and chunk.start_index is not None:
                             response_text += f"- **Start Index**: {chunk.start_index}\n"
                         if hasattr(chunk, 'end_index') and chunk.end_index is not None:
                             response_text += f"- **End Index**: {chunk.end_index}\n"
-                        
+
                         response_text += "\n"
-                    
+
                     return [TextContent(type="text", text=response_text)]
-                    
+
                 except Exception as e:
                     logger.warning(f"Vector search failed, falling back to text search: {e}")
-            
+
             # Fallback to knowledge graph text chunks
             if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.text_chunks:
                 return [TextContent(type="text", text="No text chunks found in the knowledge graph.")]
-            
+
             text_chunks = list(self.agraph.knowledge_graph.text_chunks.values())
-            
+
             # Filter by search query if specified (simple text matching)
             if search_query:
                 search_query_lower = search_query.lower()
@@ -548,7 +548,7 @@ class AGraphMCPServer:
                        (chunk.title and search_query_lower in chunk.title.lower()) or
                        (chunk.source and search_query_lower in chunk.source.lower())
                 ]
-            
+
             # Filter by entity ID if specified
             if entity_id:
                 # This is a simplified implementation - you might want to enhance this
@@ -557,36 +557,36 @@ class AGraphMCPServer:
                     chunk for chunk in text_chunks
                     if entity_id in chunk.content  # Simple text-based search
                 ]
-            
+
             # Apply pagination
             total_count = len(text_chunks)
             text_chunks = text_chunks[offset:offset + limit]
-            
+
             response_text = f"# Text Chunk Search Results\n\n"
             if search_query:
                 response_text += f"**Query**: {search_query}\n"
             response_text += f"**Found**: {total_count} text chunks\n"
             response_text += f"**Showing**: {len(text_chunks)} text chunks (offset: {offset})\n\n"
-            
+
             for chunk in text_chunks:
                 response_text += f"## Text Chunk: {chunk.id}\n"
                 response_text += f"- **Source**: {chunk.source or 'N/A'}\n"
                 response_text += f"- **Title**: {chunk.title or 'N/A'}\n"
-                
+
                 content_preview = chunk.content[:config.max_content_preview_length]
                 if len(chunk.content) > config.max_content_preview_length:
                     content_preview += "..."
                 response_text += f"- **Content**: {content_preview}\n"
-                
+
                 if hasattr(chunk, 'start_index') and chunk.start_index is not None:
                     response_text += f"- **Start Index**: {chunk.start_index}\n"
                 if hasattr(chunk, 'end_index') and chunk.end_index is not None:
                     response_text += f"- **End Index**: {chunk.end_index}\n"
-                
+
                 response_text += "\n"
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to search text chunks: {e}")
             return [TextContent(type="text", text=f"Failed to search text chunks: {str(e)}")]
@@ -595,18 +595,18 @@ class AGraphMCPServer:
         """Search clusters"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get parameters
             cluster_type = arguments.get("cluster_type")
             limit = arguments.get("limit", config.default_cluster_limit)
             offset = arguments.get("offset", 0)
-            
+
             if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.clusters:
                 return [TextContent(type="text", text="No clusters found in the knowledge graph.")]
-            
+
             clusters = list(self.agraph.knowledge_graph.clusters.values())
-            
+
             # Filter by cluster type if specified
             if cluster_type:
                 try:
@@ -615,15 +615,15 @@ class AGraphMCPServer:
                 except ValueError:
                     # Allow string matching for custom cluster types
                     clusters = [c for c in clusters if str(c.cluster_type).upper() == cluster_type.upper()]
-            
+
             # Apply pagination
             total_count = len(clusters)
             clusters = clusters[offset:offset + limit]
-            
+
             response_text = f"# Cluster Search Results\n\n"
             response_text += f"**Found**: {total_count} clusters\n"
             response_text += f"**Showing**: {len(clusters)} clusters (offset: {offset})\n\n"
-            
+
             for cluster in clusters:
                 response_text += f"## {cluster.name}\n"
                 response_text += f"- **ID**: {cluster.id}\n"
@@ -632,14 +632,14 @@ class AGraphMCPServer:
                 response_text += f"- **Confidence**: {cluster.confidence}\n"
                 response_text += f"- **Entities Count**: {len(cluster.entities) if cluster.entities else 0}\n"
                 response_text += f"- **Relations Count**: {len(cluster.relations) if cluster.relations else 0}\n"
-                
+
                 if cluster.properties:
                     response_text += f"- **Properties**: {json.dumps(cluster.properties, ensure_ascii=False)}\n"
-                
+
                 response_text += "\n"
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to search clusters: {e}")
             return [TextContent(type="text", text=f"Failed to search clusters: {str(e)}")]
@@ -648,27 +648,27 @@ class AGraphMCPServer:
         """Get full knowledge graph"""
         collection_name = arguments.get("collection_name")
         await self.initialize_agraph(collection_name)
-        
+
         try:
             # Get parameters
             include_text_chunks = arguments.get("include_text_chunks", False)
             include_clusters = arguments.get("include_clusters", False)
             entity_limit = arguments.get("entity_limit")
             relation_limit = arguments.get("relation_limit")
-            
+
             if not self.agraph.knowledge_graph:
                 return [TextContent(type="text", text="No knowledge graph found.")]
-            
+
             kg = self.agraph.knowledge_graph
-            
+
             response_text = f"# Complete Knowledge Graph: {kg.name or 'Unnamed'}\n\n"
             response_text += f"**Description**: {kg.description or 'N/A'}\n\n"
-            
+
             # Entities summary
             entities = list(kg.entities.values())
             if entity_limit:
                 entities = entities[:entity_limit]
-            
+
             if entities:
                 response_text += f"## Entities ({len(entities)})\n\n"
                 for entity in entities[:5]:  # Show first 5 entities in detail
@@ -676,12 +676,12 @@ class AGraphMCPServer:
                 if len(entities) > 5:
                     response_text += f"- ... and {len(entities) - 5} more entities\n"
                 response_text += "\n"
-            
+
             # Relations summary
             relations = list(kg.relations.values())
             if relation_limit:
                 relations = relations[:relation_limit]
-            
+
             if relations:
                 response_text += f"## Relations ({len(relations)})\n\n"
                 for relation in relations[:5]:  # Show first 5 relations in detail
@@ -691,7 +691,7 @@ class AGraphMCPServer:
                 if len(relations) > 5:
                     response_text += f"- ... and {len(relations) - 5} more relations\n"
                 response_text += "\n"
-            
+
             # Clusters summary (if requested)
             if include_clusters and kg.clusters:
                 response_text += f"## Clusters ({len(kg.clusters)})\n\n"
@@ -700,7 +700,7 @@ class AGraphMCPServer:
                 if len(kg.clusters) > 5:
                     response_text += f"- ... and {len(kg.clusters) - 5} more clusters\n"
                 response_text += "\n"
-            
+
             # Text chunks summary (if requested)
             if include_text_chunks and kg.text_chunks:
                 response_text += f"## Text Chunks ({len(kg.text_chunks)})\n\n"
@@ -712,11 +712,11 @@ class AGraphMCPServer:
                 if len(kg.text_chunks) > 3:
                     response_text += f"- ... and {len(kg.text_chunks) - 3} more text chunks\n"
                 response_text += "\n"
-            
+
             response_text += f"\n**Note**: This is a summary view. Use specific search tools for detailed information about entities, relations, or clusters."
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Failed to get knowledge graph: {e}")
             return [TextContent(type="text", text=f"Failed to get knowledge graph: {str(e)}")]
@@ -726,15 +726,15 @@ class AGraphMCPServer:
         query = arguments.get("query", "")
         if not query:
             return [TextContent(type="text", text="Error: Query is required for natural language search")]
-        
+
         collection_name = arguments.get("collection_name")
         search_type = arguments.get("search_type", "all")
         limit = arguments.get("limit", config.natural_search_default_limit)
-        
+
         await self.initialize_agraph(collection_name)
-        
+
         response_text = f"# Natural Language Search Results for: '{query}'\n\n"
-        
+
         try:
             # Search entities if requested
             if search_type in ["all", "entities"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.entities:
@@ -751,11 +751,11 @@ class AGraphMCPServer:
                         # Fallback to simple keyword matching
                         entities = list(self.agraph.knowledge_graph.entities.values())
                         matching_entities = [
-                            e for e in entities 
-                            if query.lower() in e.name.lower() or 
+                            e for e in entities
+                            if query.lower() in e.name.lower() or
                                (e.description and query.lower() in e.description.lower())
                         ]
-                        
+
                         if matching_entities:
                             response_text += f"## Matching Entities ({len(matching_entities[:limit])})\n\n"
                             for entity in matching_entities[:limit]:
@@ -763,7 +763,7 @@ class AGraphMCPServer:
                             response_text += "\n"
                 except Exception as e:
                     logger.warning(f"Entity search failed: {e}")
-            
+
             # Search text chunks if requested
             if search_type in ["all", "text_chunks"]:
                 try:
@@ -787,7 +787,7 @@ class AGraphMCPServer:
                                (c.title and query.lower() in c.title.lower()) or
                                (c.source and query.lower() in c.source.lower())
                         ]
-                        
+
                         if matching_chunks:
                             response_text += f"## Matching Text Chunks ({len(matching_chunks[:limit])})\n\n"
                             for chunk in matching_chunks[:limit]:
@@ -798,7 +798,7 @@ class AGraphMCPServer:
                             response_text += "\n"
                 except Exception as e:
                     logger.warning(f"Text chunk search failed: {e}")
-            
+
             # Search relations if requested
             if search_type in ["all", "relations"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.relations:
                 try:
@@ -821,7 +821,7 @@ class AGraphMCPServer:
                                (r.head_entity and query.lower() in r.head_entity.name.lower()) or
                                (r.tail_entity and query.lower() in r.tail_entity.name.lower())
                         ]
-                        
+
                         if matching_relations:
                             response_text += f"## Matching Relations ({len(matching_relations[:limit])})\n\n"
                             for relation in matching_relations[:limit]:
@@ -831,7 +831,7 @@ class AGraphMCPServer:
                             response_text += "\n"
                 except Exception as e:
                     logger.warning(f"Relation search failed: {e}")
-            
+
             # Search clusters if requested
             if search_type in ["all", "clusters"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.clusters:
                 try:
@@ -842,7 +842,7 @@ class AGraphMCPServer:
                         if query.lower() in c.name.lower() or
                            (c.description and query.lower() in c.description.lower())
                     ]
-                    
+
                     if matching_clusters:
                         response_text += f"## Matching Clusters ({len(matching_clusters[:limit])})\n\n"
                         for cluster in matching_clusters[:limit]:
@@ -850,12 +850,12 @@ class AGraphMCPServer:
                         response_text += "\n"
                 except Exception as e:
                     logger.warning(f"Cluster search failed: {e}")
-            
+
             if len(response_text.split('\n')) <= 3:  # Only header, no results found
                 response_text += "No matching results found for your query. Try different keywords or search types."
-            
+
             return [TextContent(type="text", text=response_text)]
-            
+
         except Exception as e:
             logger.error(f"Natural language search failed: {e}")
             return [TextContent(type="text", text=f"Natural language search failed: {str(e)}")]
@@ -863,14 +863,14 @@ class AGraphMCPServer:
     async def run(self):
         """Run the MCP server"""
         import mcp.server.stdio
-        
+
         logger.info("Starting AGraph MCP Server...")
         logger.info(f"Workdir: {config.workdir}")
         logger.info(f"Default Collection: {config.default_collection}")
-        
+
         async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
             await self.server.run(read_stream, write_stream)
-    
+
     async def cleanup(self):
         """Cleanup resources"""
         if self.agraph:
@@ -880,7 +880,7 @@ class AGraphMCPServer:
 def main():
     """Main entry point"""
     server = AGraphMCPServer()
-    
+
     try:
         asyncio.run(server.run())
     except KeyboardInterrupt:

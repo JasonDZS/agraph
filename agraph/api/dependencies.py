@@ -148,7 +148,7 @@ def get_document_manager(project_name: Optional[str] = None) -> DocumentManager:
 
     # Ensure project directory structure exists
     ensure_project_directory(current_project)
-    
+
     # Create new manager for this project
     new_manager = DocumentManager(storage_dir, project_name=current_project)
 

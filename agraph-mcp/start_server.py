@@ -19,10 +19,10 @@ if __name__ == "__main__":
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
     logger = logging.getLogger(__name__)
     logger.info("Starting AGraph MCP Server...")
-    
+
     try:
         main()
     except KeyboardInterrupt:

@@ -19,13 +19,7 @@ from ...config import (
 )
 from ...logger import logger
 from ..dependencies import ensure_project_directory, save_project_config_changes
-from ..models import (
-    ProjectCreateRequest,
-    ProjectDeleteRequest,
-    ProjectListResponse,
-    ProjectResponse,
-    ResponseStatus,
-)
+from ..models import ProjectCreateRequest, ProjectDeleteRequest, ProjectListResponse, ProjectResponse, ResponseStatus
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -37,9 +31,7 @@ async def list_all_projects() -> ProjectListResponse:
         projects = list_projects()
 
         return ProjectListResponse(
-            status=ResponseStatus.SUCCESS,
-            message=f"Found {len(projects)} projects",
-            projects=projects
+            status=ResponseStatus.SUCCESS, message=f"Found {len(projects)} projects", projects=projects
         )
     except Exception as e:
         logger.error(f"Failed to list projects: {e}")
@@ -67,10 +59,11 @@ async def create_new_project(request: ProjectCreateRequest) -> ProjectResponse:
         project_config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(project_config_file, "w", encoding="utf-8") as f:
             json.dump(project_settings.to_dict(), f, indent=2, ensure_ascii=False)
-        
+
         # Set secure file permissions (readable only by owner)
         try:
             import stat
+
             project_config_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
         except Exception as e:
             logger.warning(f"Could not set secure permissions on config file: {e}")
@@ -228,7 +221,7 @@ async def get_project_info(project_name: str) -> ProjectResponse:
                 except Exception:
                     # Fallback: if validation fails, just mark as available without exposing data
                     project_data["settings_data"] = {"masked": "Configuration available but not displayed for security"}
-                
+
                 project_data["backup_available"] = True
                 project_data["config_format"] = "direct_settings"
         else:
