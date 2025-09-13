@@ -11,8 +11,12 @@ dependencies = [
     "pydantic>=2.0.0",
     "numpy>=1.24.0",
     "loguru>=0.7.3",
+    "agraph",
 ]
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
+
+[tool.uv.sources]
+agraph = { git = "https://github.com/JasonDZS/agraph.git", rev = "master" }

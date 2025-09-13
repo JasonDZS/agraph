@@ -1,894 +1,916 @@
 #!/usr/bin/env python3
 """
-AGraph Knowledge Graph MCP Server
+AGraph MCP Server - Model Context Protocol server for AGraph semantic search
 
-This server provides access to AGraph knowledge graph functionalities through MCP.
-It directly uses AGraph instances for local knowledge graph operations and supports
-natural language queries for entities, relations, clusters, and text chunks.
+This MCP server provides semantic search capabilities using AGraph knowledge graphs.
+It supports searching entities, relations, clusters, and text chunks across projects.
 """
 
 import asyncio
-import json
-import logging
-import os
 import sys
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Any
+from collections.abc import AsyncIterator
 
-from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.session import ServerSession
+from pydantic import BaseModel, Field
 
-# Add the parent directory to the path to import agraph
-current_dir = Path(__file__).parent.absolute()
-parent_dir = current_dir.parent
-sys.path.insert(0, str(parent_dir))
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 try:
-    from agraph import AGraph, Settings, get_settings
-    from agraph.base.core.types import EntityType, RelationType, ClusterType
-    from agraph.base.models.entities import Entity
-    from agraph.base.models.relations import Relation
-    from agraph.base.models.clusters import Cluster
-    from agraph.base.models.text import TextChunk
+    from agraph import AGraph
+    from agraph.config import get_settings, update_settings
+    from config import get_config_manager, load_server_config, get_agraph_settings
+    from exceptions import (
+        AGrapeMCPError, AGraphInitializationError, SearchError, 
+        handle_agraph_error
+    )
+    
+    # ChromaDB compatibility fix for AGraph
+    try:
+        import chromadb.errors as chroma_errors
+        if not hasattr(chroma_errors, 'InvalidCollectionException'):
+            # Add compatibility alias for older AGraph versions
+            chroma_errors.InvalidCollectionException = chroma_errors.NotFoundError
+            print("✅ ChromaDB compatibility patch applied")
+    except ImportError:
+        print("⚠️  ChromaDB not available for compatibility patch")
+    
 except ImportError as e:
-    logging.error(f"Failed to import AGraph: {e}")
-    logging.error("Make sure you're running from the correct directory and AGraph is installed")
+    print(f"Error importing AGraph or MCP modules: {e}")
+    print("Please ensure AGraph is installed and accessible")
     sys.exit(1)
 
-from config import config
-from exceptions import AGraphMCPError, ConfigurationError
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("agraph-mcp")
+@dataclass
+class AGraphContext:
+    """Application context with AGraph instances per project."""
+    instances: Dict[str, AGraph]
+    project_base_dir: Path
+    config: Dict[str, Any]
 
-class AGraphMCPServer:
-    """MCP Server for AGraph Knowledge Graph using direct AGraph instances"""
 
-    def __init__(self):
-        # Validate configuration
-        try:
-            config.validate()
-        except ValueError as e:
-            raise ConfigurationError(f"Invalid configuration: {e}")
-
-        self.server = Server("agraph-mcp")
-        self.agraph: Optional[AGraph] = None
-        self._is_initialized = False
-        self.setup_handlers()
-
-    def setup_handlers(self):
-        """Setup MCP handlers"""
-
-        @self.server.list_tools()
-        async def handle_list_tools() -> List[Tool]:
-            """List available tools"""
-            return [
-                Tool(
-                    name="get_knowledge_graph_status",
-                    description="Get knowledge graph status and statistics",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="search_entities",
-                    description="Search and retrieve entities from the knowledge graph",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "entity_type": {
-                                "type": "string",
-                                "description": "Filter by entity type (PERSON, ORGANIZATION, LOCATION, CONCEPT, EVENT, OTHER)"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Number of entities to return (default: 50)"
-                            },
-                            "offset": {
-                                "type": "integer",
-                                "description": "Offset for pagination (default: 0)"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="search_relations",
-                    description="Search and retrieve relations from the knowledge graph",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "relation_type": {
-                                "type": "string",
-                                "description": "Filter by relation type"
-                            },
-                            "entity_id": {
-                                "type": "string",
-                                "description": "Filter by entity ID (head or tail entity)"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Number of relations to return (default: 30)"
-                            },
-                            "offset": {
-                                "type": "integer",
-                                "description": "Offset for pagination (default: 0)"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="search_text_chunks",
-                    description="Search and retrieve text chunks from the knowledge graph",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "search_query": {
-                                "type": "string",
-                                "description": "Search query for text content"
-                            },
-                            "entity_id": {
-                                "type": "string",
-                                "description": "Filter by entity ID to get text chunks containing the entity"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Number of text chunks to return (default: 20)"
-                            },
-                            "offset": {
-                                "type": "integer",
-                                "description": "Offset for pagination (default: 0)"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="search_clusters",
-                    description="Search and retrieve clusters from the knowledge graph",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "cluster_type": {
-                                "type": "string",
-                                "description": "Filter by cluster type"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Number of clusters to return (default: 15)"
-                            },
-                            "offset": {
-                                "type": "integer",
-                                "description": "Offset for pagination (default: 0)"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="get_full_knowledge_graph",
-                    description="Retrieve complete knowledge graph data",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "include_text_chunks": {
-                                "type": "boolean",
-                                "description": "Include text chunks in response (default: false)"
-                            },
-                            "include_clusters": {
-                                "type": "boolean",
-                                "description": "Include clusters in response (default: false)"
-                            },
-                            "entity_limit": {
-                                "type": "integer",
-                                "description": "Limit number of entities returned"
-                            },
-                            "relation_limit": {
-                                "type": "integer",
-                                "description": "Limit number of relations returned"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="natural_language_search",
-                    description="Perform natural language search across the knowledge graph",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Natural language query"
-                            },
-                            "collection_name": {
-                                "type": "string",
-                                "description": f"Collection name (default: {config.default_collection})"
-                            },
-                            "search_type": {
-                                "type": "string",
-                                "enum": ["all", "entities", "relations", "text_chunks", "clusters"],
-                                "description": "Type of search to perform (default: all)"
-                            },
-                            "limit": {
-                                "type": "integer",
-                                "description": "Limit number of results per type (default: 10)"
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                )
-            ]
-
-        @self.server.call_tool()
-        async def handle_call_tool(name: str, arguments: dict) -> List[TextContent]:
-            """Handle tool calls"""
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AGraphContext]:
+    """Manage AGraph instances lifecycle."""
+    print("🚀 Starting AGraph MCP Server...")
+    
+    # Load configuration
+    config = load_server_config()
+    print("📋 Configuration loaded successfully")
+    
+    # Initialize project base directory
+    project_dir = config['agraph']['project_dir']
+    project_base_dir = Path(project_dir)
+    project_base_dir.mkdir(parents=True, exist_ok=True)
+    
+    app_context = AGraphContext(
+        instances={},
+        project_base_dir=project_base_dir,
+        config=config
+    )
+    
+    print(f"✅ AGraph MCP Server initialized")
+    print(f"   📁 Project base directory: {project_base_dir}")
+    print(f"   🧠 Default model: {config['agraph']['default_model']}")
+    print(f"   ⚙️ Max concurrent projects: {config['mcp_server']['max_concurrent_projects']}")
+    
+    try:
+        yield app_context
+    finally:
+        # Cleanup AGraph instances
+        print("🔄 Cleaning up AGraph instances...")
+        cleanup_count = 0
+        for project_name, agraph in app_context.instances.items():
             try:
-                if name == "get_knowledge_graph_status":
-                    return await self._get_knowledge_graph_status(arguments)
-                elif name == "search_entities":
-                    return await self._search_entities(arguments)
-                elif name == "search_relations":
-                    return await self._search_relations(arguments)
-                elif name == "search_text_chunks":
-                    return await self._search_text_chunks(arguments)
-                elif name == "search_clusters":
-                    return await self._search_clusters(arguments)
-                elif name == "get_full_knowledge_graph":
-                    return await self._get_full_knowledge_graph(arguments)
-                elif name == "natural_language_search":
-                    return await self._natural_language_search(arguments)
-                else:
-                    raise ValueError(f"Unknown tool: {name}")
+                await agraph.__aexit__(None, None, None)
+                cleanup_count += 1
+                print(f"   ✅ Cleaned up AGraph instance for project: {project_name}")
             except Exception as e:
-                logger.error(f"Error handling tool call {name}: {e}")
-                return [TextContent(type="text", text=f"Error: {str(e)}")]
+                print(f"   ⚠️ Error cleaning up {project_name}: {e}")
+        
+        print(f"✅ AGraph MCP Server shutdown complete ({cleanup_count} instances cleaned)")
 
-    async def initialize_agraph(self, collection_name: Optional[str] = None) -> None:
-        """Initialize AGraph instance"""
-        if self._is_initialized and self.agraph and (
-            collection_name is None or self.agraph.collection_name == collection_name
-        ):
-            return
 
+# Create FastMCP server with lifespan management
+mcp = FastMCP("AGraph Semantic Search", lifespan=app_lifespan)
+
+
+async def get_or_create_agraph(
+    ctx: Context[ServerSession, AGraphContext], 
+    project: str
+) -> AGraph:
+    """Get existing AGraph instance or create new one for project."""
+    app_ctx = ctx.request_context.lifespan_context
+    
+    # Check if instance already exists
+    if project in app_ctx.instances:
+        await ctx.debug(f"Using existing AGraph instance for project: {project}")
+        return app_ctx.instances[project]
+    
+    # Check project limit
+    max_projects = app_ctx.config['mcp_server']['max_concurrent_projects']
+    if len(app_ctx.instances) >= max_projects:
+        error_msg = f"Maximum concurrent projects ({max_projects}) exceeded"
+        await ctx.error(error_msg)
+        raise AGraphInitializationError(project, error_msg)
+    
+    try:
+        # Use the project path directly as workdir (not create subdirectory)
+        project_path = app_ctx.project_base_dir / project
+        
+        # For existing projects, don't create directory, just use it
+        if not project_path.exists():
+            await ctx.warning(f"Project path does not exist: {project_path}")
+            project_path.mkdir(parents=True, exist_ok=True)
+        
+        # Get base settings and update with project-specific config
+        settings = get_settings()
+        agraph_config = app_ctx.config['agraph']
+        
+        settings_override = {
+            "workdir": str(project_path),
+            "llm_config": {
+                "model": agraph_config['default_model']
+            },
+            "processing_config": {
+                "chunk_size": agraph_config['chunk_size'],
+                "chunk_overlap": agraph_config['chunk_overlap']
+            },
+            "extraction_config": {
+                "entity_confidence_threshold": agraph_config['entity_confidence_threshold'],
+                "relation_confidence_threshold": agraph_config['relation_confidence_threshold']
+            },
+            "max_current": agraph_config['max_current']
+        }
+        
+        settings = update_settings(settings_override)
+        await ctx.debug(f"AGraph settings updated for project: {project}")
+        
+        await ctx.info(f"Creating AGraph instance for project: {project}")
+        await ctx.debug(f"Project workdir: {project_path}, model: {agraph_config['default_model']}")
+        
+        # Create AGraph with collection name that matches existing data
+        # Check if there's existing data to determine collection name
+        collection_name = project  # Use project name directly
+        if (project_path / "chroma").exists():
+            # Try to find existing collection
+            try:
+                chroma_dirs = list((project_path / "chroma").glob("*"))
+                if chroma_dirs and chroma_dirs[0].is_dir():
+                    # Use the actual collection name from chroma directory
+                    collection_name = chroma_dirs[0].name
+                    await ctx.debug(f"Found existing collection: {collection_name}")
+            except Exception as e:
+                await ctx.debug(f"Could not detect collection name: {e}")
+        
+        agraph = AGraph(collection_name=collection_name)
+        
+        # Try to enter async context and initialize with ChromaDB compatibility
         try:
-            # Use collection_name or default
-            collection = collection_name or config.default_collection
-
-            # Create settings from config
-            settings = get_settings()
-            settings.workdir = config.workdir
-
-            logger.info(f"Initializing AGraph with collection: {collection}")
-
-            # Create AGraph instance
-            self.agraph = AGraph(
-                settings=settings,
-                collection_name=collection,
-                persist_directory=config.persist_directory,
-                vector_store_type=config.vector_store_type,
-                enable_knowledge_graph=True
-            )
-
-            # Initialize the AGraph instance
-            await self.agraph.initialize()
-
-            self._is_initialized = True
-            logger.info(f"AGraph initialized successfully with collection: {collection}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize AGraph: {e}")
-            raise AGraphMCPError(f"AGraph initialization failed: {e}")
-
-    async def _get_knowledge_graph_status(self, arguments: Dict) -> List[TextContent]:
-        """Get knowledge graph status"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
-        try:
-            # Get statistics from AGraph
-            stats = await self.agraph.get_stats()
-
-            # Format the response nicely
-            collection = self.agraph.collection_name
-            status_text = f"# Knowledge Graph Status for '{collection}'\n\n"
-
-            # Basic information
-            status_text += "## Basic Information\n"
-            status_text += f"- **Collection Name**: {collection}\n"
-            status_text += f"- **Vector Store Type**: {self.agraph.vector_store_type}\n"
-            status_text += f"- **Enable Knowledge Graph**: {self.agraph.enable_knowledge_graph}\n"
-            status_text += f"- **Initialized**: {self.agraph.is_initialized}\n"
-            status_text += f"- **Has Knowledge Graph**: {self.agraph.has_knowledge_graph}\n\n"
-
-            # Knowledge graph statistics
-            if stats.get("knowledge_graph"):
-                kg_stats = stats["knowledge_graph"]
-                status_text += "## Knowledge Graph Statistics\n"
-                status_text += f"- **Entities**: {kg_stats.get('entities', 0)}\n"
-                status_text += f"- **Relations**: {kg_stats.get('relations', 0)}\n"
-                status_text += f"- **Clusters**: {kg_stats.get('clusters', 0)}\n"
-                status_text += f"- **Text Chunks**: {kg_stats.get('text_chunks', 0)}\n\n"
-
-            # Get entity type distribution if available
-            if self.agraph.knowledge_graph and self.agraph.knowledge_graph.entities:
-                entity_types = {}
-                for entity in self.agraph.knowledge_graph.entities.values():
-                    entity_type = entity.entity_type.value if entity.entity_type else "OTHER"
-                    entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
-
-                if entity_types:
-                    status_text += "## Entity Types Distribution\n"
-                    for entity_type, count in entity_types.items():
-                        status_text += f"- **{entity_type}**: {count}\n"
-                    status_text += "\n"
-
-            # Get relation type distribution if available
-            if self.agraph.knowledge_graph and self.agraph.knowledge_graph.relations:
-                relation_types = {}
-                for relation in self.agraph.knowledge_graph.relations.values():
-                    relation_type = relation.relation_type.value if relation.relation_type else "OTHER"
-                    relation_types[relation_type] = relation_types.get(relation_type, 0) + 1
-
-                if relation_types:
-                    status_text += "## Relation Types Distribution\n"
-                    for relation_type, count in relation_types.items():
-                        status_text += f"- **{relation_type}**: {count}\n"
-                    status_text += "\n"
-
-            # Vector store statistics
-            if stats.get("vector_store"):
-                vs_stats = stats["vector_store"]
-                status_text += "## Vector Store Statistics\n"
-                for key, value in vs_stats.items():
-                    status_text += f"- **{key}**: {value}\n"
-                status_text += "\n"
-
-            return [TextContent(type="text", text=status_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to get knowledge graph status: {e}")
-            return [TextContent(type="text", text=f"Failed to get knowledge graph status: {str(e)}")]
-
-    async def _search_entities(self, arguments: Dict) -> List[TextContent]:
-        """Search entities"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
-        try:
-            # Get parameters
-            entity_type = arguments.get("entity_type")
-            limit = arguments.get("limit", config.default_entity_limit)
-            offset = arguments.get("offset", 0)
-
-            if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.entities:
-                return [TextContent(type="text", text="No entities found in the knowledge graph.")]
-
-            entities = list(self.agraph.knowledge_graph.entities.values())
-
-            # Filter by entity type if specified
-            if entity_type:
+            await agraph.__aenter__()
+        except Exception as init_error:
+            init_error_msg = str(init_error)
+            if "InvalidCollectionException" in init_error_msg:
+                await ctx.warning(f"ChromaDB compatibility issue detected, attempting workaround...")
+                # Try to patch ChromaDB errors for compatibility
                 try:
-                    entity_type_enum = EntityType(entity_type.upper())
-                    entities = [e for e in entities if e.entity_type == entity_type_enum]
-                except ValueError:
-                    return [TextContent(type="text", text=f"Invalid entity type: {entity_type}")]
-
-            # Apply pagination
-            total_count = len(entities)
-            entities = entities[offset:offset + limit]
-
-            response_text = f"# Entity Search Results\n\n"
-            response_text += f"**Found**: {total_count} entities\n"
-            response_text += f"**Showing**: {len(entities)} entities (offset: {offset})\n\n"
-
-            for entity in entities:
-                response_text += f"## {entity.name}\n"
-                response_text += f"- **ID**: {entity.id}\n"
-                response_text += f"- **Type**: {entity.entity_type.value if entity.entity_type else 'N/A'}\n"
-                response_text += f"- **Description**: {entity.description or 'N/A'}\n"
-                response_text += f"- **Confidence**: {entity.confidence}\n"
-
-                if entity.aliases:
-                    response_text += f"- **Aliases**: {', '.join(entity.aliases)}\n"
-
-                if entity.properties:
-                    response_text += f"- **Properties**: {json.dumps(entity.properties, ensure_ascii=False)}\n"
-
-                response_text += "\n"
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to search entities: {e}")
-            return [TextContent(type="text", text=f"Failed to search entities: {str(e)}")]
-
-    async def _search_relations(self, arguments: Dict) -> List[TextContent]:
-        """Search relations"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
+                    import chromadb.errors as errors
+                    if not hasattr(errors, 'InvalidCollectionException'):
+                        # Create a compatibility alias
+                        errors.InvalidCollectionException = errors.NotFoundError
+                    await agraph.__aenter__()
+                except Exception as patch_error:
+                    await ctx.error(f"ChromaDB compatibility patch failed: {patch_error}")
+                    raise init_error
+            else:
+                raise init_error
+        
+        # Initialize the AGraph instance
         try:
-            # Get parameters
-            relation_type = arguments.get("relation_type")
-            entity_id = arguments.get("entity_id")
-            limit = arguments.get("limit", config.default_relation_limit)
-            offset = arguments.get("offset", 0)
-
-            if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.relations:
-                return [TextContent(type="text", text="No relations found in the knowledge graph.")]
-
-            relations = list(self.agraph.knowledge_graph.relations.values())
-
-            # Filter by relation type if specified
-            if relation_type:
-                try:
-                    relation_type_enum = RelationType(relation_type.upper())
-                    relations = [r for r in relations if r.relation_type == relation_type_enum]
-                except ValueError:
-                    # Allow string matching for custom relation types
-                    relations = [r for r in relations if str(r.relation_type).upper() == relation_type.upper()]
-
-            # Filter by entity ID if specified
-            if entity_id:
-                relations = [r for r in relations if r.head_entity.id == entity_id or r.tail_entity.id == entity_id]
-
-            # Apply pagination
-            total_count = len(relations)
-            relations = relations[offset:offset + limit]
-
-            response_text = f"# Relation Search Results\n\n"
-            response_text += f"**Found**: {total_count} relations\n"
-            response_text += f"**Showing**: {len(relations)} relations (offset: {offset})\n\n"
-
-            for relation in relations:
-                head_name = relation.head_entity.name if relation.head_entity else "Unknown"
-                tail_name = relation.tail_entity.name if relation.tail_entity else "Unknown"
-
-                response_text += f"## {head_name} → {tail_name}\n"
-                response_text += f"- **ID**: {relation.id}\n"
-                response_text += f"- **Type**: {relation.relation_type.value if relation.relation_type else 'N/A'}\n"
-                response_text += f"- **Description**: {relation.description or 'N/A'}\n"
-                response_text += f"- **Confidence**: {relation.confidence}\n"
-                response_text += f"- **Head Entity ID**: {relation.head_entity.id if relation.head_entity else 'N/A'}\n"
-                response_text += f"- **Tail Entity ID**: {relation.tail_entity.id if relation.tail_entity else 'N/A'}\n"
-
-                if relation.properties:
-                    response_text += f"- **Properties**: {json.dumps(relation.properties, ensure_ascii=False)}\n"
-
-                response_text += "\n"
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to search relations: {e}")
-            return [TextContent(type="text", text=f"Failed to search relations: {str(e)}")]
-
-    async def _search_text_chunks(self, arguments: Dict) -> List[TextContent]:
-        """Search text chunks"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
-        try:
-            # Get parameters
-            search_query = arguments.get("search_query")
-            entity_id = arguments.get("entity_id")
-            limit = arguments.get("limit", config.default_text_chunk_limit)
-            offset = arguments.get("offset", 0)
-
-            # Try vector search first if query is provided
-            if search_query and self.agraph.vector_store:
-                try:
-                    results = await self.agraph.search_text_chunks(search_query, top_k=limit + offset)
-                    # Apply offset manually for vector search results
-                    results = results[offset:]
-
-                    response_text = f"# Text Chunk Search Results (Vector Search)\n\n"
-                    response_text += f"**Query**: {search_query}\n"
-                    response_text += f"**Found**: {len(results)} text chunks\n\n"
-
-                    for chunk, score in results:
-                        response_text += f"## Text Chunk: {chunk.id}\n"
-                        response_text += f"- **Source**: {chunk.source or 'N/A'}\n"
-                        response_text += f"- **Title**: {chunk.title or 'N/A'}\n"
-                        response_text += f"- **Score**: {score:.4f}\n"
-
-                        content_preview = chunk.content[:config.max_content_preview_length]
-                        if len(chunk.content) > config.max_content_preview_length:
-                            content_preview += "..."
-                        response_text += f"- **Content**: {content_preview}\n"
-
-                        if hasattr(chunk, 'start_index') and chunk.start_index is not None:
-                            response_text += f"- **Start Index**: {chunk.start_index}\n"
-                        if hasattr(chunk, 'end_index') and chunk.end_index is not None:
-                            response_text += f"- **End Index**: {chunk.end_index}\n"
-
-                        response_text += "\n"
-
-                    return [TextContent(type="text", text=response_text)]
-
-                except Exception as e:
-                    logger.warning(f"Vector search failed, falling back to text search: {e}")
-
-            # Fallback to knowledge graph text chunks
-            if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.text_chunks:
-                return [TextContent(type="text", text="No text chunks found in the knowledge graph.")]
-
-            text_chunks = list(self.agraph.knowledge_graph.text_chunks.values())
-
-            # Filter by search query if specified (simple text matching)
-            if search_query:
-                search_query_lower = search_query.lower()
-                text_chunks = [
-                    chunk for chunk in text_chunks
-                    if search_query_lower in chunk.content.lower() or
-                       (chunk.title and search_query_lower in chunk.title.lower()) or
-                       (chunk.source and search_query_lower in chunk.source.lower())
-                ]
-
-            # Filter by entity ID if specified
-            if entity_id:
-                # This is a simplified implementation - you might want to enhance this
-                # based on how entity-chunk relationships are stored in your system
-                text_chunks = [
-                    chunk for chunk in text_chunks
-                    if entity_id in chunk.content  # Simple text-based search
-                ]
-
-            # Apply pagination
-            total_count = len(text_chunks)
-            text_chunks = text_chunks[offset:offset + limit]
-
-            response_text = f"# Text Chunk Search Results\n\n"
-            if search_query:
-                response_text += f"**Query**: {search_query}\n"
-            response_text += f"**Found**: {total_count} text chunks\n"
-            response_text += f"**Showing**: {len(text_chunks)} text chunks (offset: {offset})\n\n"
-
-            for chunk in text_chunks:
-                response_text += f"## Text Chunk: {chunk.id}\n"
-                response_text += f"- **Source**: {chunk.source or 'N/A'}\n"
-                response_text += f"- **Title**: {chunk.title or 'N/A'}\n"
-
-                content_preview = chunk.content[:config.max_content_preview_length]
-                if len(chunk.content) > config.max_content_preview_length:
-                    content_preview += "..."
-                response_text += f"- **Content**: {content_preview}\n"
-
-                if hasattr(chunk, 'start_index') and chunk.start_index is not None:
-                    response_text += f"- **Start Index**: {chunk.start_index}\n"
-                if hasattr(chunk, 'end_index') and chunk.end_index is not None:
-                    response_text += f"- **End Index**: {chunk.end_index}\n"
-
-                response_text += "\n"
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to search text chunks: {e}")
-            return [TextContent(type="text", text=f"Failed to search text chunks: {str(e)}")]
-
-    async def _search_clusters(self, arguments: Dict) -> List[TextContent]:
-        """Search clusters"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
-        try:
-            # Get parameters
-            cluster_type = arguments.get("cluster_type")
-            limit = arguments.get("limit", config.default_cluster_limit)
-            offset = arguments.get("offset", 0)
-
-            if not self.agraph.knowledge_graph or not self.agraph.knowledge_graph.clusters:
-                return [TextContent(type="text", text="No clusters found in the knowledge graph.")]
-
-            clusters = list(self.agraph.knowledge_graph.clusters.values())
-
-            # Filter by cluster type if specified
-            if cluster_type:
-                try:
-                    cluster_type_enum = ClusterType(cluster_type.upper())
-                    clusters = [c for c in clusters if c.cluster_type == cluster_type_enum]
-                except ValueError:
-                    # Allow string matching for custom cluster types
-                    clusters = [c for c in clusters if str(c.cluster_type).upper() == cluster_type.upper()]
-
-            # Apply pagination
-            total_count = len(clusters)
-            clusters = clusters[offset:offset + limit]
-
-            response_text = f"# Cluster Search Results\n\n"
-            response_text += f"**Found**: {total_count} clusters\n"
-            response_text += f"**Showing**: {len(clusters)} clusters (offset: {offset})\n\n"
-
-            for cluster in clusters:
-                response_text += f"## {cluster.name}\n"
-                response_text += f"- **ID**: {cluster.id}\n"
-                response_text += f"- **Type**: {cluster.cluster_type.value if cluster.cluster_type else 'N/A'}\n"
-                response_text += f"- **Description**: {cluster.description or 'N/A'}\n"
-                response_text += f"- **Confidence**: {cluster.confidence}\n"
-                response_text += f"- **Entities Count**: {len(cluster.entities) if cluster.entities else 0}\n"
-                response_text += f"- **Relations Count**: {len(cluster.relations) if cluster.relations else 0}\n"
-
-                if cluster.properties:
-                    response_text += f"- **Properties**: {json.dumps(cluster.properties, ensure_ascii=False)}\n"
-
-                response_text += "\n"
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to search clusters: {e}")
-            return [TextContent(type="text", text=f"Failed to search clusters: {str(e)}")]
-
-    async def _get_full_knowledge_graph(self, arguments: Dict) -> List[TextContent]:
-        """Get full knowledge graph"""
-        collection_name = arguments.get("collection_name")
-        await self.initialize_agraph(collection_name)
-
-        try:
-            # Get parameters
-            include_text_chunks = arguments.get("include_text_chunks", False)
-            include_clusters = arguments.get("include_clusters", False)
-            entity_limit = arguments.get("entity_limit")
-            relation_limit = arguments.get("relation_limit")
-
-            if not self.agraph.knowledge_graph:
-                return [TextContent(type="text", text="No knowledge graph found.")]
-
-            kg = self.agraph.knowledge_graph
-
-            response_text = f"# Complete Knowledge Graph: {kg.name or 'Unnamed'}\n\n"
-            response_text += f"**Description**: {kg.description or 'N/A'}\n\n"
-
-            # Entities summary
-            entities = list(kg.entities.values())
-            if entity_limit:
-                entities = entities[:entity_limit]
-
-            if entities:
-                response_text += f"## Entities ({len(entities)})\n\n"
-                for entity in entities[:5]:  # Show first 5 entities in detail
-                    response_text += f"- **{entity.name}** ({entity.entity_type.value if entity.entity_type else 'unknown'}): {entity.description or 'N/A'}\n"
-                if len(entities) > 5:
-                    response_text += f"- ... and {len(entities) - 5} more entities\n"
-                response_text += "\n"
-
-            # Relations summary
-            relations = list(kg.relations.values())
-            if relation_limit:
-                relations = relations[:relation_limit]
-
-            if relations:
-                response_text += f"## Relations ({len(relations)})\n\n"
-                for relation in relations[:5]:  # Show first 5 relations in detail
-                    head_name = relation.head_entity.name if relation.head_entity else "Unknown"
-                    tail_name = relation.tail_entity.name if relation.tail_entity else "Unknown"
-                    response_text += f"- **{head_name}** --[{relation.relation_type.value if relation.relation_type else 'unknown'}]--> **{tail_name}**\n"
-                if len(relations) > 5:
-                    response_text += f"- ... and {len(relations) - 5} more relations\n"
-                response_text += "\n"
-
-            # Clusters summary (if requested)
-            if include_clusters and kg.clusters:
-                response_text += f"## Clusters ({len(kg.clusters)})\n\n"
-                for cluster in list(kg.clusters.values())[:5]:
-                    response_text += f"- **{cluster.name}**: {cluster.description or 'N/A'} ({len(cluster.entities) if cluster.entities else 0} entities)\n"
-                if len(kg.clusters) > 5:
-                    response_text += f"- ... and {len(kg.clusters) - 5} more clusters\n"
-                response_text += "\n"
-
-            # Text chunks summary (if requested)
-            if include_text_chunks and kg.text_chunks:
-                response_text += f"## Text Chunks ({len(kg.text_chunks)})\n\n"
-                for chunk in list(kg.text_chunks.values())[:3]:
-                    content_preview = chunk.content[:100]
-                    if len(chunk.content) > 100:
-                        content_preview += "..."
-                    response_text += f"- **{chunk.source or chunk.id}**: {content_preview}\n"
-                if len(kg.text_chunks) > 3:
-                    response_text += f"- ... and {len(kg.text_chunks) - 3} more text chunks\n"
-                response_text += "\n"
-
-            response_text += f"\n**Note**: This is a summary view. Use specific search tools for detailed information about entities, relations, or clusters."
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Failed to get knowledge graph: {e}")
-            return [TextContent(type="text", text=f"Failed to get knowledge graph: {str(e)}")]
-
-    async def _natural_language_search(self, arguments: Dict) -> List[TextContent]:
-        """Perform natural language search"""
-        query = arguments.get("query", "")
-        if not query:
-            return [TextContent(type="text", text="Error: Query is required for natural language search")]
-
-        collection_name = arguments.get("collection_name")
-        search_type = arguments.get("search_type", "all")
-        limit = arguments.get("limit", config.natural_search_default_limit)
-
-        await self.initialize_agraph(collection_name)
-
-        response_text = f"# Natural Language Search Results for: '{query}'\n\n"
-
-        try:
-            # Search entities if requested
-            if search_type in ["all", "entities"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.entities:
-                try:
-                    if self.agraph.vector_store:
-                        # Try vector search
-                        entity_results = await self.agraph.search_entities(query, top_k=limit)
-                        if entity_results:
-                            response_text += f"## Matching Entities (Vector Search) ({len(entity_results)})\n\n"
-                            for entity, score in entity_results:
-                                response_text += f"- **{entity.name}** ({entity.entity_type.value if entity.entity_type else 'unknown'}) [Score: {score:.4f}]: {entity.description or 'N/A'}\n"
-                            response_text += "\n"
+            await agraph.initialize()
+        except Exception as load_error:
+            load_error_msg = str(load_error)
+            if "collection" in load_error_msg.lower() and "not found" in load_error_msg.lower():
+                await ctx.warning(f"Collection not found, this may be normal for new projects")
+                # Don't fail here as collection might be created on first use
+            else:
+                await ctx.warning(f"AGraph initialization warning: {load_error_msg}")
+                # Continue anyway as some initialization issues may be recoverable
+        
+        # Cache the instance
+        app_ctx.instances[project] = agraph
+        
+        await ctx.info(f"✅ AGraph instance loaded for project: {project}")
+        await ctx.debug(f"📊 Active projects: {len(app_ctx.instances)}/{max_projects}")
+        
+        return agraph
+        
+    except Exception as e:
+        error = handle_agraph_error(e, "AGraph initialization", {"project": project})
+        await ctx.error(f"Failed to initialize AGraph for project '{project}': {error.message}")
+        raise error
+
+
+# Pydantic models for structured output
+class EntityResult(BaseModel):
+    """Search result for an entity."""
+    name: str = Field(description="Entity name")
+    entity_type: str = Field(description="Type of the entity") 
+    confidence: float = Field(description="Confidence score")
+    properties: Dict[str, Any] = Field(default_factory=dict, description="Entity properties")
+    score: float = Field(description="Search similarity score")
+
+
+class RelationResult(BaseModel):
+    """Search result for a relation."""
+    source: str = Field(description="Source entity name")
+    target: str = Field(description="Target entity name")
+    relation_type: str = Field(description="Type of the relation")
+    confidence: float = Field(description="Confidence score")
+    properties: Dict[str, Any] = Field(default_factory=dict, description="Relation properties")
+    score: float = Field(description="Search similarity score")
+
+
+class TextChunkResult(BaseModel):
+    """Search result for a text chunk."""
+    content: str = Field(description="Text chunk content")
+    chunk_id: str = Field(description="Unique chunk identifier")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Chunk metadata")
+    score: float = Field(description="Search similarity score")
+
+
+class ClusterResult(BaseModel):
+    """Search result for a cluster."""
+    cluster_id: str = Field(description="Unique cluster identifier")
+    cluster_name: str = Field(description="Cluster name or description")
+    entities: List[str] = Field(default_factory=list, description="Entity names in cluster")
+    cluster_type: str = Field(description="Type or category of cluster")
+    score: float = Field(description="Search similarity score")
+    properties: Dict[str, Any] = Field(default_factory=dict, description="Cluster properties")
+
+
+class SemanticSearchResults(BaseModel):
+    """Combined semantic search results."""
+    query: str = Field(description="Original search query")
+    project: str = Field(description="Project name")
+    entities: List[EntityResult] = Field(default_factory=list)
+    relations: List[RelationResult] = Field(default_factory=list) 
+    text_chunks: List[TextChunkResult] = Field(default_factory=list)
+    clusters: List[ClusterResult] = Field(default_factory=list)
+    total_results: int = Field(description="Total number of results found")
+
+
+@mcp.tool()
+async def search_entities(
+    project: str,
+    query: str,
+    top_k: int = 5,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[EntityResult]:
+    """
+    Search for entities in the specified project's knowledge graph.
+    
+    Args:
+        project: Project name to search within
+        query: Search query text
+        top_k: Maximum number of results to return (default: 5)
+    
+    Returns:
+        List of matching entities with similarity scores
+    """
+    try:
+        await ctx.info(f"Searching entities for query: '{query}' in project: {project}")
+        
+        agraph = await get_or_create_agraph(ctx, project)
+        results = await agraph.search_entities(query, top_k=top_k)
+        
+        entity_results = []
+        for entity, score in results:
+            entity_results.append(EntityResult(
+                name=entity.name,
+                entity_type=entity.entity_type.value if hasattr(entity.entity_type, 'value') else str(entity.entity_type),
+                confidence=entity.confidence,
+                properties=entity.properties,
+                score=score
+            ))
+        
+        await ctx.info(f"Found {len(entity_results)} entities")
+        return entity_results
+        
+    except Exception as e:
+        await ctx.error(f"Entity search error: {str(e)}")
+        return []
+
+
+@mcp.tool()
+async def search_relations(
+    project: str,
+    query: str, 
+    top_k: int = 5,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[RelationResult]:
+    """
+    Search for relations in the specified project's knowledge graph.
+    
+    Args:
+        project: Project name to search within
+        query: Search query text
+        top_k: Maximum number of results to return (default: 5)
+    
+    Returns:
+        List of matching relations with similarity scores
+    """
+    try:
+        await ctx.info(f"Searching relations for query: '{query}' in project: {project}")
+        
+        agraph = await get_or_create_agraph(ctx, project)
+        results = await agraph.search_relations(query, top_k=top_k)
+        
+        relation_results = []
+        for relation, score in results:
+            relation_results.append(RelationResult(
+                source=relation.source,
+                target=relation.target,
+                relation_type=relation.relation_type.value if hasattr(relation.relation_type, 'value') else str(relation.relation_type),
+                confidence=relation.confidence,
+                properties=relation.properties,
+                score=score
+            ))
+        
+        await ctx.info(f"Found {len(relation_results)} relations")
+        return relation_results
+        
+    except Exception as e:
+        await ctx.error(f"Relation search error: {str(e)}")
+        return []
+
+
+@mcp.tool()
+async def search_text_chunks(
+    project: str,
+    query: str,
+    top_k: int = 5,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[TextChunkResult]:
+    """
+    Search for text chunks in the specified project's knowledge graph.
+    
+    Args:
+        project: Project name to search within
+        query: Search query text  
+        top_k: Maximum number of results to return (default: 5)
+    
+    Returns:
+        List of matching text chunks with similarity scores
+    """
+    try:
+        await ctx.info(f"Searching text chunks for query: '{query}' in project: {project}")
+        
+        agraph = await get_or_create_agraph(ctx, project)
+        results = await agraph.search_text_chunks(query, top_k=top_k)
+        
+        chunk_results = []
+        for chunk, score in results:
+            chunk_results.append(TextChunkResult(
+                content=chunk.content,
+                chunk_id=getattr(chunk, 'chunk_id', str(hash(chunk.content))[:8]),
+                metadata=getattr(chunk, 'metadata', {}),
+                score=score
+            ))
+        
+        await ctx.info(f"Found {len(chunk_results)} text chunks")  
+        return chunk_results
+        
+    except Exception as e:
+        await ctx.error(f"Text chunk search error: {str(e)}")
+        return []
+
+
+@mcp.tool()
+async def search_clusters(
+    project: str,
+    query: str,
+    top_k: int = 5,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[ClusterResult]:
+    """
+    Search for clusters in the specified project's knowledge graph.
+    
+    Args:
+        project: Project name to search within
+        query: Search query text
+        top_k: Maximum number of results to return (default: 5)
+    
+    Returns:
+        List of matching clusters with similarity scores
+    """
+    try:
+        await ctx.info(f"Searching clusters for query: '{query}' in project: {project}")
+        
+        agraph = await get_or_create_agraph(ctx, project)
+        
+        # Check if AGraph has cluster search capability
+        if hasattr(agraph, 'search_clusters'):
+            results = await agraph.search_clusters(query, top_k=top_k)
+            
+            cluster_results = []
+            for cluster, score in results:
+                cluster_results.append(ClusterResult(
+                    cluster_id=getattr(cluster, 'cluster_id', str(hash(str(cluster)))[:8]),
+                    cluster_name=getattr(cluster, 'name', f"Cluster_{hash(str(cluster))%1000}"),
+                    entities=getattr(cluster, 'entities', []),
+                    cluster_type=getattr(cluster, 'cluster_type', 'general'),
+                    score=score,
+                    properties=getattr(cluster, 'properties', {})
+                ))
+            
+            await ctx.info(f"Found {len(cluster_results)} clusters")
+            return cluster_results
+        else:
+            # Fallback: cluster entities by similarity to query
+            await ctx.info("Using entity-based clustering fallback")
+            entities = await agraph.search_entities(query, top_k=top_k*2)
+            
+            # Group entities by type for basic clustering
+            entity_groups = {}
+            for entity, score in entities:
+                entity_type = str(entity.entity_type.value if hasattr(entity.entity_type, 'value') else entity.entity_type)
+                if entity_type not in entity_groups:
+                    entity_groups[entity_type] = []
+                entity_groups[entity_type].append((entity.name, score))
+            
+            cluster_results = []
+            for cluster_type, entities_in_cluster in entity_groups.items():
+                if len(entities_in_cluster) >= 2:  # Only create clusters with multiple entities
+                    avg_score = sum(score for _, score in entities_in_cluster) / len(entities_in_cluster)
+                    cluster_results.append(ClusterResult(
+                        cluster_id=f"{cluster_type}_{hash(query)%1000}",
+                        cluster_name=f"{cluster_type.title()} Cluster",
+                        entities=[name for name, _ in entities_in_cluster],
+                        cluster_type=cluster_type,
+                        score=avg_score,
+                        properties={"entity_count": len(entities_in_cluster)}
+                    ))
+            
+            # Sort by score and limit results
+            cluster_results.sort(key=lambda x: x.score, reverse=True)
+            cluster_results = cluster_results[:top_k]
+            
+            await ctx.info(f"Generated {len(cluster_results)} entity-type clusters")
+            return cluster_results
+        
+    except Exception as e:
+        await ctx.error(f"Cluster search error: {str(e)}")
+        return []
+
+
+@mcp.tool() 
+async def semantic_search_all(
+    project: str,
+    query: str,
+    top_k_per_type: int = 3,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> SemanticSearchResults:
+    """
+    Perform comprehensive semantic search across entities, relations, and text chunks.
+    
+    Args:
+        project: Project name to search within
+        query: Search query text
+        top_k_per_type: Maximum results per search type (default: 3)
+    
+    Returns:
+        Combined search results from all types
+    """
+    try:
+        await ctx.info(f"Performing comprehensive semantic search for: '{query}' in project: {project}")
+        
+        # Search all types concurrently for better performance
+        entities_task = search_entities(project, query, top_k_per_type, ctx)
+        relations_task = search_relations(project, query, top_k_per_type, ctx)  
+        chunks_task = search_text_chunks(project, query, top_k_per_type, ctx)
+        clusters_task = search_clusters(project, query, top_k_per_type, ctx)
+        
+        entities, relations, text_chunks, clusters = await asyncio.gather(
+            entities_task, relations_task, chunks_task, clusters_task,
+            return_exceptions=True
+        )
+        
+        # Handle any exceptions from concurrent searches
+        if isinstance(entities, Exception):
+            await ctx.warning(f"Entity search failed: {entities}")
+            entities = []
+        if isinstance(relations, Exception):
+            await ctx.warning(f"Relation search failed: {relations}")
+            relations = []
+        if isinstance(text_chunks, Exception):
+            await ctx.warning(f"Text chunk search failed: {text_chunks}")
+            text_chunks = []
+        if isinstance(clusters, Exception):
+            await ctx.warning(f"Cluster search failed: {clusters}")
+            clusters = []
+        
+        total = len(entities) + len(relations) + len(text_chunks) + len(clusters)
+        
+        await ctx.info(f"Comprehensive search completed: {total} total results")
+        
+        return SemanticSearchResults(
+            query=query,
+            project=project,
+            entities=entities,
+            relations=relations,
+            text_chunks=text_chunks,
+            clusters=clusters,
+            total_results=total
+        )
+        
+    except Exception as e:
+        await ctx.error(f"Comprehensive search error: {str(e)}")
+        return SemanticSearchResults(
+            query=query,
+            project=project,
+            entities=[],
+            relations=[],
+            text_chunks=[],
+            clusters=[],
+            total_results=0
+        )
+
+
+@mcp.tool()
+async def get_project_stats(
+    project: str,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> Dict[str, Any]:
+    """
+    Get statistics for a project's knowledge graph.
+    
+    Args:
+        project: Project name
+    
+    Returns:
+        Project statistics including entity, relation, and chunk counts
+    """
+    try:
+        await ctx.info(f"Getting stats for project: {project}")
+        
+        agraph = await get_or_create_agraph(ctx, project)
+        stats = await agraph.get_stats()
+        
+        project_stats = {
+            "project": project,
+            "initialized": True,
+            **stats
+        }
+        
+        await ctx.info(f"Project stats retrieved: {project_stats}")
+        return project_stats
+        
+    except Exception as e:
+        await ctx.error(f"Error getting project stats: {str(e)}")
+        return {
+            "project": project,
+            "initialized": False,
+            "error": str(e)
+        }
+
+
+@mcp.tool()
+async def get_server_config(
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> Dict[str, Any]:
+    """
+    Get current server configuration.
+    
+    Returns:
+        Current server configuration including MCP server and AGraph settings
+    """
+    try:
+        app_ctx = ctx.request_context.lifespan_context
+        
+        # Add runtime information
+        runtime_info = {
+            "active_projects": list(app_ctx.instances.keys()),
+            "active_project_count": len(app_ctx.instances),
+            "max_projects": app_ctx.config['mcp_server']['max_concurrent_projects']
+        }
+        
+        return {
+            **app_ctx.config,
+            "runtime": runtime_info
+        }
+        
+    except Exception as e:
+        await ctx.error(f"Error getting server config: {str(e)}")
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def list_available_projects(
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[Dict[str, Any]]:
+    """
+    List all available projects in the project directory.
+    
+    Returns:
+        List of available projects (both active and inactive)
+    """
+    try:
+        app_ctx = ctx.request_context.lifespan_context
+        projects = []
+        
+        # Scan project directory for available projects
+        project_base = app_ctx.project_base_dir
+        if project_base.exists():
+            for project_path in project_base.iterdir():
+                if project_path.is_dir() and not project_path.name.startswith('.'):
+                    project_name = project_path.name
+                    
+                    # Check if project has knowledge graph data
+                    has_data = any([
+                        (project_path / "vector_store").exists(),
+                        (project_path / "agraph_vectordb").exists(),
+                        (project_path / "chroma").exists(),
+                        (project_path / "knowledge_graph.json").exists(),
+                        (project_path / "knowledge_graphs").exists(),
+                        (project_path / "entities.json").exists(),
+                        (project_path / "config.json").exists(),
+                        (project_path / "document_storage").exists(),
+                        (project_path / "cache").exists(),
+                        list(project_path.glob("*.db")),
+                        list(project_path.glob("*.index")),
+                        list(project_path.glob("**/*.sqlite3")),
+                        list(project_path.glob("**/chroma.sqlite3")),
+                    ])
+                    
+                    project_info = {
+                        "project_name": project_name,
+                        "project_path": str(project_path),
+                        "has_data": has_data,
+                        "is_active": project_name in app_ctx.instances,
+                        "status": "unknown"
+                    }
+                    
+                    # Get stats if project is active
+                    if project_name in app_ctx.instances:
+                        try:
+                            stats = await app_ctx.instances[project_name].get_stats()
+                            project_info["status"] = "active"
+                            project_info["stats"] = stats
+                        except Exception as e:
+                            project_info["status"] = "error"
+                            project_info["error"] = str(e)
                     else:
-                        # Fallback to simple keyword matching
-                        entities = list(self.agraph.knowledge_graph.entities.values())
-                        matching_entities = [
-                            e for e in entities
-                            if query.lower() in e.name.lower() or
-                               (e.description and query.lower() in e.description.lower())
-                        ]
+                        project_info["status"] = "available" if has_data else "empty"
+                    
+                    projects.append(project_info)
+        
+        await ctx.info(f"Found {len(projects)} projects in {project_base}")
+        return sorted(projects, key=lambda x: x["project_name"])
+        
+    except Exception as e:
+        await ctx.error(f"Error listing available projects: {str(e)}")
+        return []
 
-                        if matching_entities:
-                            response_text += f"## Matching Entities ({len(matching_entities[:limit])})\n\n"
-                            for entity in matching_entities[:limit]:
-                                response_text += f"- **{entity.name}** ({entity.entity_type.value if entity.entity_type else 'unknown'}): {entity.description or 'N/A'}\n"
-                            response_text += "\n"
-                except Exception as e:
-                    logger.warning(f"Entity search failed: {e}")
 
-            # Search text chunks if requested
-            if search_type in ["all", "text_chunks"]:
-                try:
-                    if self.agraph.vector_store:
-                        # Try vector search
-                        chunk_results = await self.agraph.search_text_chunks(query, top_k=limit)
-                        if chunk_results:
-                            response_text += f"## Matching Text Chunks (Vector Search) ({len(chunk_results)})\n\n"
-                            for chunk, score in chunk_results:
-                                content_preview = chunk.content[:150]
-                                if len(chunk.content) > 150:
-                                    content_preview += '...'
-                                response_text += f"- **{chunk.source or chunk.id}** [Score: {score:.4f}]: {content_preview}\n"
-                            response_text += "\n"
-                    elif self.agraph.knowledge_graph and self.agraph.knowledge_graph.text_chunks:
-                        # Fallback to simple keyword matching
-                        text_chunks = list(self.agraph.knowledge_graph.text_chunks.values())
-                        matching_chunks = [
-                            c for c in text_chunks
-                            if query.lower() in c.content.lower() or
-                               (c.title and query.lower() in c.title.lower()) or
-                               (c.source and query.lower() in c.source.lower())
-                        ]
+@mcp.tool()
+async def list_active_projects(
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> List[Dict[str, Any]]:
+    """
+    List currently active projects (loaded in memory).
+    
+    Returns:
+        List of active projects with basic statistics
+    """
+    try:
+        app_ctx = ctx.request_context.lifespan_context
+        projects = []
+        
+        for project_name, agraph in app_ctx.instances.items():
+            try:
+                stats = await agraph.get_stats()
+                projects.append({
+                    "project_name": project_name,
+                    "status": "active",
+                    "stats": stats
+                })
+            except Exception as e:
+                projects.append({
+                    "project_name": project_name,
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        await ctx.info(f"Listed {len(projects)} active projects")
+        return projects
+        
+    except Exception as e:
+        await ctx.error(f"Error listing active projects: {str(e)}")
+        return []
 
-                        if matching_chunks:
-                            response_text += f"## Matching Text Chunks ({len(matching_chunks[:limit])})\n\n"
-                            for chunk in matching_chunks[:limit]:
-                                content_preview = chunk.content[:150]
-                                if len(chunk.content) > 150:
-                                    content_preview += '...'
-                                response_text += f"- **{chunk.source or chunk.id}**: {content_preview}\n"
-                            response_text += "\n"
-                except Exception as e:
-                    logger.warning(f"Text chunk search failed: {e}")
 
-            # Search relations if requested
-            if search_type in ["all", "relations"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.relations:
-                try:
-                    if self.agraph.vector_store:
-                        # Try vector search
-                        relation_results = await self.agraph.search_relations(query, top_k=limit)
-                        if relation_results:
-                            response_text += f"## Matching Relations (Vector Search) ({len(relation_results)})\n\n"
-                            for relation, score in relation_results:
-                                head_name = relation.head_entity.name if relation.head_entity else "Unknown"
-                                tail_name = relation.tail_entity.name if relation.tail_entity else "Unknown"
-                                response_text += f"- **{head_name}** --[{relation.relation_type.value if relation.relation_type else 'unknown'}]--> **{tail_name}** [Score: {score:.4f}]: {relation.description or 'N/A'}\n"
-                            response_text += "\n"
-                    else:
-                        # Fallback to simple keyword matching
-                        relations = list(self.agraph.knowledge_graph.relations.values())
-                        matching_relations = [
-                            r for r in relations
-                            if (r.description and query.lower() in r.description.lower()) or
-                               (r.head_entity and query.lower() in r.head_entity.name.lower()) or
-                               (r.tail_entity and query.lower() in r.tail_entity.name.lower())
-                        ]
+@mcp.tool()
+async def cleanup_project(
+    project: str,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> Dict[str, Any]:
+    """
+    Cleanup and remove a specific project instance.
+    
+    Args:
+        project: Project name to cleanup
+    
+    Returns:
+        Cleanup operation result
+    """
+    try:
+        app_ctx = ctx.request_context.lifespan_context
+        
+        if project not in app_ctx.instances:
+            return {
+                "project": project,
+                "status": "not_found",
+                "message": f"Project '{project}' is not active"
+            }
+        
+        await ctx.info(f"Cleaning up project: {project}")
+        
+        # Get the AGraph instance and cleanup
+        agraph = app_ctx.instances[project]
+        try:
+            await agraph.__aexit__(None, None, None)
+        except Exception as cleanup_error:
+            await ctx.warning(f"Error during AGraph cleanup: {cleanup_error}")
+        
+        # Remove from instances
+        del app_ctx.instances[project]
+        
+        await ctx.info(f"✅ Project '{project}' cleaned up successfully")
+        return {
+            "project": project,
+            "status": "cleaned",
+            "message": f"Project '{project}' has been cleaned up",
+            "remaining_projects": len(app_ctx.instances)
+        }
+        
+    except Exception as e:
+        error = handle_agraph_error(e, "project cleanup", {"project": project})
+        await ctx.error(f"Failed to cleanup project '{project}': {error.message}")
+        return {
+            "project": project,
+            "status": "error",
+            "error": error.message
+        }
 
-                        if matching_relations:
-                            response_text += f"## Matching Relations ({len(matching_relations[:limit])})\n\n"
-                            for relation in matching_relations[:limit]:
-                                head_name = relation.head_entity.name if relation.head_entity else "Unknown"
-                                tail_name = relation.tail_entity.name if relation.tail_entity else "Unknown"
-                                response_text += f"- **{head_name}** --[{relation.relation_type.value if relation.relation_type else 'unknown'}]--> **{tail_name}**: {relation.description or 'N/A'}\n"
-                            response_text += "\n"
-                except Exception as e:
-                    logger.warning(f"Relation search failed: {e}")
 
-            # Search clusters if requested
-            if search_type in ["all", "clusters"] and self.agraph.knowledge_graph and self.agraph.knowledge_graph.clusters:
-                try:
-                    clusters = list(self.agraph.knowledge_graph.clusters.values())
-                    # Simple keyword matching for clusters
-                    matching_clusters = [
-                        c for c in clusters
-                        if query.lower() in c.name.lower() or
-                           (c.description and query.lower() in c.description.lower())
-                    ]
+@mcp.tool()
+async def validate_project(
+    project: str,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> Dict[str, Any]:
+    """
+    Validate if a project has valid knowledge graph data.
+    
+    Args:
+        project: Project name to validate
+    
+    Returns:
+        Validation result with details
+    """
+    try:
+        app_ctx = ctx.request_context.lifespan_context
+        project_path = app_ctx.project_base_dir / project
+        
+        if not project_path.exists():
+            return {
+                "project": project,
+                "valid": False,
+                "reason": "Project directory does not exist",
+                "path": str(project_path)
+            }
+        
+        # Check for various knowledge graph data indicators
+        data_indicators = {
+            "vector_store": (project_path / "vector_store").exists(),
+            "agraph_vectordb": (project_path / "agraph_vectordb").exists(),
+            "chroma": (project_path / "chroma").exists(),
+            "knowledge_graph": (project_path / "knowledge_graph.json").exists(),
+            "entities": (project_path / "entities.json").exists(),
+            "relations": (project_path / "relations.json").exists(),
+            "config": (project_path / "config.json").exists(),
+            "document_storage": (project_path / "document_storage").exists(),
+            "database_files": bool(list(project_path.glob("*.db"))),
+            "index_files": bool(list(project_path.glob("*.index"))),
+            "pickle_files": bool(list(project_path.glob("*.pkl"))),
+            "sqlite_files": bool(list(project_path.glob("**/*.sqlite3"))),
+            "chroma_db": bool(list(project_path.glob("**/chroma.sqlite3"))),
+        }
+        
+        has_data = any(data_indicators.values())
+        
+        # Get file count and size
+        all_files = list(project_path.rglob("*"))
+        file_count = len([f for f in all_files if f.is_file()])
+        total_size = sum(f.stat().st_size for f in all_files if f.is_file())
+        
+        return {
+            "project": project,
+            "valid": has_data,
+            "path": str(project_path),
+            "data_indicators": data_indicators,
+            "file_count": file_count,
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "is_active": project in app_ctx.instances
+        }
+        
+    except Exception as e:
+        error = handle_agraph_error(e, "project validation", {"project": project})
+        await ctx.error(f"Failed to validate project '{project}': {error.message}")
+        return {
+            "project": project,
+            "valid": False,
+            "error": error.message
+        }
 
-                    if matching_clusters:
-                        response_text += f"## Matching Clusters ({len(matching_clusters[:limit])})\n\n"
-                        for cluster in matching_clusters[:limit]:
-                            response_text += f"- **{cluster.name}**: {cluster.description or 'N/A'} ({len(cluster.entities) if cluster.entities else 0} entities)\n"
-                        response_text += "\n"
-                except Exception as e:
-                    logger.warning(f"Cluster search failed: {e}")
 
-            if len(response_text.split('\n')) <= 3:  # Only header, no results found
-                response_text += "No matching results found for your query. Try different keywords or search types."
-
-            return [TextContent(type="text", text=response_text)]
-
-        except Exception as e:
-            logger.error(f"Natural language search failed: {e}")
-            return [TextContent(type="text", text=f"Natural language search failed: {str(e)}")]
-
-    async def run(self):
-        """Run the MCP server"""
-        import mcp.server.stdio
-
-        logger.info("Starting AGraph MCP Server...")
-        logger.info(f"Workdir: {config.workdir}")
-        logger.info(f"Default Collection: {config.default_collection}")
-
-        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-            await self.server.run(read_stream, write_stream)
-
-    async def cleanup(self):
-        """Cleanup resources"""
-        if self.agraph:
-            await self.agraph.close()
+@mcp.tool()
+async def set_project_directory(
+    project_dir: str,
+    ctx: Context[ServerSession, AGraphContext] = None
+) -> Dict[str, Any]:
+    """
+    Update the project base directory configuration.
+    
+    Args:
+        project_dir: New project directory path
+    
+    Returns:
+        Operation result
+    """
+    try:
+        from pathlib import Path
+        
+        # Validate the new directory
+        new_path = Path(project_dir)
+        if not new_path.is_absolute():
+            new_path = Path.cwd() / project_dir
+        
+        # Create directory if it doesn't exist
+        new_path.mkdir(parents=True, exist_ok=True)
+        
+        # Update configuration
+        config_manager = get_config_manager()
+        config_manager.agraph_config.project_dir = str(new_path)
+        config_manager.save_config()
+        
+        # Update app context
+        app_ctx = ctx.request_context.lifespan_context
+        app_ctx.project_base_dir = new_path
+        app_ctx.config['agraph']['project_dir'] = str(new_path)
+        
+        await ctx.info(f"Project directory updated to: {new_path}")
+        
+        # List available projects in new directory
+        available_projects = []
+        if new_path.exists():
+            for project_path in new_path.iterdir():
+                if project_path.is_dir() and not project_path.name.startswith('.'):
+                    available_projects.append(project_path.name)
+        
+        return {
+            "success": True,
+            "old_directory": str(app_ctx.project_base_dir),
+            "new_directory": str(new_path),
+            "available_projects": sorted(available_projects),
+            "project_count": len(available_projects)
+        }
+        
+    except Exception as e:
+        error = handle_agraph_error(e, "set project directory", {"project_dir": project_dir})
+        await ctx.error(f"Failed to set project directory: {error.message}")
+        return {
+            "success": False,
+            "error": error.message
+        }
 
 
 def main():
-    """Main entry point"""
-    server = AGraphMCPServer()
-
+    """Run the AGraph MCP server."""
     try:
-        asyncio.run(server.run())
+        mcp.run()
     except KeyboardInterrupt:
-        logger.info("Server interrupted by user")
+        print("\n⏹️  AGraph MCP Server stopped by user")
     except Exception as e:
-        logger.error(f"Server error: {e}")
-    finally:
-        asyncio.run(server.cleanup())
+        print(f"❌ Server error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
