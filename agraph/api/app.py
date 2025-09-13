@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from ..logger import logger
 from .dependencies import close_agraph_instance, get_agraph_instance
 from .models import ErrorResponse, HealthResponse, ResponseStatus
+from .. import get_version
 from .routers import (
     cache_router,
     chat_router,
@@ -91,7 +92,7 @@ app.include_router(system_router)
 @app.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Health check endpoint."""
-    return HealthResponse()
+    return HealthResponse(version=get_version())
 
 
 # Exception handlers

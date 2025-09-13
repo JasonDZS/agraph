@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agraph": {
+      "command": "python",
+      "args": ["/path/to/agraph-mcp/start_server.py"],
+      "env": {
+        "AGRAPH_API_BASE_URL": "http://localhost:8000",
+        "AGRAPH_DEFAULT_PROJECT": "my_knowledge_base",
+        "AGRAPH_TIMEOUT": "30"
+      }
+    }
+  }
+}

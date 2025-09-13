@@ -16,7 +16,7 @@ from .builder.builder import KnowledgeGraphBuilder
 from .chunker import SimpleTokenChunker, TokenChunker
 from .config import BuilderConfig, Settings, get_settings
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "JasonDZS"
 __email__ = "dizhensheng@sz.tsinghua.edu.cn"
 

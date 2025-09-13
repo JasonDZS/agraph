@@ -17,6 +17,18 @@ class OpenAIConfig(BaseModel):
     api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     api_base: str = Field(default_factory=lambda: os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"))
 
+    def mask_sensitive_data(self) -> dict:
+        """Return configuration with masked sensitive data for safe serialization."""
+        data = self.model_dump()
+        if data["api_key"]:
+            # Show first 3 and last 4 characters, mask the rest
+            key = data["api_key"]
+            if len(key) > 7:
+                data["api_key"] = f"{key[:3]}{'*' * (len(key) - 7)}{key[-4:]}"
+            else:
+                data["api_key"] = "*" * len(key)
+        return data
+
 
 class LLMConfig(BaseModel):
     """Language model configuration."""

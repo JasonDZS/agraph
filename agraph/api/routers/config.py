@@ -41,14 +41,14 @@ async def get_config(
 
             config_data: Dict[str, Any] = {
                 "project_info": project_info,
-                "settings": settings.to_dict(),
+                "settings": settings.to_dict_safe(),
                 "config_source": "project_local_cache",
                 "config_file_path": config_file_path,
                 "is_project_specific": True,
             }
         else:
             settings = get_settings()
-            config_data = settings.to_dict()
+            config_data = settings.to_dict_safe()
             config_data["config_source"] = "global_settings"
             config_data["is_project_specific"] = False
 
@@ -63,7 +63,7 @@ async def get_config(
                 "enable_knowledge_graph": agraph.enable_knowledge_graph,
                 "is_initialized": agraph.is_initialized,
                 "has_knowledge_graph": agraph.has_knowledge_graph,
-                "builder_config": agraph.config.to_dict() if agraph.config else None,
+                "builder_config": agraph.config.to_dict_safe() if agraph.config else None,
             }
             # Don't close the instance as it's cached
         except Exception as runtime_error:
@@ -218,7 +218,7 @@ async def update_config(
                     status=ResponseStatus.SUCCESS,
                     message=message,
                     data={
-                        **new_settings.to_dict(),
+                        **new_settings.to_dict_safe(),
                         "config_saved_to": config_path,
                         "config_source": "project_local_cache",
                     },
@@ -230,7 +230,7 @@ async def update_config(
             return ConfigResponse(
                 status=ResponseStatus.SUCCESS,
                 message=message,
-                data=new_settings.to_dict(),
+                data=new_settings.to_dict_safe(),
             )
 
         if project_name:
@@ -243,7 +243,7 @@ async def update_config(
         return ConfigResponse(
             status=ResponseStatus.SUCCESS,
             message=message,
-            data=settings.to_dict(),
+            data=settings.to_dict_safe(),
         )
 
     except Exception as e:
@@ -269,7 +269,7 @@ async def reset_config(
         return ConfigResponse(
             status=ResponseStatus.SUCCESS,
             message=message,
-            data=new_settings.to_dict(),
+            data=new_settings.to_dict_safe(),
         )
     except Exception as e:
         logger.error(f"Failed to reset configuration: {e}")
@@ -297,7 +297,7 @@ async def save_config_to_file(
         return ConfigFileResponse(
             status=ResponseStatus.SUCCESS,
             message=message,
-            data=settings.to_dict(),
+            data=settings.to_dict_safe(),
             file_path=file_path,
         )
     except Exception as e:
@@ -326,7 +326,7 @@ async def load_config_from_file(
         return ConfigFileResponse(
             status=ResponseStatus.SUCCESS,
             message=message,
-            data=new_settings.to_dict(),
+            data=new_settings.to_dict_safe(),
             file_path=file_path,
         )
     except FileNotFoundError as e:
@@ -372,7 +372,7 @@ async def copy_project_config(project_name: str, source_project: str) -> ConfigR
         return ConfigResponse(
             status=ResponseStatus.SUCCESS,
             message=f"Configuration successfully copied from '{source_project}' to '{project_name}'",
-            data=new_settings.to_dict(),
+            data=new_settings.to_dict_safe(),
         )
     except FileNotFoundError as e:
         logger.error(f"Source project configuration not found: {e}")
@@ -418,7 +418,7 @@ async def load_project_config_from_backup(project_name: str) -> ConfigResponse:
             status=ResponseStatus.SUCCESS,
             message=f"Configuration successfully loaded from backup for project '{project_name}'",
             data={
-                **loaded_settings.to_dict(),
+                **loaded_settings.to_dict_safe(),
                 "loaded_from": str(project_config_file),
                 "config_saved_to": config_path,
                 "config_source": "backup_file",

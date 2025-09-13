@@ -723,6 +723,71 @@ class AGraph:
         except Exception as e:
             logger.error(f"Failed to save knowledge graph to disk: {e}")
 
+    def delete_chroma_files(self) -> bool:
+        """Delete ChromaDB persistent files from disk.
+        
+        Returns:
+            True if files were deleted or didn't exist, False if deletion failed.
+        """
+        try:
+            import os
+            import shutil
+            
+            # ChromaDB persistent directory path
+            chroma_dir = os.path.join(self.persist_directory, "chroma")
+            
+            if os.path.exists(chroma_dir):
+                # Delete all contents inside the chroma directory, but keep the directory itself
+                for filename in os.listdir(chroma_dir):
+                    file_path = os.path.join(chroma_dir, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete {file_path}: {e}")
+                
+                logger.info(f"ChromaDB persistent files content deleted from: {chroma_dir}")
+            else:
+                logger.info(f"No ChromaDB persistent directory found: {chroma_dir}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete ChromaDB files: {e}")
+            return False
+
+    def delete_knowledge_graph_from_disk(self) -> bool:
+        """Delete knowledge graph file from disk.
+        
+        Returns:
+            True if file was deleted or didn't exist, False if deletion failed.
+        """
+        try:
+            # Get knowledge graph file path
+            kg_storage_dir = os.path.join(self.persist_directory, "knowledge_graphs")
+            kg_file_path = os.path.join(kg_storage_dir, f"{self.collection_name}_kg.json")
+            
+            if os.path.exists(kg_file_path):
+                os.remove(kg_file_path)
+                logger.info(f"Knowledge graph file deleted: {kg_file_path}")
+            else:
+                logger.info(f"No knowledge graph file found to delete: {kg_file_path}")
+            
+            # Also try to remove the storage directory if it's empty
+            try:
+                if os.path.exists(kg_storage_dir) and not os.listdir(kg_storage_dir):
+                    os.rmdir(kg_storage_dir)
+                    logger.info(f"Empty knowledge graph storage directory removed: {kg_storage_dir}")
+            except OSError:
+                # Directory not empty or other issues, ignore
+                pass
+                
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete knowledge graph from disk: {e}")
+            return False
+
     def load_knowledge_graph_from_disk(self) -> bool:
         """Load knowledge graph from disk if it exists.
 
@@ -1136,16 +1201,34 @@ class AGraph:
         return stats
 
     async def clear_all(self) -> bool:
-        """Clear all data."""
+        """Clear all data including vector store, cache, and disk files."""
         try:
+            # Clear vector store
             if self.vector_store:
                 await self.vector_store.clear_all()
 
+            # Clear builder cache
             if self.builder and hasattr(self.builder, "clear_cache"):
                 self.builder.clear_cache()
 
+            # Delete knowledge graph file from disk
+            self.delete_knowledge_graph_from_disk()
+
+            # Delete ChromaDB persistent files from disk
+            self.delete_chroma_files()
+
+            # Close current vector store to release file handles
+            if self.vector_store:
+                await self.vector_store.close()
+                self.vector_store = None
+
+            # Re-initialize vector store to ensure clean state
+            await self._initialize_vector_store()
+
+            # Clear in-memory knowledge graph
             self.knowledge_graph = None
-            logger.info("All data cleared")
+            
+            logger.info("All data cleared including disk files and ChromaDB persistent files, vector store reinitialized")
             return True
 
         except Exception as e:

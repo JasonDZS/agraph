@@ -16,7 +16,6 @@ from ...config import (
     get_settings,
     list_projects,
     load_project_settings,
-    set_current_project,
 )
 from ...logger import logger
 from ..dependencies import ensure_project_directory, save_project_config_changes
@@ -25,7 +24,6 @@ from ..models import (
     ProjectDeleteRequest,
     ProjectListResponse,
     ProjectResponse,
-    ProjectSwitchRequest,
     ResponseStatus,
 )
 
@@ -37,17 +35,11 @@ async def list_all_projects() -> ProjectListResponse:
     """List all available projects."""
     try:
         projects = list_projects()
-        current_project = get_current_project()
 
         return ProjectListResponse(
             status=ResponseStatus.SUCCESS,
             message=f"Found {len(projects)} projects",
-            projects=projects,
-            data={
-                "current_project": current_project,
-                "total_count": len(projects),
-                "projects": projects,
-            },
+            projects=projects
         )
     except Exception as e:
         logger.error(f"Failed to list projects: {e}")
@@ -69,12 +61,19 @@ async def create_new_project(request: ProjectCreateRequest) -> ProjectResponse:
         project_settings = base_settings.model_copy(deep=True)
         project_settings.current_project = request.name
 
-        # Save Settings configuration directly to config.json
+        # Save Settings configuration directly to config.json with secure permissions
         project_config_file = Path(project_paths["config_file"])
 
         project_config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(project_config_file, "w", encoding="utf-8") as f:
             json.dump(project_settings.to_dict(), f, indent=2, ensure_ascii=False)
+        
+        # Set secure file permissions (readable only by owner)
+        try:
+            import stat
+            project_config_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        except Exception as e:
+            logger.warning(f"Could not set secure permissions on config file: {e}")
 
         config_path = str(project_config_file)
 
@@ -92,7 +91,7 @@ async def create_new_project(request: ProjectCreateRequest) -> ProjectResponse:
                 "backup_config_path": str(project_config_file),
                 "project_paths": project_paths,
                 "settings_saved": True,
-                "complete_settings": project_settings.to_dict(),
+                "complete_settings": project_settings.to_dict_safe(),
             },
         )
     except ValueError as e:
@@ -103,105 +102,105 @@ async def create_new_project(request: ProjectCreateRequest) -> ProjectResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/current", response_model=ProjectResponse)
-async def get_current_project_info() -> ProjectResponse:
-    """Get current active project information with local config details."""
-    try:
-        current_project = get_current_project()
+# @router.get("/current", response_model=ProjectResponse)
+# async def get_current_project_info() -> ProjectResponse:
+#     """Get current active project information with local config details."""
+#     try:
+#         current_project = get_current_project()
 
-        if not current_project:
-            return ProjectResponse(
-                status=ResponseStatus.SUCCESS,
-                message="No current project set (using default workspace)",
-                data={"current_project": None, "using_default": True},
-            )
+#         if not current_project:
+#             return ProjectResponse(
+#                 status=ResponseStatus.SUCCESS,
+#                 message="No current project set (using default workspace)",
+#                 data={"current_project": None, "using_default": True},
+#             )
 
-        project_paths = get_project_paths(current_project)
-        project_config_path = Path(project_paths["config_file"])
+#         project_paths = get_project_paths(current_project)
+#         project_config_path = Path(project_paths["config_file"])
 
-        # Load project config.json (now directly contains Settings)
-        project_data: Dict[str, Any] = {"current_project": current_project, "paths": project_paths}
+#         # Load project config.json (now directly contains Settings)
+#         project_data: Dict[str, Any] = {"current_project": current_project, "paths": project_paths}
 
-        if project_config_path.exists():
-            with open(project_config_path, "r", encoding="utf-8") as f:
-                settings_data = json.load(f)
+#         if project_config_path.exists():
+#             with open(project_config_path, "r", encoding="utf-8") as f:
+#                 settings_data = json.load(f)
 
-                # config.json now directly contains Settings data
-                project_data["settings_data"] = settings_data
-                project_data["backup_available"] = True
-                project_data["config_format"] = "direct_settings"
-        else:
-            project_data["backup_available"] = False
+#                 # config.json now directly contains Settings data
+#                 project_data["settings_data"] = settings_data
+#                 project_data["backup_available"] = True
+#                 project_data["config_format"] = "direct_settings"
+#         else:
+#             project_data["backup_available"] = False
 
-        # Add current settings from local cache
-        try:
-            project_settings = load_project_settings(current_project)
-            project_data["current_settings"] = project_settings.to_dict()
-            project_data["config_cache_status"] = "loaded_from_local"
-        except Exception as e:
-            logger.warning(f"Could not load project settings from cache: {e}")
-            project_data["config_cache_status"] = "error"
+#         # Add current settings from local cache
+#         try:
+#             project_settings = load_project_settings(current_project)
+#             project_data["current_settings"] = project_settings.to_dict_safe()
+#             project_data["config_cache_status"] = "loaded_from_local"
+#         except Exception as e:
+#             logger.warning(f"Could not load project settings from cache: {e}")
+#             project_data["config_cache_status"] = "error"
 
-            # Try to recover from backup if available
-            if project_data.get("backup_available") and "settings_data" in project_data:
-                logger.info(f"Attempting to recover settings from backup for project: {current_project}")
-                try:
-                    # Create Settings object from backup
-                    recovered_settings = Settings.model_validate(project_data["settings_data"])
+#             # Try to recover from backup if available
+#             if project_data.get("backup_available") and "settings_data" in project_data:
+#                 logger.info(f"Attempting to recover settings from backup for project: {current_project}")
+#                 try:
+#                     # Create Settings object from backup
+#                     recovered_settings = Settings.model_validate(project_data["settings_data"])
 
-                    # Save recovered settings to cache
-                    config_path = await save_project_config_changes(current_project, recovered_settings)
-                    project_data["current_settings"] = recovered_settings.to_dict()
-                    project_data["config_cache_status"] = "recovered_from_backup"
-                    project_data["recovery_log"] = f"Settings recovered from backup and saved to {config_path}"
-                    logger.info(f"Successfully recovered settings for project: {current_project}")
-                except Exception as recovery_error:
-                    logger.error(f"Failed to recover settings from backup: {recovery_error}")
-                    project_data["recovery_error"] = str(recovery_error)
+#                     # Save recovered settings to cache
+#                     config_path = await save_project_config_changes(current_project, recovered_settings)
+#                     project_data["current_settings"] = recovered_settings.to_dict_safe()
+#                     project_data["config_cache_status"] = "recovered_from_backup"
+#                     project_data["recovery_log"] = f"Settings recovered from backup and saved to {config_path}"
+#                     logger.info(f"Successfully recovered settings for project: {current_project}")
+#                 except Exception as recovery_error:
+#                     logger.error(f"Failed to recover settings from backup: {recovery_error}")
+#                     project_data["recovery_error"] = str(recovery_error)
 
-        return ProjectResponse(
-            status=ResponseStatus.SUCCESS,
-            message=f"Current project: {current_project}",
-            project_name=current_project,
-            data=project_data,
-        )
-    except Exception as e:
-        logger.error(f"Failed to get current project: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+#         return ProjectResponse(
+#             status=ResponseStatus.SUCCESS,
+#             message=f"Current project: {current_project}",
+#             project_name=current_project,
+#             data=project_data,
+#         )
+#     except Exception as e:
+#         logger.error(f"Failed to get current project: {e}")
+#         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/switch", response_model=ProjectResponse)
-async def switch_project(request: ProjectSwitchRequest) -> ProjectResponse:
-    """Switch to a different project (or no project)."""
-    try:
-        # Reset instances to ensure clean switch
-        reset_instances()
+# @router.post("/switch", response_model=ProjectResponse)
+# async def switch_project(request: ProjectSwitchRequest) -> ProjectResponse:
+#     """Switch to a different project (or no project)."""
+#     try:
+#         # Reset instances to ensure clean switch
+#         reset_instances()
 
-        new_settings = set_current_project(request.project_name)
-        logger.info(f"Switched to project: {request.project_name or 'default'}")
+#         new_settings = set_current_project(request.project_name)
+#         logger.info(f"Switched to project: {request.project_name or 'default'}")
 
-        message = (
-            f"Switched to project: {request.project_name}"
-            if request.project_name
-            else "Switched to default workspace (no project)"
-        )
+#         message = (
+#             f"Switched to project: {request.project_name}"
+#             if request.project_name
+#             else "Switched to default workspace (no project)"
+#         )
 
-        return ProjectResponse(
-            status=ResponseStatus.SUCCESS,
-            message=message,
-            project_name=request.project_name,
-            data={
-                "previous_project": get_current_project(),
-                "new_project": request.project_name,
-                "settings": new_settings.to_dict(),
-            },
-        )
-    except ValueError as e:
-        logger.error(f"Invalid project switch request: {e}")
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"Failed to switch project: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+#         return ProjectResponse(
+#             status=ResponseStatus.SUCCESS,
+#             message=message,
+#             project_name=request.project_name,
+#             data={
+#                 "previous_project": get_current_project(),
+#                 "new_project": request.project_name,
+#                 "settings": new_settings.to_dict_safe(),
+#             },
+#         )
+#     except ValueError as e:
+#         logger.error(f"Invalid project switch request: {e}")
+#         raise HTTPException(status_code=400, detail=str(e)) from e
+#     except Exception as e:
+#         logger.error(f"Failed to switch project: {e}")
+#         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{project_name}", response_model=ProjectResponse)
@@ -222,8 +221,14 @@ async def get_project_info(project_name: str) -> ProjectResponse:
             with open(project_config_path, "r", encoding="utf-8") as f:
                 settings_data = json.load(f)
 
-                # config.json now directly contains Settings data
-                project_data["settings_data"] = settings_data
+                # Mask sensitive data in settings_data before adding to response
+                try:
+                    temp_settings = Settings.model_validate(settings_data)
+                    project_data["settings_data"] = temp_settings.to_dict_safe()
+                except Exception:
+                    # Fallback: if validation fails, just mark as available without exposing data
+                    project_data["settings_data"] = {"masked": "Configuration available but not displayed for security"}
+                
                 project_data["backup_available"] = True
                 project_data["config_format"] = "direct_settings"
         else:
@@ -232,7 +237,7 @@ async def get_project_info(project_name: str) -> ProjectResponse:
         # Load current settings from local cache
         try:
             project_settings = load_project_settings(project_name)
-            project_data["current_settings"] = project_settings.to_dict()
+            project_data["current_settings"] = project_settings.to_dict_safe()
             project_data["config_cache_status"] = "loaded_from_local"
             project_data["config_file_path"] = str(project_config_path)
         except Exception as e:
@@ -249,7 +254,7 @@ async def get_project_info(project_name: str) -> ProjectResponse:
 
                     # Save recovered settings to cache
                     config_path = await save_project_config_changes(project_name, recovered_settings)
-                    project_data["current_settings"] = recovered_settings.to_dict()
+                    project_data["current_settings"] = recovered_settings.to_dict_safe()
                     project_data["config_cache_status"] = "recovered_from_backup"
                     project_data["recovery_log"] = f"Settings recovered from backup and saved to {config_path}"
                     logger.info(f"Successfully recovered settings for project: {project_name}")
@@ -370,7 +375,7 @@ async def recover_project_settings_from_backup(project_name: str) -> ProjectResp
             data={
                 "recovery_source": str(project_config_path),
                 "config_cache_path": config_path,
-                "recovered_settings": recovered_settings.to_dict(),
+                "recovered_settings": recovered_settings.to_dict_safe(),
             },
         )
 

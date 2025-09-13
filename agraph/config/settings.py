@@ -114,6 +114,23 @@ class Settings(BaseModel):
 
         return result
 
+    def to_dict_safe(self) -> Dict[str, Any]:
+        """Convert settings to dictionary with masked sensitive data for API responses."""
+        result = {
+            "workdir": self.workdir,
+            "current_project": self.current_project,
+            "max_current": self.max_current,
+            "openai": self.openai.mask_sensitive_data(),
+            "llm": self.llm.model_dump(),
+            "embedding": self.embedding.model_dump(),
+            "graph": self.graph.model_dump(),
+            "text": self.text.model_dump(),
+            "rag": self.rag.model_dump(),
+            "builder": self.builder.to_dict_safe(),  # Use safe method
+        }
+
+        return result
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Settings":
         """Create settings from dictionary with validation."""

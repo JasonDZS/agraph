@@ -123,7 +123,6 @@ class ProjectResponse(BaseResponse):
 class ProjectListResponse(BaseResponse):
     """Project list response."""
 
-    data: Optional[Dict[str, Any]] = None
     projects: List[str] = Field(default_factory=list)
 
 
@@ -322,6 +321,8 @@ class StatsResponse(BaseResponse):
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     status: str = "healthy"
     timestamp: datetime = Field(default_factory=datetime.now)

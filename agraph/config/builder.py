@@ -123,6 +123,28 @@ class BuilderConfig:
             "openai_config": self.openai_config.model_dump(),
         }
 
+    def to_dict_safe(self) -> Dict[str, Any]:
+        """Convert config to dictionary with masked sensitive data for API responses."""
+        return {
+            "enable_cache": self.enable_cache,
+            "cache_dir": self.cache_dir,
+            "cache_ttl": self.cache_ttl,
+            "auto_cleanup": self.auto_cleanup,
+            "chunk_size": self.chunk_size,
+            "chunk_overlap": self.chunk_overlap,
+            "entity_confidence_threshold": self.entity_confidence_threshold,
+            "entity_types": [str(et) for et in self.entity_types],
+            "relation_confidence_threshold": self.relation_confidence_threshold,
+            "relation_types": [str(rt) for rt in self.relation_types],
+            "cluster_algorithm": self.cluster_algorithm,
+            "min_cluster_size": self.min_cluster_size,
+            "enable_user_interaction": self.enable_user_interaction,
+            "auto_save_edits": self.auto_save_edits,
+            "llm_config": self.llm_config.model_dump(),
+            "embedding_config": self.embedding_config.model_dump(),
+            "openai_config": self.openai_config.mask_sensitive_data(),
+        }
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "BuilderConfig":
         """Create config from dictionary with validation."""

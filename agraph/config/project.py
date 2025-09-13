@@ -13,6 +13,18 @@ from typing import Any, Dict, List, Optional
 
 from .settings import Settings, get_settings, update_settings
 
+# Import version directly to avoid circular imports
+try:
+    # Try to get version from parent module
+    import sys
+    parent_module = sys.modules.get('agraph')
+    if parent_module and hasattr(parent_module, '__version__'):
+        __version__ = parent_module.__version__
+    else:
+        __version__ = "0.2.2"  # Fallback version
+except ImportError:
+    __version__ = "0.2.2"  # Fallback version
+
 
 def get_config_file_path(workdir: Optional[str] = None, project_name: Optional[str] = None) -> str:
     """Get the path to the configuration file."""
@@ -113,7 +125,7 @@ def create_project(
         "project_name": project_name,
         "description": description or f"AGraph project: {project_name}",
         "created_at": datetime.now().isoformat(),
-        "version": "1.0.0",
+        "version": __version__,
         "paths": paths,
     }
 

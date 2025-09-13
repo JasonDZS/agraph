@@ -100,6 +100,10 @@ async def build_knowledge_graph(
         # Get project-specific instances
         agraph = await get_agraph_instance(project_name)
         doc_manager = get_document_manager(project_name)
+        
+        # Set knowledge graph enablement based on request
+        agraph.enable_knowledge_graph = request.enable_graph
+        
         texts_to_process = []
         document_info = []
 
@@ -176,7 +180,7 @@ async def build_knowledge_graph(
 
         logger.info(f"Building knowledge graph from {len(texts_to_process)} text sources")
 
-        # Build knowledge graph from texts
+        # Build knowledge graph from texts (will handle enable_graph internally)
         kg = await agraph.build_from_texts(
             texts=texts_to_process,
             graph_name=request.graph_name,
@@ -1132,6 +1136,65 @@ async def get_relations(
         raise
     except Exception as e:
         logger.error(f"Failed to get relations: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/delete", response_model=KnowledgeGraphStatusResponse)
+async def delete_knowledge_graph(
+    project_name: Optional[str] = Query(default=None, description="Project name for isolated knowledge graph"),
+) -> KnowledgeGraphStatusResponse:
+    """Delete knowledge graph and all associated data."""
+    try:
+        # Get project-specific instance
+        agraph = await get_agraph_instance(project_name)
+        
+        if not agraph.has_knowledge_graph:
+            return KnowledgeGraphStatusResponse(
+                status=ResponseStatus.SUCCESS,
+                message="No knowledge graph found to delete",
+                data={
+                    "exists": False,
+                    "graph_name": None,
+                    "graph_description": None,
+                    "statistics": {"entities": 0, "relations": 0, "clusters": 0, "text_chunks": 0},
+                    "deleted": False,
+                },
+            )
+
+        # Get current stats before deletion
+        kg = agraph.knowledge_graph
+        current_stats = {
+            "entities": len(kg.entities) if kg else 0,
+            "relations": len(kg.relations) if kg else 0,
+            "clusters": len(kg.clusters) if kg else 0,
+            "text_chunks": len(kg.text_chunks) if kg else 0,
+        }
+        graph_name = kg.name if kg else "Unknown"
+        
+        # Clear all knowledge graph data
+        success = await agraph.clear_all()
+        
+        if success:
+            logger.info(f"Knowledge graph '{graph_name}' deleted successfully")
+            return KnowledgeGraphStatusResponse(
+                status=ResponseStatus.SUCCESS,
+                message=f"Knowledge graph '{graph_name}' deleted successfully",
+                data={
+                    "exists": False,
+                    "graph_name": None,
+                    "graph_description": None,
+                    "statistics": {"entities": 0, "relations": 0, "clusters": 0, "text_chunks": 0},
+                    "deleted": True,
+                    "deleted_stats": current_stats,
+                },
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete knowledge graph")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete knowledge graph: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
